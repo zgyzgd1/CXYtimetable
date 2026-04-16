@@ -1,24 +1,42 @@
 package com.example.timetable.ui
 
-import androidx.compose.foundation.border
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.timetable.data.*
+import com.example.timetable.data.TimetableEntry
+import com.example.timetable.data.parseEntryDate
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.format.TextStyle
+import java.util.Locale
 
 /**
- * 星期选择标签页组件
- * 显示一周七天的选择按钮
+ * 轻量级水平周日历选择器
+ * 使用 LazyRow 替代全月网格，大幅降低渲染开销
  *
- * @param selectedDay 当前选中的星期
- * @param onDaySelected 选择星期时的回调
+ * @param selectedDate 当前选中的日期（yyyy-MM-dd）
+ * @param entries 所有课程，用于渲染小圆点提示
+ * @param onDateChanged 日期切换回调
  */
 @Composable
 fun PerpetualCalendar(
@@ -26,122 +44,160 @@ fun PerpetualCalendar(
     entries: List<TimetableEntry>,
     onDateChanged: (String) -> Unit,
 ) {
-    val min = LocalDate.of(1970, 1, 1)
-    val max = LocalDate.of(2100, 12, 31)
-    val selected = parseEntryDate(selectedDate) ?: min
-    var visibleMonthText by rememberSaveable(selected.withDayOfMonth(1).toString()) {
-        mutableStateOf(selected.withDayOfMonth(1).toString())
+    val today = LocalDate.now()
+    val selected = parseEntryDate(selectedDate) ?: today
+
+    // 以选中日期所在月份为基准显示月份文字
+    var visibleMonth by remember { mutableStateOf(YearMonth.from(selected)) }
+
+    // 跨月切换时自动同步（不覆盖用户手动翻页）
+    LaunchedEffect(selected) {
+        val selectedMonth = YearMonth.from(selected)
+        if (selectedMonth != visibleMonth) {
+            visibleMonth = selectedMonth
+        }
     }
 
-    val visibleMonth = parseEntryDate(visibleMonthText)?.let { YearMonth.from(it) } ?: YearMonth.from(selected)
-    val monthStart = visibleMonth.atDay(1)
-    val monthStartOffset = monthStart.dayOfWeek.value - 1
-    val daysInMonth = visibleMonth.lengthOfMonth()
-    val totalCells = monthStartOffset + daysInMonth
-    val totalRows = (totalCells + 6) / 7
+    // 预生成当前月所有日期
+    val daysInMonth = remember(visibleMonth) {
+        val start = visibleMonth.atDay(1)
+        val len = visibleMonth.lengthOfMonth()
+        (0 until len).map { start.plusDays(it.toLong()) }
+    }
+
     val entriesByDate = remember(entries) { entries.groupingBy { it.date }.eachCount() }
-    val weekdayLabels = listOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
+
+    val listState = rememberLazyListState()
+
+    // 当选中日期改变时自动滚动到对应位置
+    LaunchedEffect(selected, daysInMonth) {
+        val idx = daysInMonth.indexOfFirst { it == selected }
+        if (idx >= 0) {
+            listState.animateScrollToItem(idx, scrollOffset = -20)
+        }
+    }
 
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            // 月份切换行
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                val prevMonth = visibleMonth.minusMonths(1)
-                val nextMonth = visibleMonth.plusMonths(1)
-                OutlinedButton(
-                    onClick = { visibleMonthText = prevMonth.atDay(1).toString() },
-                    enabled = prevMonth.atDay(1) >= min.withDayOfMonth(1),
-                ) { Text("上月") }
+                IconButton(
+                    onClick = { visibleMonth = visibleMonth.minusMonths(1) },
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        Icons.Default.ChevronLeft,
+                        contentDescription = "上月",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Text(
-                    "${visibleMonth.year}年${visibleMonth.monthValue}月",
-                    style = MaterialTheme.typography.titleMedium,
+                    text = "${visibleMonth.year}年${visibleMonth.monthValue}月",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
-                OutlinedButton(
-                    onClick = { visibleMonthText = nextMonth.atDay(1).toString() },
-                    enabled = nextMonth.atDay(1) <= max.withDayOfMonth(1),
-                ) { Text("下月") }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                listOf("一", "二", "三", "四", "五", "六", "日").forEach { label ->
-                    Text(
-                        text = label,
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                IconButton(
+                    onClick = { visibleMonth = visibleMonth.plusMonths(1) },
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        Icons.Default.ChevronRight,
+                        contentDescription = "下月",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
 
-            for (row in 0 until totalRows) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    for (column in 0 until 7) {
-                        val dayNumber = row * 7 + column - monthStartOffset + 1
-                        if (dayNumber in 1..daysInMonth) {
-                            val date = visibleMonth.atDay(dayNumber)
-                            val entryCount = entriesByDate[date.toString()] ?: 0
-                            Surface(
-                                onClick = { onDateChanged(date.toString()) },
-                                enabled = date in min..max,
-                                shape = RoundedCornerShape(16.dp),
-                                tonalElevation = if (date == selected) 3.dp else 0.dp,
-                                color = if (date == selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .aspectRatio(1f)
-                                    .border(
-                                        width = if (date == selected) 2.dp else 1.dp,
-                                        color = if (date == selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                                        shape = RoundedCornerShape(16.dp),
-                                    ),
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(8.dp),
-                                    verticalArrangement = Arrangement.SpaceBetween,
-                                ) {
-                                    Text(
-                                        text = dayNumber.toString(),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = if (date == selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-                                    )
-                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                        Text(
-                                                text = weekdayLabels[date.dayOfWeek.value - 1],
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = if (date == selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                        if (entryCount > 0) {
-                                            Text(
-                                                text = "$entryCount 门课",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = if (date == selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary,
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            Spacer(modifier = Modifier.weight(1f).aspectRatio(1f))
-                        }
+            // 水平滚动日期行
+            LazyRow(
+                state = listState,
+                contentPadding = PaddingValues(horizontal = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(daysInMonth.size, key = { daysInMonth[it].toEpochDay() }) { idx ->
+                    val date = daysInMonth[idx]
+                    val isSelected = date == selected
+                    val isToday = date == today
+                    val hasCourse = (entriesByDate[date.toString()] ?: 0) > 0
+
+                    val bgColor by animateColorAsState(
+                        targetValue = when {
+                            isSelected -> MaterialTheme.colorScheme.primary
+                            isToday -> MaterialTheme.colorScheme.primaryContainer
+                            else -> Color.Transparent
+                        },
+                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                        label = "dateBg",
+                    )
+                    val textColor by animateColorAsState(
+                        targetValue = when {
+                            isSelected -> MaterialTheme.colorScheme.onPrimary
+                            isToday -> MaterialTheme.colorScheme.onPrimaryContainer
+                            else -> MaterialTheme.colorScheme.onSurface
+                        },
+                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                        label = "dateText",
+                    )
+                    val subTextColor by animateColorAsState(
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                        label = "subText",
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .width(46.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(bgColor)
+                            .clickable { onDateChanged(date.toString()) }
+                            .padding(vertical = 10.dp, horizontal = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        // 星期缩写
+                        Text(
+                            text = date.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.CHINESE),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = subTextColor,
+                            textAlign = TextAlign.Center,
+                        )
+                        // 日期数字
+                        Text(
+                            text = date.dayOfMonth.toString(),
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal,
+                            ),
+                            color = textColor,
+                            textAlign = TextAlign.Center,
+                        )
+                        // 有课指示小点
+                        Box(
+                            modifier = Modifier
+                                .size(5.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (hasCourse) {
+                                        if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                        else MaterialTheme.colorScheme.primary
+                                    } else Color.Transparent
+                                ),
+                        )
                     }
                 }
             }
