@@ -45,22 +45,29 @@ object CourseReminderScheduler {
 
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val oldCodes = prefs.getStringSet(KEY_CODES, emptySet()).orEmpty()
-
-        oldCodes.mapNotNull { it.toIntOrNull() }.forEach { code ->
-            cancelAlarm(context, alarmManager, code)
-        }
+        val oldCodes = prefs.getStringSet(KEY_CODES, emptySet()).orEmpty().mapNotNull { it.toIntOrNull() }.toSet()
 
         val now = System.currentTimeMillis()
-        val newCodes = mutableSetOf<String>()
-        val usedCodes = mutableSetOf<Int>()
+        val newSchedules = mutableMapOf<Int, Pair<Long, TimetableEntry>>()
 
         entries.forEach { entry ->
             val triggerAtMillis = computeTriggerAtMillis(entry, reminderMinutes) ?: return@forEach
             if (triggerAtMillis <= now) return@forEach
 
-            val requestCode = requestCodeFor(entry, usedCodes)
-            usedCodes += requestCode
+            val requestCode = requestCodeFor(entry, reminderMinutes)
+            newSchedules[requestCode] = triggerAtMillis to entry
+        }
+
+        val newCodes = newSchedules.keys
+        val codesToCancel = oldCodes - newCodes
+        val codesToSchedule = newCodes - oldCodes
+
+        codesToCancel.forEach { code ->
+            cancelAlarm(context, alarmManager, code)
+        }
+
+        codesToSchedule.forEach { requestCode ->
+            val (triggerAtMillis, entry) = newSchedules[requestCode]!!
             val pendingIntent = createPendingIntent(
                 context = context,
                 entry = entry,
@@ -69,10 +76,9 @@ object CourseReminderScheduler {
             ) ?: return@forEach
 
             scheduleAlarm(alarmManager, triggerAtMillis, pendingIntent)
-            newCodes += requestCode.toString()
         }
 
-        prefs.edit().putStringSet(KEY_CODES, newCodes).apply()
+        prefs.edit().putStringSet(KEY_CODES, newCodes.map { it.toString() }.toSet()).apply()
     }
 
     fun getReminderMinutes(context: Context): Int {
@@ -152,12 +158,8 @@ object CourseReminderScheduler {
         }.getOrNull()
     }
 
-    private fun requestCodeFor(entry: TimetableEntry, usedCodes: Set<Int>): Int {
-        var candidate = "${entry.id}|${entry.date}|${entry.startMinutes}".hashCode()
-        while (candidate in usedCodes) {
-            candidate = candidate * 31 + 17
-        }
-        return candidate
+    private fun requestCodeFor(entry: TimetableEntry, reminderMinutes: Int): Int {
+        return "${entry.id}|${entry.date}|${entry.startMinutes}|$reminderMinutes".hashCode()
     }
 
     private fun cancelAlarm(context: Context, alarmManager: AlarmManager, requestCode: Int) {
@@ -202,13 +204,19 @@ object CourseReminderScheduler {
     }
 
     private fun scheduleAlarm(alarmManager: AlarmManager, triggerAtMillis: Long, pendingIntent: PendingIntent) {
-        try {
+        val hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            alarmManager.canScheduleExactAlarms()
+        } else {
+            true
+        }
+
+        if (hasPermission) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
             } else {
                 alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
             }
-        } catch (_: SecurityException) {
+        } else {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
             } else {
