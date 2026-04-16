@@ -37,7 +37,7 @@ object CourseReminderScheduler {
     private const val DEFAULT_REMINDER_MINUTES = 20
     private val reminderOptions = listOf(5, 10, 20, 30)
 
-    private val beijingZone: ZoneId = ZoneId.of("Asia/Shanghai")
+    private val systemZone: ZoneId = ZoneId.systemDefault()
 
     fun sync(context: Context, entries: List<TimetableEntry>) {
         ensureNotificationChannel(context)
@@ -151,7 +151,7 @@ object CourseReminderScheduler {
             val date = LocalDate.parse(entry.date)
             val start = LocalTime.of(entry.startMinutes / 60, entry.startMinutes % 60)
             date.atTime(start)
-                .atZone(beijingZone)
+                .atZone(systemZone)
                 .minusMinutes(reminderMinutes.toLong())
                 .toInstant()
                 .toEpochMilli()

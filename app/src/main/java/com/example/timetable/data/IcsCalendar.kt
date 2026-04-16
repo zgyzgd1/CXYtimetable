@@ -23,7 +23,7 @@ object IcsCalendar {
     // 用于分割行的正则表达式，支持不同平台的换行符
     private val lineSplit = Regex("\\r?\\n")
     private val multiValueKeys = setOf("EXDATE")
-    private val beijingZone: ZoneId = ZoneId.of("Asia/Shanghai")
+    private val systemZone: ZoneId = ZoneId.systemDefault()
 
     /**
      * 将课程列表写入 ICS 格式的字符串
@@ -40,7 +40,7 @@ object IcsCalendar {
         builder.appendLine("VERSION:2.0")
         builder.appendLine("PRODID:-//TimetableMinimal//CN")
         builder.appendLine("CALSCALE:GREGORIAN")
-        builder.appendLine("X-WR-TIMEZONE:Asia/Shanghai")
+        builder.appendLine("X-WR-TIMEZONE:${systemZone.id}")
         builder.appendLine("X-WR-CALNAME:${escapeText(calendarName)}")
         val dtStamp = utcFormatter.format(OffsetDateTime.now(ZoneOffset.UTC))
 
@@ -64,8 +64,8 @@ object IcsCalendar {
                 if (entry.note.isNotBlank()) {
                     builder.appendLine("DESCRIPTION:${escapeText(entry.note)}")
                 }
-                builder.appendLine("DTSTART;TZID=Asia/Shanghai:${formatter.format(start)}")
-                builder.appendLine("DTEND;TZID=Asia/Shanghai:${formatter.format(end)}")
+                builder.appendLine("DTSTART;TZID=${systemZone.id}:${formatter.format(start)}")
+                builder.appendLine("DTEND;TZID=${systemZone.id}:${formatter.format(end)}")
                 builder.appendLine("END:VEVENT")
             }
 
@@ -400,19 +400,19 @@ object IcsCalendar {
         if (value.isBlank()) return null
         val raw = value.trim()
         val cleaned = raw.removeSuffix("Z")  // 移除 UTC 标识
-        val sourceZone = resolveZone(tzid) ?: beijingZone
+        val sourceZone = resolveZone(tzid) ?: systemZone
 
         // 处理 RFC5545 UTC 时间（例如 20260413T080000Z）
         if (raw.endsWith("Z") && cleaned.length == 15) {
             return runCatching {
                 OffsetDateTime.parse(raw, DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmssX"))
-                    .atZoneSameInstant(beijingZone)
+                    .atZoneSameInstant(systemZone)
                     .toLocalDateTime()
             }.getOrElse {
                 runCatching {
                     LocalDateTime.parse(cleaned, formatter)
                         .atZone(sourceZone)
-                        .withZoneSameInstant(beijingZone)
+                        .withZoneSameInstant(systemZone)
                         .toLocalDateTime()
                 }.getOrNull()
             }
@@ -422,14 +422,14 @@ object IcsCalendar {
         if (Regex("\\d{8}T\\d{6}[+-]\\d{4}").matches(raw)) {
             return runCatching {
                 OffsetDateTime.parse(raw, DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmssXX"))
-                    .atZoneSameInstant(beijingZone)
+                    .atZoneSameInstant(systemZone)
                     .toLocalDateTime()
             }.getOrNull()
         }
         if (Regex("\\d{8}T\\d{6}[+-]\\d{2}:\\d{2}").matches(raw)) {
             return runCatching {
                 OffsetDateTime.parse(raw, DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmssXXX"))
-                    .atZoneSameInstant(beijingZone)
+                    .atZoneSameInstant(systemZone)
                     .toLocalDateTime()
             }.getOrNull()
         }
@@ -441,19 +441,19 @@ object IcsCalendar {
             15 -> runCatching {
                 LocalDateTime.parse(cleaned, formatter)
                     .atZone(sourceZone)
-                    .withZoneSameInstant(beijingZone)
+                    .withZoneSameInstant(systemZone)
                     .toLocalDateTime()
             }.getOrNull()
             // 其他格式尝试使用 ISO 格式解析
             else -> runCatching {
                 OffsetDateTime.parse(cleaned, DateTimeFormatter.ISO_DATE_TIME)
-                    .atZoneSameInstant(beijingZone)
+                    .atZoneSameInstant(systemZone)
                     .toLocalDateTime()
             }.getOrElse {
                 runCatching {
                     LocalDateTime.parse(cleaned, DateTimeFormatter.ISO_DATE_TIME)
                         .atZone(sourceZone)
-                        .withZoneSameInstant(beijingZone)
+                        .withZoneSameInstant(systemZone)
                         .toLocalDateTime()
                 }.getOrNull()
             }
