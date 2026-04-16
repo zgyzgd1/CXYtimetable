@@ -1,0 +1,32 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "envDoctor",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				".\\scripts\\env-doctor.ps1"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "assembleDebug",
+			"type": "shell",
+			"command": ".\\gradlew.bat",
+			"args": [
+				"assembleDebug"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "build"
+		}
+	]
+}
