@@ -13,6 +13,8 @@ import com.example.timetable.data.sampleEntries
 import com.example.timetable.notify.CourseReminderScheduler
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -29,6 +31,7 @@ import org.json.JSONObject
  */
 class ScheduleViewModel(application: Application) : AndroidViewModel(application) {
     private val storageFile = File(application.filesDir, STORAGE_FILE_NAME)
+    private val storageMutex = Mutex()
     private val entryComparator = compareBy<TimetableEntry> { it.date }.thenBy { it.startMinutes }
     private val initialLoadState = loadEntries()
 
@@ -360,8 +363,10 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
     private fun sortEntries(entries: List<TimetableEntry>): List<TimetableEntry> =
         entries.sortedWith(entryComparator)
 
-    private fun writeEntries(entries: List<TimetableEntry>): Result<Unit> = runCatching {
-        storageFile.writeText(TimetableShareCodec.encode(entries))
+    private suspend fun writeEntries(entries: List<TimetableEntry>): Result<Unit> = runCatching {
+        storageMutex.withLock {
+            storageFile.writeText(TimetableShareCodec.encode(entries))
+        }
     }
 
     private fun syncReminders(entries: List<TimetableEntry>) {
