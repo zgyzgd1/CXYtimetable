@@ -141,7 +141,8 @@ fun formatDateLabel(date: String): String {
 
 fun defaultDateForWeekday(dayOfWeek: Int): String {
     val safeDay = dayOfWeek.coerceIn(1, 7)
-    return LocalDate.of(2026, 1, 5).plusDays((safeDay - 1).toLong()).toString()
+    val monday = LocalDate.now().with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+    return monday.plusDays((safeDay - 1).toLong()).toString()
 }
 
 /**

@@ -1,13 +1,18 @@
 package com.example.timetable.notify
 
+import com.example.timetable.data.TimetableShareCodec
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * 测试课程数据解码逻辑
+ * decode 逻辑已迁移至 TimetableRepository（内部使用 TimetableShareCodec），
+ * 此处直接测试 TimetableShareCodec.decode 的正确性。
+ */
 class CourseReminderSchedulerTest {
     @Test
-    fun decodeEntriesForResyncReturnsEntriesWhenPayloadValid() {
+    fun decodeReturnsEntriesWhenPayloadValid() {
         val payload = """
             {
               "version": 1,
@@ -26,31 +31,32 @@ class CourseReminderSchedulerTest {
             }
         """.trimIndent()
 
-        val entries = CourseReminderScheduler.decodeEntriesForResync(payload)
+        val entries = TimetableShareCodec.decode(payload)
 
-        assertNotNull(entries)
-        assertEquals(1, entries?.size)
+        assertEquals(1, entries.size)
+        assertEquals("数据结构", entries[0].title)
+        assertEquals("A-101", entries[0].location)
     }
 
     @Test
-    fun decodeEntriesForResyncReturnsNullWhenPayloadMalformed() {
-        val entries = CourseReminderScheduler.decodeEntriesForResync("not-json")
+    fun decodeReturnsEmptyWhenPayloadMalformed() {
+        val entries = TimetableShareCodec.decode("not-json")
 
-        assertNull(entries)
+        assertTrue(entries.isEmpty())
     }
 
     @Test
-    fun decodeEntriesForResyncReturnsNullWhenEntriesNodeInvalid() {
+    fun decodeReturnsEmptyWhenVersionMismatch() {
         val payload = """
             {
-              "version": 1,
+              "version": 999,
               "entries": [
                 {
                   "id": "entry-1",
                   "title": "损坏数据",
                   "date": "2026-04-16",
                   "dayOfWeek": 4,
-                  "startMinutes": -1,
+                  "startMinutes": 480,
                   "endMinutes": 540,
                   "location": "A-101",
                   "note": ""
@@ -59,8 +65,8 @@ class CourseReminderSchedulerTest {
             }
         """.trimIndent()
 
-        val entries = CourseReminderScheduler.decodeEntriesForResync(payload)
+        val entries = TimetableShareCodec.decode(payload)
 
-        assertNull(entries)
+        assertTrue(entries.isEmpty())
     }
 }

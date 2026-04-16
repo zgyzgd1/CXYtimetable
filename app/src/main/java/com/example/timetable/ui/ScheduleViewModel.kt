@@ -7,14 +7,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.timetable.data.IcsCalendar
 import com.example.timetable.data.TimetableEntry
-import com.example.timetable.data.TimetableShareCodec
 import com.example.timetable.data.formatMinutes
-import com.example.timetable.data.sampleEntries
 import com.example.timetable.notify.CourseReminderScheduler
-import java.io.File
+import com.example.timetable.data.TimetableRepository
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -22,7 +18,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 
 /**
  * 课程表视图模型
@@ -30,13 +25,10 @@ import org.json.JSONObject
  * 使用 Kotlin Flow 实现响应式数据流
  */
 class ScheduleViewModel(application: Application) : AndroidViewModel(application) {
-    private val storageFile = File(application.filesDir, STORAGE_FILE_NAME)
-    private val storageMutex = Mutex()
     private val entryComparator = compareBy<TimetableEntry> { it.date }.thenBy { it.startMinutes }
-    private val initialLoadState = loadEntries()
 
     // 存储课程列表的可变状态流
-    private val _entries = MutableStateFlow(initialLoadState.entries)
+    private val _entries = MutableStateFlow<List<TimetableEntry>>(emptyList())
     // 对外暴露的只读课程列表流
     val entries = _entries.asStateFlow()
 
@@ -46,18 +38,21 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
     val messages = _messages.asSharedFlow()
 
     init {
-        if (initialLoadState.shouldPersist) {
-            persistEntries(_entries.value)
+        viewModelScope.launch {
+            val loadState = TimetableRepository.loadEntries(getApplication())
+            val sorted = sortEntries(loadState.entries)
+            _entries.value = sorted
+
+            if (loadState.shouldPersist) {
+                TimetableRepository.saveEntries(getApplication(), sorted)
+            }
+            syncReminders(sorted)
+            loadState.warningMessage?.let { postMessage(it) }
         }
-        syncReminders(_entries.value)
-        initialLoadState.warningMessage?.let(::postMessage)
     }
 
     /**
      * 添加或更新课程条目
-     * 如果条目 ID 已存在则更新，否则新增
-     *
-     * @param entry 要保存的课程条目
      */
     fun upsertEntry(entry: TimetableEntry) {
         val normalized = normalizeEntry(entry)
@@ -71,13 +66,10 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
             val mutable = current.toMutableList()
             val index = mutable.indexOfFirst { it.id == normalized.id }
             if (index >= 0) {
-                // 更新已有条目
                 mutable[index] = normalized
             } else {
-                // 添加新条目
                 mutable += normalized
             }
-            // 按星期和时间排序
             sortEntries(mutable)
         }
         persistEntries(updated)
@@ -93,8 +85,6 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
 
     /**
      * 删除指定 ID 的课程条目
-     *
-     * @param entryId 要删除的课程条目 ID
      */
     fun deleteEntry(entryId: String) {
         val updated = _entries.updateAndGet { current -> current.filterNot { it.id == entryId } }
@@ -105,19 +95,11 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
 
     /**
      * 导出课程表为 ICS 格式
-     *
-     * @return ICS 格式的字符串
      */
     fun exportIcs(): String = IcsCalendar.write(_entries.value)
 
-
-
     /**
      * 从 ICS 文件导入课程数据
-     * 在协程中异步读取文件内容并解析
-     *
-     * @param contentResolver 内容解析器，用于读取文件
-     * @param uri 文件的 URI 地址
      */
     fun importFromIcs(contentResolver: ContentResolver, uri: Uri) {
         viewModelScope.launch {
@@ -139,21 +121,12 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-
-
     fun updateReminderMinutes(minutes: Int) {
         CourseReminderScheduler.setReminderMinutes(getApplication(), minutes)
         syncReminders(_entries.value)
         postMessage("已设置为提前 $minutes 分钟提醒")
     }
 
-    /**
-     * 异步读取 URI 对应的文本内容
-     *
-     * @param contentResolver 内容解析器
-     * @param uri 文件的 URI 地址
-     * @return 读取的文本内容，失败返回空字符串
-     */
     private suspend fun readText(contentResolver: ContentResolver, uri: Uri): String {
         return withContext(Dispatchers.IO) {
             runCatching {
@@ -166,91 +139,16 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    private fun loadEntries(): EntryLoadState {
-        if (!storageFile.exists()) {
-            return EntryLoadState(
-                entries = sortEntries(sampleEntries()),
-                shouldPersist = true,
-            )
-        }
-
-        val payload = runCatching { storageFile.readText() }.getOrElse {
-            val backup = backupCorruptedStorage()
-            return EntryLoadState(
-                entries = emptyList(),
-                shouldPersist = false,
-                warningMessage = buildCorruptedStorageMessage(backup),
-            )
-        }
-
-        val structure = validateStoredPayload(payload)
-        if (!structure.valid) {
-            val backup = backupCorruptedStorage()
-            return EntryLoadState(
-                entries = emptyList(),
-                shouldPersist = false,
-                warningMessage = buildCorruptedStorageMessage(backup),
-            )
-        }
-
-        val persisted = TimetableShareCodec.decode(payload)
-        if (structure.entryCount > 0 && persisted.isEmpty()) {
-            val backup = backupCorruptedStorage()
-            return EntryLoadState(
-                entries = emptyList(),
-                shouldPersist = false,
-                warningMessage = buildCorruptedStorageMessage(backup),
-            )
-        }
-
-        return EntryLoadState(
-            entries = sortEntries(persisted),
-            shouldPersist = false,
-        )
-    }
-
-    private fun validateStoredPayload(payload: String): PayloadValidation {
-        if (payload.isBlank()) {
-            return PayloadValidation(valid = false, entryCount = 0)
-        }
-
-        val root = runCatching { JSONObject(payload) }.getOrNull()
-            ?: return PayloadValidation(valid = false, entryCount = 0)
-        if (root.optInt("version", -1) != SHARE_PAYLOAD_VERSION) {
-            return PayloadValidation(valid = false, entryCount = 0)
-        }
-
-        val entries = root.optJSONArray("entries")
-            ?: return PayloadValidation(valid = false, entryCount = 0)
-        return PayloadValidation(valid = true, entryCount = entries.length())
-    }
-
-    private fun backupCorruptedStorage(): File? {
-        if (!storageFile.exists()) return null
-        return runCatching {
-            val backup = File(storageFile.parentFile, "timetable_entries.corrupt.${System.currentTimeMillis()}.json")
-            storageFile.copyTo(backup, overwrite = true)
-            backup
-        }.getOrNull()
-    }
-
-    private fun buildCorruptedStorageMessage(backupFile: File?): String {
-        val backupName = backupFile?.name ?: "timetable_entries.corrupt.json"
-        return "检测到本地课程数据异常，已保留备份：$backupName"
-    }
-
     private fun persistEntries(entries: List<TimetableEntry>) {
-        viewModelScope.launch(Dispatchers.IO) {
-            writeEntries(entries).onFailure {
+        viewModelScope.launch {
+            TimetableRepository.saveEntries(getApplication(), entries).onFailure {
                 postMessage("保存失败：${it.message ?: "未知错误"}")
             }
         }
     }
 
     private suspend fun persistEntriesNow(entries: List<TimetableEntry>): Boolean {
-        return withContext(Dispatchers.IO) {
-            writeEntries(entries).isSuccess
-        }
+        return TimetableRepository.saveEntries(getApplication(), entries).isSuccess
     }
 
     private suspend fun applyImportedEntries(imported: List<TimetableEntry>) {
@@ -264,7 +162,6 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
                     invalidCount++
                     return@forEach
                 }
-
                 validEntries += entry
             }
 
@@ -339,43 +236,19 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
     private fun sortEntries(entries: List<TimetableEntry>): List<TimetableEntry> =
         entries.sortedWith(entryComparator)
 
-    private suspend fun writeEntries(entries: List<TimetableEntry>): Result<Unit> = runCatching {
-        storageMutex.withLock {
-            storageFile.writeText(TimetableShareCodec.encode(entries))
-        }
-    }
-
     private fun syncReminders(entries: List<TimetableEntry>) {
         viewModelScope.launch(Dispatchers.Default) {
             CourseReminderScheduler.sync(getApplication(), entries)
         }
     }
 
-    /**
-     * 发送用户提示消息
-     *
-     * @param message 要显示的消息文本
-     */
     private fun postMessage(message: String) {
         viewModelScope.launch {
             _messages.emit(message)
         }
     }
 
-    private data class EntryLoadState(
-        val entries: List<TimetableEntry>,
-        val shouldPersist: Boolean,
-        val warningMessage: String? = null,
-    )
-
-    private data class PayloadValidation(
-        val valid: Boolean,
-        val entryCount: Int,
-    )
-
     private companion object {
-        const val STORAGE_FILE_NAME = "timetable_entries.json"
         const val MAX_SHARE_PAYLOAD_LENGTH = 300_000
-        const val SHARE_PAYLOAD_VERSION = 1
     }
 }

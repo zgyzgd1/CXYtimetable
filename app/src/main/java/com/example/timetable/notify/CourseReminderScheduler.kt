@@ -11,12 +11,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
 import com.example.timetable.data.TimetableEntry
-import com.example.timetable.data.TimetableShareCodec
-import java.io.File
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
-import org.json.JSONObject
 
 object CourseReminderScheduler {
     const val CHANNEL_ID = "course_reminder_channel"
@@ -32,8 +29,6 @@ object CourseReminderScheduler {
     private const val PREFS_NAME = "course_reminder_prefs"
     private const val KEY_CODES = "scheduled_codes"
     private const val KEY_REMINDER_MINUTES = "reminder_minutes"
-    private const val STORAGE_FILE_NAME = "timetable_entries.json"
-    private const val SHARE_PAYLOAD_VERSION = 1
     private const val DEFAULT_REMINDER_MINUTES = 20
     private val reminderOptions = listOf(5, 10, 20, 30)
 
@@ -50,12 +45,27 @@ object CourseReminderScheduler {
         val now = System.currentTimeMillis()
         val newSchedules = mutableMapOf<Int, Pair<Long, TimetableEntry>>()
 
+        // 仅寻找距离现在最近的"下一个"（或者同时间的几个）课程，实现接力式定闹钟
+        var nextTriggerAtMillis: Long? = null
+        val nextEntries = mutableListOf<TimetableEntry>()
+
         entries.forEach { entry ->
             val triggerAtMillis = computeTriggerAtMillis(entry, reminderMinutes) ?: return@forEach
+            // 只看未来的课程，过去的不定闹钟
             if (triggerAtMillis <= now) return@forEach
 
+            if (nextTriggerAtMillis == null || triggerAtMillis < nextTriggerAtMillis!!) {
+                nextTriggerAtMillis = triggerAtMillis
+                nextEntries.clear()
+                nextEntries.add(entry)
+            } else if (triggerAtMillis == nextTriggerAtMillis) {
+                nextEntries.add(entry)
+            }
+        }
+
+        nextEntries.forEach { entry ->
             val requestCode = requestCodeFor(entry, reminderMinutes)
-            newSchedules[requestCode] = triggerAtMillis to entry
+            newSchedules[requestCode] = nextTriggerAtMillis!! to entry
         }
 
         val newCodes = newSchedules.keys
@@ -96,31 +106,11 @@ object CourseReminderScheduler {
     fun reminderMinuteOptions(): List<Int> = reminderOptions
 
     fun resyncFromStorage(context: Context) {
-        val file = File(context.filesDir, STORAGE_FILE_NAME)
-        if (!file.exists()) {
-            sync(context, emptyList())
-            return
+        // 使用 Repository 的 Mutex 读取，彻底解决并发读写碰撞的问题
+        kotlinx.coroutines.runBlocking {
+            val loadState = com.example.timetable.data.TimetableRepository.loadEntries(context)
+            sync(context, loadState.entries)
         }
-
-        val payload = runCatching { file.readText() }.getOrNull() ?: return
-        val entries = decodeEntriesForResync(payload) ?: return
-
-        sync(context, entries)
-    }
-
-    internal fun decodeEntriesForResync(payload: String): List<TimetableEntry>? {
-        if (payload.isBlank()) return null
-
-        val root = runCatching { JSONObject(payload) }.getOrNull() ?: return null
-        if (root.optInt("version", -1) != SHARE_PAYLOAD_VERSION) return null
-
-        val entriesNode = root.optJSONArray("entries") ?: return null
-        val decoded = TimetableShareCodec.decode(payload)
-        if (entriesNode.length() > 0 && decoded.isEmpty()) {
-            return null
-        }
-
-        return decoded
     }
 
     fun notificationsEnabled(context: Context): Boolean {

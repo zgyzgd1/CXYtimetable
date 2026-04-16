@@ -52,5 +52,8 @@ class CourseReminderReceiver : BroadcastReceiver() {
         runCatching {
             NotificationManagerCompat.from(context).notify(requestCode, notification)
         }
+
+        // 接力机制：当前提醒发送后，立即安排下一次最近的提醒
+        CourseReminderScheduler.resyncFromStorage(context)
     }
 }
