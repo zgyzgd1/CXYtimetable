@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
@@ -50,6 +51,9 @@ import androidx.compose.ui.unit.sp
  * @param onImport 导入回调
  * @param onExport 导出回调
  * @param onEnableNotifications 通知权限回调
+ * @param hasCustomBackground 是否已设置自定义背景图
+ * @param onImportBackground 导入背景图回调
+ * @param onClearBackground 清除背景图回调
  * @param reminderMinutes 当前提醒分钟数
  * @param reminderOptions 可选提醒分钟列表
  * @param onReminderMinutesChange 提醒分钟改变回调
@@ -60,11 +64,15 @@ fun HeroSection(
     onImport: () -> Unit,
     onExport: () -> Unit,
     onEnableNotifications: () -> Unit,
+    hasCustomBackground: Boolean,
+    onImportBackground: () -> Unit,
+    onClearBackground: () -> Unit,
     reminderMinutes: Int,
     reminderOptions: List<Int>,
     onReminderMinutesChange: (Int) -> Unit,
 ) {
     var showReminderSheet by remember { mutableStateOf(false) }
+    var showBackgroundDialog by remember { mutableStateOf(false) }
 
     // 主 Hero 卡片——渐变背景
     Box(
@@ -96,7 +104,7 @@ fun HeroSection(
                 )
             }
 
-            // 三个操作按钮横向排布
+            // 四个操作按钮横向排布
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -119,6 +127,12 @@ fun HeroSection(
                     onClick = { showReminderSheet = true },
                     modifier = Modifier.weight(1f),
                 )
+                HeroActionChip(
+                    icon = Icons.Default.Image,
+                    label = if (hasCustomBackground) "换背景" else "背景图",
+                    onClick = { showBackgroundDialog = true },
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
     }
@@ -136,6 +150,21 @@ fun HeroSection(
             onEnableNotifications = {
                 onEnableNotifications()
                 showReminderSheet = false
+            },
+        )
+    }
+
+    if (showBackgroundDialog) {
+        BackgroundImageDialog(
+            hasCustomBackground = hasCustomBackground,
+            onDismiss = { showBackgroundDialog = false },
+            onImportBackground = {
+                onImportBackground()
+                showBackgroundDialog = false
+            },
+            onClearBackground = {
+                onClearBackground()
+                showBackgroundDialog = false
             },
         )
     }
@@ -183,6 +212,45 @@ private fun HeroActionChip(
             )
         }
     }
+}
+
+/**
+ * 背景图设置对话框
+ */
+@Composable
+private fun BackgroundImageDialog(
+    hasCustomBackground: Boolean,
+    onDismiss: () -> Unit,
+    onImportBackground: () -> Unit,
+    onClearBackground: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("自定义背景图", style = MaterialTheme.typography.titleMedium)
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "从图片文件中选择一张背景图，课程卡片和文字会自动加遮罩保持可读。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(onClick = onImportBackground) {
+                    Text(if (hasCustomBackground) "更换背景图" else "导入背景图")
+                }
+                if (hasCustomBackground) {
+                    OutlinedButton(onClick = onClearBackground) {
+                        Text("恢复默认背景")
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("关闭") }
+        },
+        shape = RoundedCornerShape(20.dp),
+    )
 }
 
 /**

@@ -1,6 +1,7 @@
 package com.example.timetable.ui
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -52,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.timetable.data.BackgroundImageStore
 import com.example.timetable.data.TimetableEntry
 import com.example.timetable.data.formatDateLabel
 import com.example.timetable.data.parseEntryDate
@@ -75,6 +77,7 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val listState = rememberLazyListState()
+    var backgroundImageUri by remember(context) { mutableStateOf(BackgroundImageStore.getBackgroundImageUri(context)) }
     // 当前选中的日期，支持较广时间范围
     val minDate = LocalDate.of(1970, 1, 1)
     val maxDate = LocalDate.of(2100, 12, 31)
@@ -133,174 +136,205 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
         }
     }
 
+    val backgroundImportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+                BackgroundImageStore.setBackgroundImageUri(context, uri)
+                backgroundImageUri = uri.toString()
+            }.onSuccess {
+                scope.launch {
+                    snackbarHostState.showSnackbar("已更新背景图")
+                }
+            }.onFailure {
+                scope.launch {
+                    snackbarHostState.showSnackbar("设置背景图失败：${it.message ?: "未知错误"}")
+                }
+            }
+        }
+    }
+
     // 根据选中的日期过滤课程列表
     val filteredEntries = remember(entries, selectedDate) {
         entries.filter { it.date == selectedDate }.sortedBy { it.startMinutes }
     }
 
-    // 构建应用的主框架
-    Scaffold(
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        topBar = {
-            LargeTopAppBar(
-                title = {
-                    Text(
-                        text = "我的课程表",
-                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
-                    titleContentColor = MaterialTheme.colorScheme.onBackground,
-                ),
-            )
-        },
-        floatingActionButton = {
-            // 浮动操作按钮：新增课程
-            FloatingActionButton(onClick = {
-                editingEntry = TimetableEntry(
-                    title = "",
-                    date = selectedDate,
-                    dayOfWeek = selectedLocalDate.dayOfWeek.value,
-                    startMinutes = 8 * 60,
-                    endMinutes = 9 * 60,
-                )
-            }) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "新增课程")
-            }
-        },
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.background,
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+    Box(modifier = Modifier.fillMaxSize()) {
+        ScheduleBackgroundLayer(backgroundImageUri = backgroundImageUri)
+
+        // 构建应用的主框架
+        Scaffold(
+            containerColor = Color.Transparent,
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+            topBar = {
+                LargeTopAppBar(
+                    title = {
+                        Text(
+                            text = "我的课程表",
+                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                         )
-                    )
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
+                        titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    ),
                 )
-                .pointerInput(selectedDate) {
-                    var totalHorizontalDrag = 0f
-                    detectHorizontalDragGestures(
-                        onHorizontalDrag = { _, dragAmount ->
-                            totalHorizontalDrag += dragAmount
-                        },
-                        onDragEnd = {
-                            when {
-                                // 右滑：查看昨天
-                                totalHorizontalDrag > 80f -> {
-                                    val previousDate = selectedLocalDate.minusDays(1)
-                                    if (previousDate >= minDate) {
-                                        selectedDate = previousDate.toString()
-                                    }
-                                }
-                                // 左滑：查看明天
-                                totalHorizontalDrag < -80f -> {
-                                    val nextDate = selectedLocalDate.plusDays(1)
-                                    if (nextDate <= maxDate) {
-                                        selectedDate = nextDate.toString()
-                                    }
-                                }
-                            }
-                            totalHorizontalDrag = 0f
-                        },
+            },
+            floatingActionButton = {
+                // 浮动操作按钮：新增课程
+                FloatingActionButton(onClick = {
+                    editingEntry = TimetableEntry(
+                        title = "",
+                        date = selectedDate,
+                        dayOfWeek = selectedLocalDate.dayOfWeek.value,
+                        startMinutes = 8 * 60,
+                        endMinutes = 9 * 60,
                     )
+                }) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = "新增课程")
                 }
-                .padding(padding),
-        ) {
-            // 可滚动的课程列表
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                state = listState,
+            },
+        ) { padding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(selectedDate) {
+                        var totalHorizontalDrag = 0f
+                        detectHorizontalDragGestures(
+                            onHorizontalDrag = { _, dragAmount ->
+                                totalHorizontalDrag += dragAmount
+                            },
+                            onDragEnd = {
+                                when {
+                                    // 右滑：查看昨天
+                                    totalHorizontalDrag > 80f -> {
+                                        val previousDate = selectedLocalDate.minusDays(1)
+                                        if (previousDate >= minDate) {
+                                            selectedDate = previousDate.toString()
+                                        }
+                                    }
+                                    // 左滑：查看明天
+                                    totalHorizontalDrag < -80f -> {
+                                        val nextDate = selectedLocalDate.plusDays(1)
+                                        if (nextDate <= maxDate) {
+                                            selectedDate = nextDate.toString()
+                                        }
+                                    }
+                                }
+                                totalHorizontalDrag = 0f
+                            },
+                        )
+                    }
+                    .padding(padding),
             ) {
-                // 顶部英雄区域：显示统计信息和操作按钮
-                item {
-                    HeroSection(
-                        courseCount = entries.size,
-                        onImport = {
-                            importLauncher.launch(
-                                arrayOf(
-                                    "text/calendar",
-                                    "text/plain",
-                                    "application/ics",
-                                    "application/x-ical",
-                                    "application/octet-stream",
-                                    "*/*",
-                                )
-                            )
-                        },
-                        onExport = { exportLauncher.launch("课程表导出.ics") },
-                        onEnableNotifications = {
-                            when {
-                                Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU -> {
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar("当前系统版本无需额外通知授权")
-                                    }
-                                }
-                                CourseReminderScheduler.notificationsEnabled(context) ||
-                                    ContextCompat.checkSelfPermission(
-                                        context,
-                                        Manifest.permission.POST_NOTIFICATIONS,
-                                    ) == PackageManager.PERMISSION_GRANTED -> {
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar("通知权限已开启")
-                                    }
-                                }
-                                else -> {
-                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                }
-                            }
-                        },
-                        reminderMinutes = reminderMinutes,
-                        reminderOptions = reminderOptions,
-                        onReminderMinutesChange = { minutes ->
-                            reminderMinutes = minutes
-                            viewModel.updateReminderMinutes(minutes)
-                        },
-                    )
-                }
-                // 日期切换
-                item {
-                    PerpetualCalendar(
-                        selectedDate = selectedDate,
-                        entries = entries,
-                        onDateChanged = { selectedDate = it },
-                    )
-                }
-                // 当前选中日期的标题
-                item {
-                    SectionHeader(title = formatDateLabel(selectedDate))
-                }
-                // 如果没有课程，显示空状态卡片
-                if (filteredEntries.isEmpty()) {
+                // 可滚动的课程列表
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    state = listState,
+                ) {
+                    // 顶部英雄区域：显示统计信息和操作按钮
                     item {
-                        EmptyStateCard(onAdd = {
-                            editingEntry = TimetableEntry(
-                                title = "",
-                                date = selectedDate,
-                                dayOfWeek = selectedLocalDate.dayOfWeek.value,
-                                startMinutes = 8 * 60,
-                                endMinutes = 9 * 60,
-                            )
-                        })
-                    }
-                } else {
-                    // 显示课程列表
-                    items(filteredEntries, key = { it.id }) { entry ->
-                        EntryCard(
-                            entry = entry,
-                            onEdit = { editingEntry = entry },
-                            onDelete = { viewModel.deleteEntry(entry.id) },
+                        HeroSection(
+                            courseCount = entries.size,
+                            onImport = {
+                                importLauncher.launch(
+                                    arrayOf(
+                                        "text/calendar",
+                                        "text/plain",
+                                        "application/ics",
+                                        "application/x-ical",
+                                        "application/octet-stream",
+                                        "*/*",
+                                    )
+                                )
+                            },
+                            onExport = { exportLauncher.launch("课程表导出.ics") },
+                            onEnableNotifications = {
+                                when {
+                                    Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU -> {
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar("当前系统版本无需额外通知授权")
+                                        }
+                                    }
+                                    CourseReminderScheduler.notificationsEnabled(context) ||
+                                        ContextCompat.checkSelfPermission(
+                                            context,
+                                            Manifest.permission.POST_NOTIFICATIONS,
+                                        ) == PackageManager.PERMISSION_GRANTED -> {
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar("通知权限已开启")
+                                        }
+                                    }
+                                    else -> {
+                                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    }
+                                }
+                            },
+                            hasCustomBackground = backgroundImageUri != null,
+                            onImportBackground = {
+                                backgroundImportLauncher.launch(arrayOf("image/*"))
+                            },
+                            onClearBackground = {
+                                BackgroundImageStore.clearBackgroundImage(context)
+                                backgroundImageUri = null
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("已恢复默认背景")
+                                }
+                            },
+                            reminderMinutes = reminderMinutes,
+                            reminderOptions = reminderOptions,
+                            onReminderMinutesChange = { minutes ->
+                                reminderMinutes = minutes
+                                viewModel.updateReminderMinutes(minutes)
+                            },
                         )
                     }
+                    // 日期切换
+                    item {
+                        PerpetualCalendar(
+                            selectedDate = selectedDate,
+                            entries = entries,
+                            onDateChanged = { selectedDate = it },
+                        )
+                    }
+                    // 当前选中日期的标题
+                    item {
+                        SectionHeader(title = formatDateLabel(selectedDate))
+                    }
+                    // 如果没有课程，显示空状态卡片
+                    if (filteredEntries.isEmpty()) {
+                        item {
+                            EmptyStateCard(onAdd = {
+                                editingEntry = TimetableEntry(
+                                    title = "",
+                                    date = selectedDate,
+                                    dayOfWeek = selectedLocalDate.dayOfWeek.value,
+                                    startMinutes = 8 * 60,
+                                    endMinutes = 9 * 60,
+                                )
+                            })
+                        }
+                    } else {
+                        // 显示课程列表
+                        items(filteredEntries, key = { it.id }) { entry ->
+                            EntryCard(
+                                entry = entry,
+                                onEdit = { editingEntry = entry },
+                                onDelete = { viewModel.deleteEntry(entry.id) },
+                            )
+                        }
+                    }
+                    // 底部留白
+                    item { Spacer(modifier = Modifier.height(56.dp)) }
                 }
-                // 底部留白
-                item { Spacer(modifier = Modifier.height(56.dp)) }
             }
         }
     }
