@@ -3,28 +3,27 @@ package com.example.timetable.ui
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,7 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -50,10 +48,6 @@ import java.time.YearMonth
 import java.time.format.TextStyle
 import java.util.Locale
 
-/**
- * 轻量级水平周日历选择器
- * 使用带玻璃质感的日期卡，让整体视觉更接近液态玻璃风格。
- */
 @Composable
 fun PerpetualCalendar(
     selectedDate: String,
@@ -74,8 +68,7 @@ fun PerpetualCalendar(
 
     val daysInMonth = remember(visibleMonth) {
         val start = visibleMonth.atDay(1)
-        val len = visibleMonth.lengthOfMonth()
-        (0 until len).map { start.plusDays(it.toLong()) }
+        (0 until visibleMonth.lengthOfMonth()).map { start.plusDays(it.toLong()) }
     }
     val entriesByDate = remember(entries) { entries.groupingBy { it.date }.eachCount() }
     val listState = rememberLazyListState()
@@ -87,10 +80,10 @@ fun PerpetualCalendar(
         }
     }
 
-    LiquidGlassPane(
-        shape = RoundedCornerShape(26.dp),
-        tint = appSurfaceColor(),
-        accent = MaterialTheme.colorScheme.primary,
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
             modifier = Modifier
@@ -105,10 +98,7 @@ fun PerpetualCalendar(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(
-                    onClick = { visibleMonth = visibleMonth.minusMonths(1) },
-                    modifier = Modifier.size(34.dp),
-                ) {
+                IconButton(onClick = { visibleMonth = visibleMonth.minusMonths(1) }, modifier = Modifier.size(34.dp)) {
                     Icon(
                         imageVector = Icons.Default.ChevronLeft,
                         contentDescription = "上月",
@@ -120,10 +110,7 @@ fun PerpetualCalendar(
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                IconButton(
-                    onClick = { visibleMonth = visibleMonth.plusMonths(1) },
-                    modifier = Modifier.size(34.dp),
-                ) {
+                IconButton(onClick = { visibleMonth = visibleMonth.plusMonths(1) }, modifier = Modifier.size(34.dp)) {
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
                         contentDescription = "下月",
@@ -137,20 +124,19 @@ fun PerpetualCalendar(
                 contentPadding = PaddingValues(horizontal = 14.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                items(daysInMonth.size, key = { daysInMonth[it].toEpochDay() }) { idx ->
-                    val date = daysInMonth[idx]
+                items(daysInMonth, key = { it.toEpochDay() }) { date ->
                     val isSelected = date == selected
                     val isToday = date == today
                     val hasCourse = (entriesByDate[date.toString()] ?: 0) > 0
 
-                    val glassTint by animateColorAsState(
+                    val containerColor by animateColorAsState(
                         targetValue = when {
                             isSelected -> MaterialTheme.colorScheme.primary
                             isToday -> MaterialTheme.colorScheme.primaryContainer
-                            else -> MaterialTheme.colorScheme.surface
+                            else -> MaterialTheme.colorScheme.surfaceVariant
                         },
                         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                        label = "glassTint",
+                        label = "calendarContainer",
                     )
                     val textColor by animateColorAsState(
                         targetValue = when {
@@ -159,85 +145,17 @@ fun PerpetualCalendar(
                             else -> MaterialTheme.colorScheme.onSurface
                         },
                         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                        label = "dateText",
-                    )
-                    val subTextColor by animateColorAsState(
-                        targetValue = if (isSelected) {
-                            MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.80f)
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                        label = "subText",
-                    )
-                    val accentColor by animateColorAsState(
-                        targetValue = when {
-                            isSelected -> MaterialTheme.colorScheme.primary
-                            isToday -> MaterialTheme.colorScheme.primaryContainer
-                            else -> MaterialTheme.colorScheme.tertiary
-                        },
-                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                        label = "accentColor",
+                        label = "calendarText",
                     )
 
-                    Box(
+                    Card(
                         modifier = Modifier
                             .width(54.dp)
-                            .clip(RoundedCornerShape(22.dp))
                             .clickable { onDateChanged(date.toString()) },
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(containerColor = containerColor),
+                        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 2.dp else 0.dp),
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(22.dp))
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(
-                                            glassTint.copy(alpha = if (isSelected) 0.44f else 0.24f),
-                                            glassTint.copy(alpha = if (isSelected) 0.22f else 0.10f),
-                                        )
-                                    )
-                                ),
-                        )
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(22.dp))
-                                .background(
-                                    Brush.radialGradient(
-                                        colors = listOf(
-                                            accentColor.copy(alpha = if (isSelected) 0.24f else 0.12f),
-                                            Color.Transparent,
-                                        )
-                                    )
-                                ),
-                        )
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(22.dp))
-                                .border(
-                                    BorderStroke(
-                                        1.dp,
-                                        if (isSelected) Color.White.copy(alpha = 0.34f)
-                                        else Color.White.copy(alpha = 0.18f),
-                                    )
-                                ),
-                        )
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .fillMaxWidth(0.7f)
-                                .height(16.dp)
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(
-                                            Color.White.copy(alpha = 0.20f),
-                                            Color.Transparent,
-                                        )
-                                    )
-                                ),
-                        )
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -248,7 +166,7 @@ fun PerpetualCalendar(
                             Text(
                                 text = date.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.CHINESE),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = subTextColor,
+                                color = textColor.copy(alpha = 0.8f),
                                 textAlign = TextAlign.Center,
                             )
                             Text(
@@ -264,11 +182,7 @@ fun PerpetualCalendar(
                                     .size(6.dp)
                                     .clip(CircleShape)
                                     .background(
-                                        if (hasCourse) {
-                                            if (isSelected) MaterialTheme.colorScheme.onPrimary else accentColor
-                                        } else {
-                                            Color.Transparent
-                                        }
+                                        if (hasCourse) textColor else Color.Transparent,
                                     ),
                             )
                         }

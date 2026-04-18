@@ -12,7 +12,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -23,10 +22,8 @@ import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-val LocalGlobalBackgroundEnabled = staticCompositionLocalOf { false }
-
 @Composable
-fun ScheduleBackgroundLayer(backgroundImageUri: String?) {
+fun AppBackgroundLayer(backgroundImageUri: String?) {
     val context = LocalContext.current
     val backgroundImage by produceState<ImageBitmap?>(initialValue = null, context, backgroundImageUri) {
         value = loadBackgroundImage(context, backgroundImageUri)
@@ -39,9 +36,9 @@ fun ScheduleBackgroundLayer(backgroundImageUri: String?) {
                 Brush.verticalGradient(
                     colors = listOf(
                         MaterialTheme.colorScheme.background,
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                    )
-                )
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
+                    ),
+                ),
             ),
     ) {
         backgroundImage?.let { image ->
@@ -50,7 +47,7 @@ fun ScheduleBackgroundLayer(backgroundImageUri: String?) {
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
-                alpha = 0.82f,
+                alpha = 0.72f,
             )
         }
 
@@ -60,39 +57,13 @@ fun ScheduleBackgroundLayer(backgroundImageUri: String?) {
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            MaterialTheme.colorScheme.background.copy(alpha = 0.12f),
-                            MaterialTheme.colorScheme.background.copy(alpha = 0.46f),
-                        )
-                    )
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.18f),
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.30f),
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.58f),
+                        ),
+                    ),
                 ),
         )
-    }
-}
-
-@Composable
-fun appSurfaceColor(): Color {
-    return if (LocalGlobalBackgroundEnabled.current) {
-        MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
-}
-
-@Composable
-fun appSurfaceVariantColor(alphaWhenWallpaper: Float = 0.56f): Color {
-    return if (LocalGlobalBackgroundEnabled.current) {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alphaWhenWallpaper)
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
-    }
-}
-
-@Composable
-fun appOutlineColor(): Color {
-    return if (LocalGlobalBackgroundEnabled.current) {
-        MaterialTheme.colorScheme.outline.copy(alpha = 0.16f)
-    } else {
-        Color.Transparent
     }
 }
 
@@ -141,7 +112,7 @@ internal fun calculateInSampleSize(
 
     while (
         halfWidth / inSampleSize >= targetWidth &&
-            halfHeight / inSampleSize >= targetHeight
+        halfHeight / inSampleSize >= targetHeight
     ) {
         inSampleSize *= 2
     }

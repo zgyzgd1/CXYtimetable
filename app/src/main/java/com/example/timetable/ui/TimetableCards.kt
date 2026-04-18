@@ -3,18 +3,35 @@ package com.example.timetable.ui
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.automirrored.filled.Notes
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -25,33 +42,26 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.timetable.data.*
+import com.example.timetable.data.TimetableEntry
+import com.example.timetable.data.dayLabel
+import com.example.timetable.data.formatMinutes
 
-// 课程颜色池——根据课程标题 hashCode 自动分配，低饱和度柔和色系
 private val courseAccentColors = listOf(
-    Color(0xFF7986CB), // 靛蓝
-    Color(0xFF4DB6AC), // 青绿
-    Color(0xFFFF8A65), // 橙
-    Color(0xFFA1887F), // 棕
-    Color(0xFF4FC3F7), // 天蓝
-    Color(0xFFAED581), // 绿
-    Color(0xFFBA68C8), // 紫
-    Color(0xFFFFB74D), // 黄橙
-    Color(0xFFF06292), // 粉
-    Color(0xFF4DD0E1), // 湖蓝
+    Color(0xFF7986CB),
+    Color(0xFF4DB6AC),
+    Color(0xFFFF8A65),
+    Color(0xFFA1887F),
+    Color(0xFF4FC3F7),
+    Color(0xFFAED581),
+    Color(0xFFBA68C8),
+    Color(0xFFFFB74D),
+    Color(0xFFF06292),
+    Color(0xFF4DD0E1),
 )
 
 private fun accentColorFor(title: String): Color =
     courseAccentColors[(title.hashCode() and Int.MAX_VALUE) % courseAccentColors.size]
 
-/**
- * 精美课程卡片组件
- * 左侧带有彩色强调竖条（Accent Bar），现代简洁排版
- *
- * @param entry 课程条目数据
- * @param onEdit 编辑按钮点击回调
- * @param onDelete 删除按钮点击回调
- */
 @Composable
 fun EntryCard(
     entry: TimetableEntry,
@@ -60,18 +70,17 @@ fun EntryCard(
 ) {
     val accent = remember(entry.title) { accentColorFor(entry.title) }
 
-    LiquidGlassPane(
-        shape = RoundedCornerShape(28.dp),
-        tint = appSurfaceColor(),
-        accent = accent,
+    Card(
         modifier = Modifier.animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(IntrinsicSize.Min),
         ) {
-            // 左侧彩色强调条
             Box(
                 modifier = Modifier
                     .width(7.dp)
@@ -81,8 +90,8 @@ fun EntryCard(
                             colors = listOf(
                                 accent.copy(alpha = 0.98f),
                                 accent.copy(alpha = 0.72f),
-                            )
-                        )
+                            ),
+                        ),
                     ),
             )
 
@@ -93,12 +102,10 @@ fun EntryCard(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // 课程信息主体
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    // 课程名称（高亮主标题）
                     Text(
                         text = entry.title.ifBlank { "未命名课程" },
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
@@ -107,15 +114,13 @@ fun EntryCard(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
 
-                    // 时间行
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         Surface(
-                            color = Color.White.copy(alpha = 0.14f),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
                             shape = RoundedCornerShape(999.dp),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -129,7 +134,7 @@ fun EntryCard(
                                     tint = accent,
                                 )
                                 Text(
-                                    text = "${formatMinutes(entry.startMinutes)} – ${formatMinutes(entry.endMinutes)}",
+                                    text = "${formatMinutes(entry.startMinutes)} - ${formatMinutes(entry.endMinutes)}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -137,9 +142,8 @@ fun EntryCard(
                         }
                         Spacer(modifier = Modifier.width(6.dp))
                         Surface(
-                            color = accent.copy(alpha = 0.16f),
+                            color = accent.copy(alpha = 0.14f),
                             shape = RoundedCornerShape(999.dp),
-                            border = BorderStroke(1.dp, accent.copy(alpha = 0.20f)),
                         ) {
                             Text(
                                 text = dayLabel(entry.dayOfWeek),
@@ -150,7 +154,6 @@ fun EntryCard(
                         }
                     }
 
-                    // 地点行（仅在有数据时显示）
                     if (entry.location.isNotBlank()) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -172,7 +175,6 @@ fun EntryCard(
                         }
                     }
 
-                    // 备注行（仅在有数据时显示）
                     if (entry.note.isNotBlank()) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -195,7 +197,6 @@ fun EntryCard(
                     }
                 }
 
-                // 右侧操作按钮列
                 Column(
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -204,7 +205,7 @@ fun EntryCard(
                         onClick = onEdit,
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White.copy(alpha = 0.12f))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
                             .size(38.dp),
                     ) {
                         Icon(
@@ -218,14 +219,14 @@ fun EntryCard(
                         onClick = onDelete,
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White.copy(alpha = 0.12f))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
                             .size(38.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "删除",
                             modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
                         )
                     }
                 }
@@ -234,16 +235,12 @@ fun EntryCard(
     }
 }
 
-/**
- * 精美空状态卡片组件
- * 当没有课程时显示带有趣味 emoji 的提示信息
- */
 @Composable
 fun EmptyStateCard(onAdd: () -> Unit) {
-    LiquidGlassPane(
-        shape = RoundedCornerShape(30.dp),
-        tint = appSurfaceVariantColor(alphaWhenWallpaper = 0.48f),
-        accent = MaterialTheme.colorScheme.tertiary,
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
             modifier = Modifier
@@ -252,9 +249,8 @@ fun EmptyStateCard(onAdd: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // 趣味 emoji 插画
             Text(
-                text = "📅",
+                text = "📮",
                 style = MaterialTheme.typography.displaySmall,
             )
             Column(

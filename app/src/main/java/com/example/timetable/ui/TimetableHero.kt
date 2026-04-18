@@ -4,8 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -20,12 +18,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Opacity
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -38,125 +41,95 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/**
- * 精简版英雄区域组件
- * 渐变背景 + 横向三栏胶囊按钮，减少竖向空间占用
- *
- * @param courseCount 课程总数
- * @param onImport 导入回调
- * @param onExport 导出回调
- * @param onEnableNotifications 通知权限回调
- * @param hasCustomBackground 是否已设置自定义背景图
- * @param onImportBackground 导入背景图回调
- * @param onClearBackground 清除背景图回调
- * @param reminderMinutes 当前提醒分钟数
- * @param reminderOptions 可选提醒分钟列表
- * @param onReminderMinutesChange 提醒分钟改变回调
- */
 @Composable
 fun HeroSection(
     courseCount: Int,
     onImport: () -> Unit,
     onExport: () -> Unit,
     onEnableNotifications: () -> Unit,
-    hasCustomBackground: Boolean,
-    onImportBackground: () -> Unit,
-    onClearBackground: () -> Unit,
     reminderMinutes: Int,
     reminderOptions: List<Int>,
     onReminderMinutesChange: (Int) -> Unit,
+    hasCustomBackground: Boolean,
+    onImportBackground: () -> Unit,
+    onClearBackground: () -> Unit,
+    weekCardAlpha: Float,
+    onWeekCardAlphaChange: (Float) -> Unit,
 ) {
     var showReminderSheet by remember { mutableStateOf(false) }
-    var showBackgroundDialog by remember { mutableStateOf(false) }
-    val hasGlobalBackground = LocalGlobalBackgroundEnabled.current
+    var showAppearanceDialog by remember { mutableStateOf(false) }
 
-    // 主 Hero 卡片——渐变背景
-    Surface(
+    Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        color = if (hasGlobalBackground) appSurfaceColor().copy(alpha = 0.42f) else Color.Transparent,
-        border = BorderStroke(1.dp, appOutlineColor()),
-        tonalElevation = if (hasGlobalBackground) 0.dp else 2.dp,
-        shadowElevation = 0.dp,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
                 .background(
                     Brush.linearGradient(
-                        colors = if (hasGlobalBackground) {
-                            listOf(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.48f),
-                                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.34f),
-                            )
-                        } else {
-                            listOf(
-                                MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.85f),
-                            )
-                        }
-                    )
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.92f),
+                            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.78f),
+                        ),
+                    ),
                 )
                 .padding(horizontal = 20.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                // 标题行
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = "课程表助手",
-                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                    Text(
-                        text = "当前共 $courseCount 门课程 · 支持 .ics 导入 / 导出",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
-                    )
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "课程表助手",
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+                Text(
+                    text = "当前共 $courseCount 门课程 · 支持 .ics 导入 / 导出",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
+                )
+            }
 
-                // 四个操作按钮横向排布
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    HeroActionChip(
-                        icon = Icons.Default.Download,
-                        label = "导入",
-                        onClick = onImport,
-                        modifier = Modifier.weight(1f),
-                    )
-                    HeroActionChip(
-                        icon = Icons.Default.Upload,
-                        label = "导出",
-                        onClick = onExport,
-                        modifier = Modifier.weight(1f),
-                    )
-                    HeroActionChip(
-                        icon = Icons.Default.NotificationsActive,
-                        label = "提醒 ${reminderMinutes}m",
-                        onClick = { showReminderSheet = true },
-                        modifier = Modifier.weight(1f),
-                    )
-                    HeroActionChip(
-                        icon = Icons.Default.Image,
-                        label = if (hasCustomBackground) "换全局背景" else "全局背景",
-                        onClick = { showBackgroundDialog = true },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                HeroActionChip(
+                    icon = Icons.Default.Download,
+                    label = "导入",
+                    onClick = onImport,
+                    modifier = Modifier.weight(1f),
+                )
+                HeroActionChip(
+                    icon = Icons.Default.Upload,
+                    label = "导出",
+                    onClick = onExport,
+                    modifier = Modifier.weight(1f),
+                )
+                HeroActionChip(
+                    icon = Icons.Default.NotificationsActive,
+                    label = "提醒 ${reminderMinutes}m",
+                    onClick = { showReminderSheet = true },
+                    modifier = Modifier.weight(1f),
+                )
+                HeroActionChip(
+                    icon = Icons.Default.Image,
+                    label = "外观",
+                    onClick = { showAppearanceDialog = true },
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
     }
 
-    // 提醒时间选择对话框
     if (showReminderSheet) {
         ReminderPickerDialog(
             reminderMinutes = reminderMinutes,
@@ -173,25 +146,21 @@ fun HeroSection(
         )
     }
 
-    if (showBackgroundDialog) {
-        BackgroundImageDialog(
+    if (showAppearanceDialog) {
+        AppearanceDialog(
             hasCustomBackground = hasCustomBackground,
-            onDismiss = { showBackgroundDialog = false },
+            onDismiss = { showAppearanceDialog = false },
             onImportBackground = {
                 onImportBackground()
-                showBackgroundDialog = false
+                showAppearanceDialog = false
             },
-            onClearBackground = {
-                onClearBackground()
-                showBackgroundDialog = false
-            },
+            onClearBackground = onClearBackground,
+            weekCardAlpha = weekCardAlpha,
+            onWeekCardAlphaChange = onWeekCardAlphaChange,
         )
     }
 }
 
-/**
- * Hero 区域内的操作小胶囊按钮
- */
 @Composable
 private fun HeroActionChip(
     icon: ImageVector,
@@ -199,17 +168,11 @@ private fun HeroActionChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val chipColor = if (LocalGlobalBackgroundEnabled.current) {
-        MaterialTheme.colorScheme.scrim.copy(alpha = 0.22f)
-    } else {
-        MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.18f)
-    }
-
     Surface(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick),
-        color = chipColor,
+        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.18f),
         shape = RoundedCornerShape(14.dp),
     ) {
         Column(
@@ -239,48 +202,76 @@ private fun HeroActionChip(
     }
 }
 
-/**
- * 背景图设置对话框
- */
 @Composable
-private fun BackgroundImageDialog(
+private fun AppearanceDialog(
     hasCustomBackground: Boolean,
     onDismiss: () -> Unit,
     onImportBackground: () -> Unit,
     onClearBackground: () -> Unit,
+    weekCardAlpha: Float,
+    onWeekCardAlphaChange: (Float) -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = {
-            Text("设置全局背景", style = MaterialTheme.typography.titleMedium)
-        },
+        title = { Text("外观设置", style = MaterialTheme.typography.titleMedium) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = "选择一张图片作为整个应用的全局背景。界面卡片会自动变成半透明材质，保证内容可读。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Button(onClick = onImportBackground) {
-                    Text(if (hasCustomBackground) "更换全局背景" else "选择全局背景")
-                }
-                if (hasCustomBackground) {
-                    OutlinedButton(onClick = onClearBackground) {
-                        Text("恢复默认全局背景")
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Image,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Text("最底层背景图", style = MaterialTheme.typography.titleSmall)
                     }
+                    Button(onClick = onImportBackground) {
+                        Text(if (hasCustomBackground) "更换背景图" else "选择背景图")
+                    }
+                    if (hasCustomBackground) {
+                        OutlinedButton(onClick = onClearBackground) {
+                            Text("清除背景图")
+                        }
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Opacity,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Text("周视图色卡透明度", style = MaterialTheme.typography.titleSmall)
+                    }
+                    Slider(
+                        value = weekCardAlpha,
+                        onValueChange = onWeekCardAlphaChange,
+                        valueRange = 0.35f..1.0f,
+                    )
+                    Text(
+                        text = "当前透明度 ${(weekCardAlpha * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("关闭") }
+            TextButton(onClick = onDismiss) { Text("完成") }
         },
         shape = RoundedCornerShape(20.dp),
     )
 }
 
-/**
- * 提醒时间选择对话框（紧凑）
- */
 @Composable
 private fun ReminderPickerDialog(
     reminderMinutes: Int,
@@ -291,9 +282,7 @@ private fun ReminderPickerDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = {
-            Text("课前提醒时间", style = MaterialTheme.typography.titleMedium)
-        },
+        title = { Text("课前提醒时间", style = MaterialTheme.typography.titleMedium) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
@@ -337,9 +326,6 @@ private fun ReminderPickerDialog(
     )
 }
 
-/**
- * 分区标题组件
- */
 @Composable
 fun SectionHeader(title: String) {
     Row(
@@ -358,6 +344,30 @@ fun SectionHeader(title: String) {
             text = "按时间顺序",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+fun ViewModeSwitcher(
+    isWeekMode: Boolean,
+    onModeChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        FilterChip(
+            selected = !isWeekMode,
+            onClick = { onModeChange(false) },
+            label = { Text("日视图") },
+            modifier = Modifier.weight(1f),
+        )
+        FilterChip(
+            selected = isWeekMode,
+            onClick = { onModeChange(true) },
+            label = { Text("周视图") },
+            modifier = Modifier.weight(1f),
         )
     }
 }
