@@ -6,6 +6,9 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+val appVersionCode = providers.gradleProperty("APP_VERSION_CODE").get().toInt()
+val appVersionName = providers.gradleProperty("APP_VERSION_NAME").get()
+
 android {
     namespace = "com.example.timetable"
     compileSdk = 36
@@ -15,8 +18,8 @@ android {
         applicationId = "com.example.timetable"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = appVersionCode
+        versionName = appVersionName
     }
 
     buildFeatures {
