@@ -24,7 +24,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -353,21 +354,18 @@ fun ViewModeSwitcher(
     isWeekMode: Boolean,
     onModeChange: (Boolean) -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        FilterChip(
+    NavigationBar(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)) {
+        NavigationBarItem(
             selected = !isWeekMode,
             onClick = { onModeChange(false) },
+            icon = {},
             label = { Text("日视图") },
-            modifier = Modifier.weight(1f),
         )
-        FilterChip(
+        NavigationBarItem(
             selected = isWeekMode,
             onClick = { onModeChange(true) },
+            icon = {},
             label = { Text("周视图") },
-            modifier = Modifier.weight(1f),
         )
     }
 }

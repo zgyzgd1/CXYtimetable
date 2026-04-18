@@ -14,9 +14,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -56,6 +59,11 @@ import java.time.LocalDate
 import java.time.temporal.TemporalAdjusters
 import kotlinx.coroutines.launch
 
+private enum class BackgroundTarget {
+    Home,
+    Week,
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
@@ -66,19 +74,25 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
     val listState = rememberLazyListState()
 
     var backgroundImageUri by remember(context) { mutableStateOf(AppearanceStore.getBackgroundImageUri(context)) }
+    var weekBackgroundImageUri by remember(context) { mutableStateOf(AppearanceStore.getWeekBackgroundImageUri(context)) }
     var weekCardAlpha by remember(context) { mutableStateOf(AppearanceStore.getWeekCardAlpha(context)) }
+    var weekTimeSlots by remember(context) { mutableStateOf(AppearanceStore.getWeekTimeSlots(context)) }
+    var backgroundTarget by remember { mutableStateOf(BackgroundTarget.Home) }
 
     val minDate = LocalDate.of(1970, 1, 1)
     val maxDate = LocalDate.of(2100, 12, 31)
     val initialDate = LocalDate.now().takeIf { it in minDate..maxDate } ?: LocalDate.of(2026, 1, 1)
     var selectedDate by rememberSaveable { mutableStateOf(initialDate.toString()) }
     var isWeekMode by rememberSaveable { mutableStateOf(false) }
+
     val selectedLocalDate = parseEntryDate(selectedDate) ?: minDate
     val selectedWeekStart = remember(selectedLocalDate) {
         selectedLocalDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
     }
     val selectedWeekEnd = remember(selectedWeekStart) { selectedWeekStart.plusDays(6) }
+
     var editingEntry by remember { mutableStateOf<TimetableEntry?>(null) }
+    var editingWeekSlotIndex by remember { mutableStateOf<Int?>(null) }
     var reminderMinutes by remember { mutableStateOf(CourseReminderScheduler.getReminderMinutes(context)) }
     val reminderOptions = remember { CourseReminderScheduler.reminderMinuteOptions() }
 
@@ -86,18 +100,14 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
         scope.launch {
-            if (granted) {
-                snackbarHostState.showSnackbar("已开启手机通知提醒")
-            } else {
-                snackbarHostState.showSnackbar("未授予通知权限，可能无法收到提醒")
-            }
+            snackbarHostState.showSnackbar(
+                if (granted) "已开启通知提醒" else "未授予通知权限，可能无法收到提醒",
+            )
         }
     }
 
     LaunchedEffect(Unit) {
-        viewModel.messages.collect { message ->
-            snackbarHostState.showSnackbar(message)
-        }
+        viewModel.messages.collect(snackbarHostState::showSnackbar)
     }
 
     val importLauncher = rememberLauncherForActivityResult(
@@ -118,7 +128,7 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
                     context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { writer ->
                         writer.write(text)
                     }
-                    snackbarHostState.showSnackbar("已导出日历")
+                    snackbarHostState.showSnackbar("已导出日历文件")
                 }.onFailure {
                     snackbarHostState.showSnackbar("导出失败：${it.message ?: "未知错误"}")
                 }
@@ -135,11 +145,24 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
                     uri,
                     Intent.FLAG_GRANT_READ_URI_PERMISSION,
                 )
-                AppearanceStore.setBackgroundImageUri(context, uri)
-                backgroundImageUri = uri.toString()
+                when (backgroundTarget) {
+                    BackgroundTarget.Home -> {
+                        AppearanceStore.setBackgroundImageUri(context, uri)
+                        backgroundImageUri = uri.toString()
+                    }
+                    BackgroundTarget.Week -> {
+                        AppearanceStore.setWeekBackgroundImageUri(context, uri)
+                        weekBackgroundImageUri = uri.toString()
+                    }
+                }
             }.onSuccess {
                 scope.launch {
-                    snackbarHostState.showSnackbar("已更新背景图")
+                    snackbarHostState.showSnackbar(
+                        when (backgroundTarget) {
+                            BackgroundTarget.Home -> "已更新首页背景图"
+                            BackgroundTarget.Week -> "已更新周视图背景图"
+                        },
+                    )
                 }
             }.onFailure {
                 scope.launch {
@@ -157,22 +180,27 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        AppBackgroundLayer(backgroundImageUri = backgroundImageUri)
+        AppBackgroundLayer(
+            backgroundImageUri = if (isWeekMode) weekBackgroundImageUri ?: backgroundImageUri else backgroundImageUri,
+        )
 
         Scaffold(
+            modifier = Modifier.safeDrawingPadding(),
             containerColor = Color.Transparent,
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             topBar = {
                 LargeTopAppBar(
                     title = {
                         Text(
-                            text = "我的课程表",
+                            text = if (isWeekMode) "周视图" else "我的课表",
                             style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                         )
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = Color.Transparent,
-                        scrolledContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.88f),
+                        scrolledContainerColor = MaterialTheme.colorScheme.background.copy(
+                            alpha = if (isWeekMode) 0.62f else 0.88f,
+                        ),
                         titleContentColor = MaterialTheme.colorScheme.onBackground,
                     ),
                 )
@@ -192,126 +220,163 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
                     Icon(imageVector = Icons.Default.Add, contentDescription = "新增课程")
                 }
             },
+            bottomBar = {
+                ViewModeSwitcher(
+                    isWeekMode = isWeekMode,
+                    onModeChange = { isWeekMode = it },
+                )
+            },
         ) { padding ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(selectedDate, isWeekMode) {
-                        var totalHorizontalDrag = 0f
-                        detectHorizontalDragGestures(
-                            onHorizontalDrag = { _, dragAmount ->
-                                totalHorizontalDrag += dragAmount
-                            },
-                            onDragEnd = {
-                                when {
-                                    totalHorizontalDrag > 80f -> {
-                                        val previousDate = selectedLocalDate.minusDays(if (isWeekMode) 7 else 1)
-                                        if (previousDate >= minDate) {
-                                            selectedDate = previousDate.toString()
+            if (isWeekMode) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(selectedDate, isWeekMode) {
+                            var totalHorizontalDrag = 0f
+                            detectHorizontalDragGestures(
+                                onHorizontalDrag = { _, dragAmount ->
+                                    totalHorizontalDrag += dragAmount
+                                },
+                                onDragEnd = {
+                                    when {
+                                        totalHorizontalDrag > 80f -> {
+                                            val previousDate = selectedLocalDate.minusDays(7)
+                                            if (previousDate >= minDate) selectedDate = previousDate.toString()
+                                        }
+                                        totalHorizontalDrag < -80f -> {
+                                            val nextDate = selectedLocalDate.plusDays(7)
+                                            if (nextDate <= maxDate) selectedDate = nextDate.toString()
                                         }
                                     }
-                                    totalHorizontalDrag < -80f -> {
-                                        val nextDate = selectedLocalDate.plusDays(if (isWeekMode) 7 else 1)
-                                        if (nextDate <= maxDate) {
-                                            selectedDate = nextDate.toString()
-                                        }
-                                    }
-                                }
-                                totalHorizontalDrag = 0f
-                            },
-                        )
-                    }
-                    .padding(padding),
-            ) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                    state = listState,
-                ) {
-                    item {
-                        HeroSection(
-                            courseCount = entries.size,
-                            onImport = {
-                                importLauncher.launch(
-                                    arrayOf(
-                                        "text/calendar",
-                                        "text/plain",
-                                        "application/ics",
-                                        "application/x-ical",
-                                        "application/octet-stream",
-                                        "*/*",
-                                    ),
-                                )
-                            },
-                            onExport = { exportLauncher.launch("课程表导出.ics") },
-                            onEnableNotifications = {
-                                when {
-                                    Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU -> {
-                                        scope.launch {
-                                            snackbarHostState.showSnackbar("当前系统版本无需额外通知授权")
-                                        }
-                                    }
-                                    CourseReminderScheduler.notificationsEnabled(context) ||
-                                        ContextCompat.checkSelfPermission(
-                                            context,
-                                            Manifest.permission.POST_NOTIFICATIONS,
-                                        ) == PackageManager.PERMISSION_GRANTED -> {
-                                        scope.launch {
-                                            snackbarHostState.showSnackbar("通知权限已开启")
-                                        }
-                                    }
-                                    else -> {
-                                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                    }
-                                }
-                            },
-                            reminderMinutes = reminderMinutes,
-                            reminderOptions = reminderOptions,
-                            onReminderMinutesChange = { minutes ->
-                                reminderMinutes = minutes
-                                viewModel.updateReminderMinutes(minutes)
-                            },
-                            hasCustomBackground = backgroundImageUri != null,
-                            onImportBackground = {
-                                backgroundImportLauncher.launch(arrayOf("image/*"))
-                            },
-                            onClearBackground = {
-                                AppearanceStore.clearBackgroundImage(context)
-                                backgroundImageUri = null
-                                scope.launch { snackbarHostState.showSnackbar("已恢复默认背景") }
-                            },
-                            weekCardAlpha = weekCardAlpha,
-                            onWeekCardAlphaChange = { alpha ->
-                                weekCardAlpha = alpha
-                                AppearanceStore.setWeekCardAlpha(context, alpha)
-                            },
-                        )
-                    }
-                    item {
-                        PerpetualCalendar(
-                            selectedDate = selectedDate,
-                            entries = entries,
-                            onDateChanged = { selectedDate = it },
-                        )
-                    }
-                    item {
-                        ViewModeSwitcher(
-                            isWeekMode = isWeekMode,
-                            onModeChange = { isWeekMode = it },
-                        )
-                    }
-                    if (isWeekMode) {
-                        item {
-                            WeekScheduleBoard(
-                                selectedDate = selectedLocalDate,
-                                weekStart = selectedWeekStart,
-                                weekEnd = selectedWeekEnd,
-                                entries = filteredEntries,
-                                cardAlpha = weekCardAlpha,
+                                    totalHorizontalDrag = 0f
+                                },
                             )
                         }
-                    } else {
+                        .padding(padding)
+                        .padding(horizontal = 10.dp, vertical = 8.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    WeekScheduleBoard(
+                        selectedDate = selectedLocalDate,
+                        weekStart = selectedWeekStart,
+                        weekEnd = selectedWeekEnd,
+                        entries = filteredEntries,
+                        slots = weekTimeSlots,
+                        cardAlpha = weekCardAlpha,
+                        hasCustomBackground = weekBackgroundImageUri != null,
+                        onImportBackground = {
+                            backgroundTarget = BackgroundTarget.Week
+                            backgroundImportLauncher.launch(arrayOf("image/*"))
+                        },
+                        onClearBackground = {
+                            AppearanceStore.clearWeekBackgroundImage(context)
+                            weekBackgroundImageUri = null
+                            scope.launch { snackbarHostState.showSnackbar("已恢复默认周视图背景") }
+                        },
+                        onEntryClick = { editingEntry = it },
+                        onSlotClick = { editingWeekSlotIndex = it },
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(selectedDate, isWeekMode) {
+                            var totalHorizontalDrag = 0f
+                            detectHorizontalDragGestures(
+                                onHorizontalDrag = { _, dragAmount ->
+                                    totalHorizontalDrag += dragAmount
+                                },
+                                onDragEnd = {
+                                    when {
+                                        totalHorizontalDrag > 80f -> {
+                                            val previousDate = selectedLocalDate.minusDays(1)
+                                            if (previousDate >= minDate) selectedDate = previousDate.toString()
+                                        }
+                                        totalHorizontalDrag < -80f -> {
+                                            val nextDate = selectedLocalDate.plusDays(1)
+                                            if (nextDate <= maxDate) selectedDate = nextDate.toString()
+                                        }
+                                    }
+                                    totalHorizontalDrag = 0f
+                                },
+                            )
+                        }
+                        .padding(padding),
+                ) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        state = listState,
+                    ) {
+                        item {
+                            HeroSection(
+                                courseCount = entries.size,
+                                onImport = {
+                                    importLauncher.launch(
+                                        arrayOf(
+                                            "text/calendar",
+                                            "text/plain",
+                                            "application/ics",
+                                            "application/x-ical",
+                                            "application/octet-stream",
+                                            "*/*",
+                                        ),
+                                    )
+                                },
+                                onExport = { exportLauncher.launch("课表导出.ics") },
+                                onEnableNotifications = {
+                                    when {
+                                        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU -> {
+                                            scope.launch {
+                                                snackbarHostState.showSnackbar("当前系统版本无需额外通知授权")
+                                            }
+                                        }
+                                        CourseReminderScheduler.notificationsEnabled(context) ||
+                                            ContextCompat.checkSelfPermission(
+                                                context,
+                                                Manifest.permission.POST_NOTIFICATIONS,
+                                            ) == PackageManager.PERMISSION_GRANTED -> {
+                                            scope.launch {
+                                                snackbarHostState.showSnackbar("通知权限已开启")
+                                            }
+                                        }
+                                        else -> {
+                                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                        }
+                                    }
+                                },
+                                reminderMinutes = reminderMinutes,
+                                reminderOptions = reminderOptions,
+                                onReminderMinutesChange = { minutes ->
+                                    reminderMinutes = minutes
+                                    viewModel.updateReminderMinutes(minutes)
+                                },
+                                hasCustomBackground = backgroundImageUri != null,
+                                onImportBackground = {
+                                    backgroundTarget = BackgroundTarget.Home
+                                    backgroundImportLauncher.launch(arrayOf("image/*"))
+                                },
+                                onClearBackground = {
+                                    AppearanceStore.clearBackgroundImage(context)
+                                    backgroundImageUri = null
+                                    scope.launch { snackbarHostState.showSnackbar("已恢复默认首页背景") }
+                                },
+                                weekCardAlpha = weekCardAlpha,
+                                onWeekCardAlphaChange = { alpha ->
+                                    weekCardAlpha = alpha
+                                    AppearanceStore.setWeekCardAlpha(context, alpha)
+                                },
+                            )
+                        }
+                        item {
+                            PerpetualCalendar(
+                                selectedDate = selectedDate,
+                                entries = entries,
+                                onDateChanged = { selectedDate = it },
+                            )
+                        }
                         item {
                             SectionHeader(title = formatDateLabel(selectedDate))
                         }
@@ -338,8 +403,8 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
                                 )
                             }
                         }
+                        item { Spacer(modifier = Modifier.height(56.dp)) }
                     }
-                    item { Spacer(modifier = Modifier.height(56.dp)) }
                 }
             }
         }
@@ -352,6 +417,23 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
             onSave = {
                 viewModel.upsertEntry(it)
                 editingEntry = null
+            },
+        )
+    }
+
+    editingWeekSlotIndex?.let { index ->
+        val currentSlot = weekTimeSlots.getOrNull(index) ?: return@let
+        WeekSlotEditorDialog(
+            slotNumber = index + 1,
+            initial = currentSlot,
+            onDismiss = { editingWeekSlotIndex = null },
+            onSave = { updatedSlot ->
+                val updatedSlots = weekTimeSlots.toMutableList().apply {
+                    this[index] = updatedSlot
+                }.sortedBy { it.startMinutes }
+                weekTimeSlots = updatedSlots
+                AppearanceStore.setWeekTimeSlots(context, updatedSlots)
+                editingWeekSlotIndex = null
             },
         )
     }

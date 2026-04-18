@@ -182,3 +182,63 @@ fun AppTextField(
         modifier = modifier.fillMaxWidth(),
     )
 }
+
+@Composable
+fun WeekSlotEditorDialog(
+    slotNumber: Int,
+    initial: WeekTimeSlot,
+    onDismiss: () -> Unit,
+    onSave: (WeekTimeSlot) -> Unit,
+) {
+    var startTime by rememberSaveable(slotNumber) { mutableStateOf(formatMinutes(initial.startMinutes)) }
+    var endTime by rememberSaveable(slotNumber) { mutableStateOf(formatMinutes(initial.endMinutes)) }
+    var errorText by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("编辑第 $slotNumber 节时间") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                TimeRangeFields(
+                    startTime = startTime,
+                    endTime = endTime,
+                    onStartChanged = {
+                        startTime = it
+                        errorText = null
+                    },
+                    onEndChanged = {
+                        endTime = it
+                        errorText = null
+                    },
+                )
+                errorText?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val parsedStart = parseMinutes(startTime)
+                    val parsedEnd = parseMinutes(endTime)
+                    when {
+                        parsedStart == null || parsedEnd == null -> {
+                            errorText = "请输入合法时间，例如 08:00"
+                        }
+                        parsedStart >= parsedEnd -> {
+                            errorText = "结束时间需要晚于开始时间"
+                        }
+                        else -> onSave(WeekTimeSlot(parsedStart, parsedEnd))
+                    }
+                },
+            ) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        },
+    )
+}
