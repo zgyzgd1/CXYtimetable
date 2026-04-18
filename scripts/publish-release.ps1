@@ -70,7 +70,7 @@ function Get-GitHubToken {
     $credentialRequest = @"
 protocol=https
 host=github.com
-path=zgyzgd1/-.git
+path=zgyzgd1/CXYtimetable.git
 
 "@
     $credential = $credentialRequest | git credential fill
@@ -153,7 +153,7 @@ try {
     }
 
     try {
-        $release = Invoke-RestMethod -Method Get -Headers $headers -Uri "https://api.github.com/repos/zgyzgd1/-/releases/tags/$tag"
+        $release = Invoke-RestMethod -Method Get -Headers $headers -Uri "https://api.github.com/repos/zgyzgd1/CXYtimetable/releases/tags/$tag"
     } catch {
         $body = @{
             tag_name = $tag
@@ -168,11 +168,11 @@ Asset:
             draft = $false
             prerelease = $false
         } | ConvertTo-Json
-        $release = Invoke-RestMethod -Method Post -Headers $headers -Uri "https://api.github.com/repos/zgyzgd1/-/releases" -Body $body -ContentType "application/json"
+        $release = Invoke-RestMethod -Method Post -Headers $headers -Uri "https://api.github.com/repos/zgyzgd1/CXYtimetable/releases" -Body $body -ContentType "application/json"
     }
 
     foreach ($existing in @($release.assets | Where-Object { $_.name -eq $assetName })) {
-        Invoke-RestMethod -Method Delete -Headers $headers -Uri "https://api.github.com/repos/zgyzgd1/-/releases/assets/$($existing.id)" | Out-Null
+        Invoke-RestMethod -Method Delete -Headers $headers -Uri "https://api.github.com/repos/zgyzgd1/CXYtimetable/releases/assets/$($existing.id)" | Out-Null
     }
 
     $uploadUrl = ($release.upload_url -replace '\{\?name,label\}$', '') + "?name=$assetName"
@@ -184,7 +184,7 @@ Asset:
     } -Uri $uploadUrl -InFile $releaseAssetPath -UseBasicParsing | Out-Null
 
     Write-Host "Published $tag"
-    Write-Host "Release URL: https://github.com/zgyzgd1/-/releases/tag/$tag"
+    Write-Host "Release URL: https://github.com/zgyzgd1/CXYtimetable/releases/tag/$tag"
     Write-Host "Asset: $releaseAssetPath"
 } catch {
     Set-PropertyValue -Path $propertiesPath -Name "APP_VERSION_NAME" -Value $currentVersion
