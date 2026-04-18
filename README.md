@@ -1,142 +1,145 @@
-# 课程表助手 (Timetable Minimal)
+# 课程表助手
 
-> 轻量、精美、低占用的 Android 原生课程表应用。  
-> 基于 Kotlin + Jetpack Compose + Material Design 3 构建。
+一个基于 Kotlin、Jetpack Compose 和 Material 3 的 Android 原生课表应用，强调本地离线、轻量界面和可维护的代码结构。
 
----
+## 当前能力
 
-## 技术评估报告
+- 课程的新增、编辑、删除与按日期查看
+- `.ics` 课表导入与导出
+- 课前提醒与接力式闹钟调度
+- 本地 Room 持久化与旧 JSON 数据迁移
+- 自定义背景图导入，并在应用重启后保持生效
+- 二维码分享能力
 
-本报告针对当前代码库就架构设计、工程质量与技术选型进行客观评估。
+## 近期变化
 
-### 评估概览
+### `4cd856f` Add customizable background image support
 
-| 维度 | 评价 |
-|------|------|
-| UI 架构 | ✅ 优秀：Compose + MVVM + UDF，组件化良好 |
-| 并发安全 | ✅ 良好：Repository + Room + Flow，读写路径清晰 |
-| 电池优化 | ✅ 优秀：接力式单点闹钟，后台唤醒锁降至最低 |
-| 数据导入导出 | ✅ 良好：手写 RFC 5545 ICS 解析器，支持 RRULE |
-| 代码整洁度 | ✅ 良好：无硬编码日期、无死代码、无冗余 import |
-| 持久层 | ⚠️ 待完善：Room 已落地，后续 schema 升级需补显式 Migration |
-| 无障碍支持 | ⚠️ 待改善：缺少 semantics 语义标签 |
-| 云同步 | ❌ 不支持：当前为纯本地离线架构 |
+- 新增自定义背景图导入入口
+- 支持持久化保存图片 URI 和系统读取权限
+- 主界面增加背景图渲染层，并叠加遮罩保证内容可读
+- 补充背景图存储和缩放逻辑的单元测试
 
----
+### `3af1263` Fix reminder scheduling and legacy migration edge cases
 
-## 架构全景
+- 修复“没有未来课程时旧提醒不会被清除”的问题
+- 后台提醒重建前增加旧 JSON 数据迁移兜底
+- 去掉 Room 的破坏性迁移默认配置，避免后续版本静默清库
+- README 与实际代码状态重新对齐
 
-```
-app/
+### `2873eb1` Upgrade Android build stack and clean warnings
+
+- 升级 Android 构建栈与依赖版本
+- 统一到较新的 Compose、Lifecycle、Room 和 SDK 配置
+- 清理一部分构建与代码层面的告警
+
+## 目前好的地方
+
+### 1. 架构比较清晰
+
+- UI、ViewModel、Repository、通知调度、ICS 解析基本分层明确
+- `ScheduleViewModel` 用 `StateFlow` 驱动界面，数据流方向简单
+- Room 已经替代旧 JSON 成为主数据源，读取和写入边界更稳定
+
+### 2. 功能闭环完整
+
+- 课表编辑、按日浏览、导入导出、提醒、分享都已经串起来
+- 自定义背景图这样的偏个性化功能也已经接入持久化，不只是临时 UI 状态
+- 提醒逻辑采用“只保留最近一批提醒”的接力式策略，更符合 Android 后台限制
+
+### 3. 工程可继续演进
+
+- 关键逻辑已经有一批单元测试覆盖，包括 ICS、Repository、提醒计划和背景图辅助逻辑
+- 代码基本没有明显的大型 God Object，继续拆分和扩展的成本可控
+- 近期修复已经开始关注边界行为，而不只是表层界面改动
+
+## 目前不足
+
+### 1. 仍然偏本地单机应用
+
+- 没有账号体系
+- 没有云同步
+- 没有跨设备恢复能力
+
+### 2. 可访问性还不够
+
+- 自定义 Compose 组件缺少系统化的 `semantics`
+- TalkBack、无障碍朗读和大字体适配还不完整
+
+### 3. 测试覆盖还不均衡
+
+- 当前以单元测试为主
+- 缺少 Compose UI 测试和真机或仪器测试
+- 图片选择、通知权限、系统文档选择器这类系统交互还没有自动化覆盖
+
+### 4. 发布流程还不够正式
+
+- 仓库当前没有接入正式的 release keystore
+- GitHub Release 中的可安装 APK 目前依赖 debug 签名包用于测试分发
+- 如果要做真正面向用户的正式发布，还需要补完整签名配置
+
+### 5. 数据库版本演进还要继续补
+
+- 现在主存储已经切到 Room
+- 但未来 schema 变化时，仍然需要显式 migration 方案
+- 否则版本升级会成为新的维护风险点
+
+## 项目结构
+
+```text
+app/src/main/java/com/example/timetable/
 ├── data/
-│   ├── TimetableModels.kt        # 数据模型与工具函数
-│   ├── TimetableRepository.kt    # Repository（旧 JSON -> Room 迁移 / Flow 数据源）
-│   ├── TimetableShareCodec.kt    # JSON 编解码（分享 / 兼容旧存储）
-│   └── IcsCalendar.kt            # RFC 5545 ICS 解析与写出
+│   ├── BackgroundImageStore.kt
+│   ├── IcsCalendar.kt
+│   ├── TimetableModels.kt
+│   ├── TimetableRepository.kt
+│   ├── TimetableShareCodec.kt
+│   └── room/
 ├── notify/
-│   ├── CourseReminderScheduler.kt       # 接力式闹钟调度引擎
-│   ├── CourseReminderReceiver.kt        # 提醒触发 + 接力下一次
-│   └── CourseReminderRescheduleReceiver.kt  # 时区/包更新重同步
+│   ├── CourseReminderReceiver.kt
+│   ├── CourseReminderRescheduleReceiver.kt
+│   └── CourseReminderScheduler.kt
 └── ui/
-    ├── ScheduleViewModel.kt      # 状态管理（StateFlow + MVVM）
-    ├── ScheduleScreen.kt         # 主界面框架
-    ├── TimetableCalendar.kt      # LazyRow 水平周日历选择器
-    ├── TimetableCards.kt         # 课程卡片（彩色 Accent Bar）
-    ├── TimetableHero.kt          # Hero 区域（胶囊按钮布局）
-    ├── TimetableDialogs.kt       # 课程编辑弹窗
-    ├── QrCode.kt                 # 二维码分享
-    └── Theme.kt                  # Material 3 主题
+    ├── QrCode.kt
+    ├── ScheduleBackground.kt
+    ├── ScheduleScreen.kt
+    ├── ScheduleViewModel.kt
+    ├── Theme.kt
+    ├── TimetableCalendar.kt
+    ├── TimetableCards.kt
+    ├── TimetableDialogs.kt
+    └── TimetableHero.kt
 ```
 
----
+## 技术栈
 
-## 核心技术亮点
+- Kotlin
+- Jetpack Compose
+- Material 3
+- AndroidX Lifecycle
+- Room
+- Coroutines
+- ZXing
 
-### 1. UI：轻量化 Compose 组件架构
+## 构建环境
 
-- 放弃旧式 XML，全量使用 **Kotlin + Jetpack Compose**，声明式渲染
-- 经过 Phase 4 重构后，原单文件"神之类"代码被拆分为高内聚独立组件，有效抑制了 Recomposition 开销
-- 日历组件采用 `LazyRow` 水平周选择器替代全月网格，渲染节点减少 70%+
-- 课程卡片引入**基于标题 Hash 的自动着色 Accent Bar**，色彩稳定无溢出崩溃（使用 `hashCode and Int.MAX_VALUE`）
-- Hero 区域精简为渐变背景卡片 + 三栏胶囊按钮，屏幕占用比原版降低约 50%
+- `minSdk = 26`
+- `targetSdk = 36`
+- Java 17
+- Gradle + Android Gradle Plugin
 
-### 2. 状态管理：MVVM + UDF 全链路
+常用命令：
 
-- `ScheduleViewModel` 通过 `StateFlow` 对外暴露只读状态，Composable 使用 `collectAsStateWithLifecycle` 感知生命周期，防止后台内存泄漏
-- 用户消息通知采用 `SharedFlow`（非粘性），避免屏幕旋转重触发
-- `init` 块通过 `viewModelScope.launch` 异步加载数据，UI 线程零阻塞
-
-### 3. 持久层：Repository + Room
-
-```
-UI / ViewModel ──┐
-                  ├──► TimetableRepository ──► Room / SQLite
-Scheduler ────────┘
-```
-
-- 课表主存储已迁移至 Room，`ScheduleViewModel` 直接订阅 `Flow<List<TimetableEntry>>`
-- 旧版 JSON 数据仍可在启动时平滑迁移，分享编解码继续复用 `TimetableShareCodec`
-- 导入覆盖使用事务写入，避免中途删除成功、插入失败导致的半状态
-
-### 4. 电池优化：接力式单点闹钟调度
-
-```
-sync() 当前调用
-  └── 查找最近一节课 ──► 设定 1 个精确闹钟
-                              │
-                         触发通知
-                              │
-                   resyncFromStorage() ──► 设定下一个
+```powershell
+.\gradlew.bat testDebugUnitTest
+.\gradlew.bat assembleDebug
+.\gradlew.bat assembleRelease
 ```
 
-- `sync()` 每次只为**距离当前最近的一节课（或同时段并列课程）**设定精确闹钟
-- 通知触发后 `CourseReminderReceiver` 自动调用 `resyncFromStorage()` 接力下一次
-- 系统后台存活的唤醒锁从「全课程数」降至**恒定 1 个**，在 Android 14 高功耗审查下可完全通过
-- 保留 `RECEIVE_BOOT_COMPLETED`，用于开机、升级和时区变更后的提醒重建
+## 适合的下一步
 
-### 5. ICS 日历解析器
-
-- 完整实现 RFC 5545 标准的 ICS 读写，无第三方依赖
-- 支持 `RRULE`（每日/每周/每月重复规则）、`EXDATE`（排除日期）、`TZID`（时区参数）
-- 使用 `ZoneId.systemDefault()` 动态适配用户本地时区，无硬编码区域假设
-- 最大展开次数保护（`MAX_EXPANDED_OCCURRENCES = 512`）防止异常规则死循环
-
----
-
-## 已知局限性与演进路线
-
-### ⚠️ 局限 1：缺少无障碍语义（A11y）
-
-**现状**：自定义 Composable 未添加 `Modifier.semantics {}` 语义标签。  
-**影响**：TalkBack 读屏用户、大字体用户体验较差。  
-**建议**：为所有交互组件添加 `contentDescription` 与 `stateDescription`。
-
-### ❌ 局限 2：无云端同步
-
-**现状**：纯离线本地架构，分享依赖 Base64 二维码或 ICS 文件导出。  
-**影响**：设备丢失时数据无法通过账户恢复，无法跨设备实时同步。  
-**建议**：接入后端 API + JWT 鉴权，实现账户体系与云端课表同步。
-
----
-
-## 版本历史
-
-| Commit | 内容 |
-|--------|------|
-| `最新` | **Phase 5**：全量持久层重构（迁移至 Room 数据库框架，废弃全量 JSON I/O），实现 Flow 响应引擎与兼容性平滑数据过渡 |
-| `2ee90e4` | 撰写技术评估报告（本 Readme） |
-| `3cd344f` | **Phase 1-3**：接力闹钟 + Mutex 存储 + 消除硬编码日期 + 清理死代码 |
-| `cc27a71` | **Phase 4**：UI 模块化重构（LazyRow 日历 / Accent Bar 卡片 / Hero 精简） |
-| 更早 | 基础架构：Mutex 并发锁 / Android 14 精确闹钟适配 / ICS 解析器 / MVVM 重构 |
-
----
-
-## 运行环境
-
-| 项目 | 要求 |
-|------|------|
-| 最低 SDK | Android 8.0（API 26） |
-| 目标 SDK | API 36 |
-| 语言 | Kotlin |
-| UI 框架 | Jetpack Compose + Material 3 |
-| 构建工具 | Gradle + AGP |
+- 补正式 release 签名配置
+- 为关键交互增加 Compose UI 测试
+- 增加无障碍语义和更完整的内容描述
+- 设计数据库显式迁移策略
+- 如果产品目标扩大，再考虑云同步和账号系统
