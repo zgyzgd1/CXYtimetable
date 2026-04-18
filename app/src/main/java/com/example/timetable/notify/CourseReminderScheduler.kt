@@ -40,6 +40,11 @@ object CourseReminderScheduler {
     private val systemZone: ZoneId
         get() = ZoneId.systemDefault()
 
+    internal data class SchedulePlan(
+        val newSchedules: Map<Int, Pair<Long, TimetableEntry>>,
+        val codesToCancel: Set<Int>,
+    )
+
     @Synchronized
     fun sync(context: Context, entries: List<TimetableEntry>) {
         val appContext = context.applicationContext
@@ -50,43 +55,19 @@ object CourseReminderScheduler {
         val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val oldCodes = prefs.getStringSet(KEY_CODES, emptySet()).orEmpty().mapNotNull { it.toIntOrNull() }.toSet()
 
-        val now = System.currentTimeMillis()
-        val newSchedules = mutableMapOf<Int, Pair<Long, TimetableEntry>>()
+        val plan = buildSchedulePlan(
+            entries = entries,
+            reminderMinutes = reminderMinutes,
+            nowMillis = System.currentTimeMillis(),
+            oldCodes = oldCodes,
+        )
 
-        // 仅寻找距离现在最近的"下一个"（或者同时间的几个）课程，实现接力式定闹钟
-        var nextTriggerAtMillis: Long? = null
-        val nextEntries = mutableListOf<TimetableEntry>()
-
-        entries.forEach { entry ->
-            val triggerAtMillis = computeTriggerAtMillis(entry, reminderMinutes) ?: return@forEach
-            // 只看未来的课程，过去的不定闹钟
-            if (triggerAtMillis <= now) return@forEach
-
-            if (nextTriggerAtMillis == null || triggerAtMillis < nextTriggerAtMillis) {
-                nextTriggerAtMillis = triggerAtMillis
-                nextEntries.clear()
-                nextEntries.add(entry)
-            } else if (triggerAtMillis == nextTriggerAtMillis) {
-                nextEntries.add(entry)
-            }
-        }
-
-        val scheduledTriggerAtMillis = nextTriggerAtMillis ?: return
-
-        nextEntries.forEach { entry ->
-            val requestCode = requestCodeFor(entry, reminderMinutes)
-            newSchedules[requestCode] = scheduledTriggerAtMillis to entry
-        }
-
-        val newCodes = newSchedules.keys
-        val codesToCancel = oldCodes - newCodes
-
-        codesToCancel.forEach { code ->
+        plan.codesToCancel.forEach { code ->
             cancelAlarm(appContext, alarmManager, code)
         }
 
         // 为当前需要触发的课程全部重设闹钟，保证同 requestCode 的文案也能更新。
-        newSchedules.forEach { (requestCode, scheduled) ->
+        plan.newSchedules.forEach { (requestCode, scheduled) ->
             val (triggerAtMillis, entry) = scheduled
             val pendingIntent = createPendingIntent(
                 context = appContext,
@@ -98,7 +79,47 @@ object CourseReminderScheduler {
             scheduleAlarm(alarmManager, triggerAtMillis, pendingIntent)
         }
 
-        prefs.edit().putStringSet(KEY_CODES, newCodes.map { it.toString() }.toSet()).apply()
+        prefs.edit().putStringSet(KEY_CODES, plan.newSchedules.keys.map { it.toString() }.toSet()).apply()
+    }
+
+    internal fun buildSchedulePlan(
+        entries: List<TimetableEntry>,
+        reminderMinutes: Int,
+        nowMillis: Long,
+        oldCodes: Set<Int>,
+    ): SchedulePlan {
+        val newSchedules = mutableMapOf<Int, Pair<Long, TimetableEntry>>()
+
+        // 仅寻找距离现在最近的"下一个"（或者同时间的几个）课程，实现接力式定闹钟
+        var nextTriggerAtMillis: Long? = null
+        val nextEntries = mutableListOf<TimetableEntry>()
+
+        entries.forEach { entry ->
+            val triggerAtMillis = computeTriggerAtMillis(entry, reminderMinutes) ?: return@forEach
+            // 只看未来的课程，过去的不定闹钟
+            if (triggerAtMillis <= nowMillis) return@forEach
+
+            if (nextTriggerAtMillis == null || triggerAtMillis < nextTriggerAtMillis) {
+                nextTriggerAtMillis = triggerAtMillis
+                nextEntries.clear()
+                nextEntries.add(entry)
+            } else if (triggerAtMillis == nextTriggerAtMillis) {
+                nextEntries.add(entry)
+            }
+        }
+
+        nextTriggerAtMillis?.let { scheduledTriggerAtMillis ->
+            nextEntries.forEach { entry ->
+                val requestCode = requestCodeFor(entry, reminderMinutes)
+                newSchedules[requestCode] = scheduledTriggerAtMillis to entry
+            }
+        }
+
+        val newCodes = newSchedules.keys
+        return SchedulePlan(
+            newSchedules = newSchedules,
+            codesToCancel = oldCodes - newCodes,
+        )
     }
 
     fun getReminderMinutes(context: Context): Int {

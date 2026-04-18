@@ -47,4 +47,29 @@ class TimetableShareCodecTest {
 
         assertTrue(decoded.isEmpty())
     }
+
+    @Test
+    fun decodeReturnsEmptyForVersionMismatch() {
+        val payload = """
+            {
+              "version": 999,
+              "entries": [
+                {
+                  "id": "entry-1",
+                  "title": "损坏数据",
+                  "date": "2026-04-16",
+                  "dayOfWeek": 4,
+                  "startMinutes": 480,
+                  "endMinutes": 540,
+                  "location": "A-101",
+                  "note": ""
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val decoded = TimetableShareCodec.decode(payload)
+
+        assertTrue(decoded.isEmpty())
+    }
 }

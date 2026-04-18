@@ -14,11 +14,11 @@
 | 维度 | 评价 |
 |------|------|
 | UI 架构 | ✅ 优秀：Compose + MVVM + UDF，组件化良好 |
-| 并发安全 | ✅ 优秀：全局 Mutex 单例 Repository，无读写竞争 |
+| 并发安全 | ✅ 良好：Repository + Room + Flow，读写路径清晰 |
 | 电池优化 | ✅ 优秀：接力式单点闹钟，后台唤醒锁降至最低 |
 | 数据导入导出 | ✅ 良好：手写 RFC 5545 ICS 解析器，支持 RRULE |
 | 代码整洁度 | ✅ 良好：无硬编码日期、无死代码、无冗余 import |
-| 持久层 | ⚠️ 一般：单文件 JSON 全量写入，不具备查询能力 |
+| 持久层 | ⚠️ 待完善：Room 已落地，后续 schema 升级需补显式 Migration |
 | 无障碍支持 | ⚠️ 待改善：缺少 semantics 语义标签 |
 | 云同步 | ❌ 不支持：当前为纯本地离线架构 |
 
@@ -30,8 +30,8 @@
 app/
 ├── data/
 │   ├── TimetableModels.kt        # 数据模型与工具函数
-│   ├── TimetableRepository.kt    # 存储单例（Mutex 并发安全）
-│   ├── TimetableShareCodec.kt    # JSON 编解码（分享/持久化）
+│   ├── TimetableRepository.kt    # Repository（旧 JSON -> Room 迁移 / Flow 数据源）
+│   ├── TimetableShareCodec.kt    # JSON 编解码（分享 / 兼容旧存储）
 │   └── IcsCalendar.kt            # RFC 5545 ICS 解析与写出
 ├── notify/
 │   ├── CourseReminderScheduler.kt       # 接力式闹钟调度引擎
@@ -66,17 +66,17 @@ app/
 - 用户消息通知采用 `SharedFlow`（非粘性），避免屏幕旋转重触发
 - `init` 块通过 `viewModelScope.launch` 异步加载数据，UI 线程零阻塞
 
-### 3. 并发安全存储：Repository + Mutex
+### 3. 持久层：Repository + Room
 
 ```
 UI / ViewModel ──┐
-                  ├──► TimetableRepository (Mutex) ──► timetable_entries.json
+                  ├──► TimetableRepository ──► Room / SQLite
 Scheduler ────────┘
 ```
 
-- 提取全局单例 `TimetableRepository`，统管所有 JSON 文件 I/O
-- 所有读写操作通过 `Mutex.withLock` 独占执行，彻底消除 UI 协程与后台广播接收器之间的读写竞争
-- 内置存储损坏检测：自动备份并通过 Snackbar 告警，确保数据有迹可查
+- 课表主存储已迁移至 Room，`ScheduleViewModel` 直接订阅 `Flow<List<TimetableEntry>>`
+- 旧版 JSON 数据仍可在启动时平滑迁移，分享编解码继续复用 `TimetableShareCodec`
+- 导入覆盖使用事务写入，避免中途删除成功、插入失败导致的半状态
 
 ### 4. 电池优化：接力式单点闹钟调度
 
@@ -92,7 +92,7 @@ sync() 当前调用
 - `sync()` 每次只为**距离当前最近的一节课（或同时段并列课程）**设定精确闹钟
 - 通知触发后 `CourseReminderReceiver` 自动调用 `resyncFromStorage()` 接力下一次
 - 系统后台存活的唤醒锁从「全课程数」降至**恒定 1 个**，在 Android 14 高功耗审查下可完全通过
-- 已移除 `RECEIVE_BOOT_COMPLETED` 权限，保持应用最小权力原则
+- 保留 `RECEIVE_BOOT_COMPLETED`，用于开机、升级和时区变更后的提醒重建
 
 ### 5. ICS 日历解析器
 
@@ -136,7 +136,7 @@ sync() 当前调用
 | 项目 | 要求 |
 |------|------|
 | 最低 SDK | Android 8.0（API 26） |
-| 目标 SDK | Android 14（API 34） |
+| 目标 SDK | API 36 |
 | 语言 | Kotlin |
 | UI 框架 | Jetpack Compose + Material 3 |
 | 构建工具 | Gradle + AGP |

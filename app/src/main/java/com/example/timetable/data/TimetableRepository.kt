@@ -30,6 +30,26 @@ object TimetableRepository {
         return !hasEntries && !hasSeededSampleEntries
     }
 
+    private suspend fun migrateLegacyStorageIfPresent(
+        context: Context,
+        dao: com.example.timetable.data.room.TimetableDao,
+    ): Boolean {
+        val file = getLegacyStorageFile(context)
+        if (!file.exists()) return false
+
+        val payload = runCatching { file.readText() }.getOrDefault("")
+        val persisted = TimetableShareCodec.decode(payload)
+
+        if (persisted.isNotEmpty()) {
+            dao.upsertEntries(persisted)
+            markSampleEntriesSeeded(context)
+        }
+
+        // 删除旧 JSON 缓存，此后均以 Room 数据库为源
+        file.delete()
+        return persisted.isNotEmpty()
+    }
+
     private suspend fun seedSampleEntriesIfNeeded(context: Context, dao: com.example.timetable.data.room.TimetableDao) {
         val currentEntries = dao.getAllEntries()
         if (shouldSeedSampleEntries(currentEntries.isNotEmpty(), hasSeededSampleEntries(context))) {
@@ -44,27 +64,12 @@ object TimetableRepository {
      * 迁移完毕后安全删除旧版 JSON。如果连 DB 也是空的则插入模板数据。
      */
     suspend fun ensureMigrated(context: Context) = withContext(Dispatchers.IO) {
-        val file = getLegacyStorageFile(context)
         val dao = AppDatabase.getDatabase(context).timetableDao()
-        
-        if (!file.exists()) {
-            seedSampleEntriesIfNeeded(context, dao)
-            return@withContext
-        }
 
-        val payload = runCatching { file.readText() }.getOrDefault("")
-        val persisted = TimetableShareCodec.decode(payload)
-
-        if (persisted.isNotEmpty()) {
-            dao.upsertEntries(persisted)
-        } else {
+        val migrated = migrateLegacyStorageIfPresent(context, dao)
+        if (!migrated) {
             seedSampleEntriesIfNeeded(context, dao)
         }
-
-        markSampleEntriesSeeded(context)
-        
-        // 删除旧 JSON 缓存，此后均以 Room 数据库为源
-        file.delete()
     }
 
     /**
@@ -78,7 +83,11 @@ object TimetableRepository {
      * 一次性获取挂起查询（后台广播接收器接力时使用此接口读取）
      */
     suspend fun getEntriesNow(context: Context): List<TimetableEntry> {
-        return AppDatabase.getDatabase(context).timetableDao().getAllEntries()
+        return withContext(Dispatchers.IO) {
+            val dao = AppDatabase.getDatabase(context).timetableDao()
+            migrateLegacyStorageIfPresent(context, dao)
+            dao.getAllEntries()
+        }
     }
 
     suspend fun upsertEntry(context: Context, entry: TimetableEntry) = withContext(Dispatchers.IO) {

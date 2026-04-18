@@ -1,72 +1,66 @@
 package com.example.timetable.notify
 
-import com.example.timetable.data.TimetableShareCodec
+import com.example.timetable.data.TimetableEntry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
+import java.time.ZoneId
 
-/**
- * 测试课程数据解码逻辑
- * decode 逻辑已迁移至 TimetableRepository（内部使用 TimetableShareCodec），
- * 此处直接测试 TimetableShareCodec.decode 的正确性。
- */
 class CourseReminderSchedulerTest {
     @Test
-    fun decodeReturnsEntriesWhenPayloadValid() {
-        val payload = """
-            {
-              "version": 1,
-              "entries": [
-                {
-                  "id": "entry-1",
-                  "title": "数据结构",
-                  "date": "2026-04-16",
-                  "dayOfWeek": 4,
-                  "startMinutes": 480,
-                  "endMinutes": 540,
-                  "location": "A-101",
-                  "note": ""
-                }
-              ]
-            }
-        """.trimIndent()
+    fun buildSchedulePlanCancelsOldCodesWhenNoFutureEntriesRemain() {
+        val pastDate = LocalDate.of(2020, 1, 1)
+        val oldCodes = setOf(101, 202)
+        val plan = CourseReminderScheduler.buildSchedulePlan(
+            entries = listOf(
+                TimetableEntry(
+                    id = "past-entry",
+                    title = "高等数学",
+                    date = pastDate.toString(),
+                    dayOfWeek = pastDate.dayOfWeek.value,
+                    startMinutes = 8 * 60,
+                    endMinutes = 9 * 60,
+                )
+            ),
+            reminderMinutes = 20,
+            nowMillis = System.currentTimeMillis(),
+            oldCodes = oldCodes,
+        )
 
-        val entries = TimetableShareCodec.decode(payload)
-
-        assertEquals(1, entries.size)
-        assertEquals("数据结构", entries[0].title)
-        assertEquals("A-101", entries[0].location)
+        assertTrue(plan.newSchedules.isEmpty())
+        assertEquals(oldCodes, plan.codesToCancel)
     }
 
     @Test
-    fun decodeReturnsEmptyWhenPayloadMalformed() {
-        val entries = TimetableShareCodec.decode("not-json")
+    fun buildSchedulePlanKeepsOnlyNearestConcurrentEntries() {
+        val zone = ZoneId.systemDefault()
+        val courseDate = LocalDate.of(2099, 1, 5)
+        val nowMillis = courseDate.minusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        val earliestA = course("entry-a", courseDate, 8 * 60, 9 * 60)
+        val earliestB = course("entry-b", courseDate, 8 * 60, 10 * 60)
+        val later = course("entry-c", courseDate, 10 * 60, 11 * 60)
 
-        assertTrue(entries.isEmpty())
+        val plan = CourseReminderScheduler.buildSchedulePlan(
+            entries = listOf(later, earliestA, earliestB),
+            reminderMinutes = 20,
+            nowMillis = nowMillis,
+            oldCodes = emptySet(),
+        )
+
+        assertEquals(setOf("entry-a", "entry-b"), plan.newSchedules.values.map { it.second.id }.toSet())
+        assertEquals(1, plan.newSchedules.values.map { it.first }.distinct().size)
+        assertTrue(plan.codesToCancel.isEmpty())
     }
 
-    @Test
-    fun decodeReturnsEmptyWhenVersionMismatch() {
-        val payload = """
-            {
-              "version": 999,
-              "entries": [
-                {
-                  "id": "entry-1",
-                  "title": "损坏数据",
-                  "date": "2026-04-16",
-                  "dayOfWeek": 4,
-                  "startMinutes": 480,
-                  "endMinutes": 540,
-                  "location": "A-101",
-                  "note": ""
-                }
-              ]
-            }
-        """.trimIndent()
-
-        val entries = TimetableShareCodec.decode(payload)
-
-        assertTrue(entries.isEmpty())
+    private fun course(id: String, date: LocalDate, startMinutes: Int, endMinutes: Int): TimetableEntry {
+        return TimetableEntry(
+            id = id,
+            title = id,
+            date = date.toString(),
+            dayOfWeek = date.dayOfWeek.value,
+            startMinutes = startMinutes,
+            endMinutes = endMinutes,
+        )
     }
 }
