@@ -15,12 +15,19 @@ android {
         applicationId = "com.example.timetable"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
     }
 
     buildFeatures {
         compose = true
+    }
+
+    buildTypes {
+        getByName("release") {
+            // Keep release artifacts consistently installable until a proper release keystore is configured.
+            signingConfig = signingConfigs.getByName("debug")
+        }
     }
 
     compileOptions {
