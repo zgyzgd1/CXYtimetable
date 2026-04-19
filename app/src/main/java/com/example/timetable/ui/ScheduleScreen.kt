@@ -87,6 +87,7 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
     var editingEntry by remember { mutableStateOf<TimetableEntry?>(null) }
     var editingWeekSlotIndex by remember { mutableStateOf<Int?>(null) }
     var addingWeekSlot by remember { mutableStateOf(false) }
+    var editingWeekSlotCount by remember { mutableStateOf(false) }
     var reminderMinutes by remember { mutableStateOf(CourseReminderScheduler.getReminderMinutes(context)) }
     val reminderOptions = remember { CourseReminderScheduler.reminderMinuteOptions() }
 
@@ -219,6 +220,7 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
                         cardAlpha = weekCardAlpha,
                         cardHue = weekCardHue,
                         onAddSlot = { addingWeekSlot = true },
+                        onCustomizeSlotCount = { editingWeekSlotCount = true },
                         onEntryClick = { editingEntry = it },
                         onSlotClick = { editingWeekSlotIndex = it },
                     )
@@ -400,12 +402,47 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
             },
         )
     }
+
+    if (editingWeekSlotCount) {
+        WeekSlotCountDialog(
+            initialCount = weekTimeSlots.size,
+            onDismiss = { editingWeekSlotCount = false },
+            onSave = { count ->
+                val updatedSlots = resizeWeekTimeSlots(weekTimeSlots, count)
+                weekTimeSlots = updatedSlots
+                AppearanceStore.setWeekTimeSlots(context, updatedSlots)
+                editingWeekSlotCount = false
+                scope.launch { snackbarHostState.showSnackbar("已调整为 $count 节") }
+            },
+        )
+    }
 }
 
 private fun defaultNewWeekSlot(slots: List<WeekTimeSlot>): WeekTimeSlot {
     val lastSlot = slots.maxByOrNull { it.endMinutes }
-    if (lastSlot == null) return WeekTimeSlot(8 * 60, 8 * 60 + 45)
-    val start = (lastSlot.endMinutes + 10).coerceAtMost(23 * 60)
-    val end = (start + 45).coerceAtMost(24 * 60)
-    return if (start < end) WeekTimeSlot(start, end) else WeekTimeSlot(23 * 60, 23 * 60 + 30)
+    if (lastSlot == null) return WeekTimeSlot(8 * 60, 8 * 60 + 40)
+    return nextWeekTimeSlot(lastSlot)
+}
+
+private fun resizeWeekTimeSlots(slots: List<WeekTimeSlot>, targetCount: Int): List<WeekTimeSlot> {
+    if (targetCount <= 0) return slots
+    if (slots.size == targetCount) return slots.sortedBy { it.startMinutes }
+    if (slots.size > targetCount) return slots.sortedBy { it.startMinutes }.take(targetCount)
+
+    val expanded = slots.sortedBy { it.startMinutes }.toMutableList()
+    while (expanded.size < targetCount) {
+        val seed = expanded.lastOrNull()
+        expanded += if (seed == null) {
+            WeekTimeSlot(8 * 60, 8 * 60 + 40)
+        } else {
+            nextWeekTimeSlot(seed)
+        }
+    }
+    return expanded
+}
+
+private fun nextWeekTimeSlot(previous: WeekTimeSlot): WeekTimeSlot {
+    val start = (previous.endMinutes + 5).coerceAtMost(23 * 60 + 19)
+    val end = (start + 40).coerceAtMost(24 * 60 - 1)
+    return if (start < end) WeekTimeSlot(start, end) else WeekTimeSlot(23 * 60, 23 * 60 + 39)
 }

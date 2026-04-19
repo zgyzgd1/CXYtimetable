@@ -224,12 +224,8 @@ fun WeekSlotEditorDialog(
                     val parsedStart = parseMinutes(startTime)
                     val parsedEnd = parseMinutes(endTime)
                     when {
-                        parsedStart == null || parsedEnd == null -> {
-                            errorText = "请输入合法时间，例如 08:00"
-                        }
-                        parsedStart >= parsedEnd -> {
-                            errorText = "结束时间需要晚于开始时间"
-                        }
+                        parsedStart == null || parsedEnd == null -> errorText = "请输入合法时间，例如 08:00"
+                        parsedStart >= parsedEnd -> errorText = "结束时间需要晚于开始时间"
                         else -> onSave(WeekTimeSlot(parsedStart, parsedEnd))
                     }
                 },
@@ -247,6 +243,63 @@ fun WeekSlotEditorDialog(
                 OutlinedButton(onClick = onDismiss) {
                     Text("取消")
                 }
+            }
+        },
+    )
+}
+
+@Composable
+fun WeekSlotCountDialog(
+    initialCount: Int,
+    onDismiss: () -> Unit,
+    onSave: (Int) -> Unit,
+) {
+    var countText by rememberSaveable(initialCount) { mutableStateOf(initialCount.toString()) }
+    var errorText by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("自定义节数") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                AppTextField(
+                    value = countText,
+                    onValueChange = {
+                        countText = it
+                        errorText = null
+                    },
+                    label = "总节数",
+                    placeholder = "20",
+                    keyboardType = KeyboardType.Number,
+                    singleLine = true,
+                )
+                Text(
+                    text = "会保留前面的节次时间，多出来的节次自动补在后面，减少时从末尾裁剪。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                errorText?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val parsed = countText.toIntOrNull()
+                    when {
+                        parsed == null -> errorText = "请输入数字"
+                        parsed !in 1..20 -> errorText = "节数范围为 1 到 20"
+                        else -> onSave(parsed)
+                    }
+                },
+            ) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("取消")
             }
         },
     )

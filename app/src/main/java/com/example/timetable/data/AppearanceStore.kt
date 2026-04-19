@@ -54,16 +54,18 @@ object AppearanceStore {
         prefs(context).edit().putString(KEY_WEEK_TIME_SLOTS, raw).apply()
     }
 
-    fun defaultWeekTimeSlots(): List<WeekTimeSlot> = listOf(
-        WeekTimeSlot(8 * 60, 8 * 60 + 45),
-        WeekTimeSlot(8 * 60 + 55, 9 * 60 + 40),
-        WeekTimeSlot(10 * 60 + 10, 10 * 60 + 55),
-        WeekTimeSlot(11 * 60 + 5, 11 * 60 + 50),
-        WeekTimeSlot(14 * 60 + 30, 15 * 60 + 15),
-        WeekTimeSlot(15 * 60 + 25, 16 * 60 + 10),
-        WeekTimeSlot(16 * 60 + 20, 17 * 60 + 5),
-        WeekTimeSlot(17 * 60 + 15, 18 * 60),
-    )
+    fun defaultWeekTimeSlots(): List<WeekTimeSlot> {
+        val slots = mutableListOf<WeekTimeSlot>()
+        var start = 8 * 60
+        repeat(20) {
+            val end = (start + 40).coerceAtMost(24 * 60)
+            if (start < end) {
+                slots += WeekTimeSlot(start, end)
+            }
+            start += 45
+        }
+        return slots
+    }
 }
 
 data class WeekTimeSlot(

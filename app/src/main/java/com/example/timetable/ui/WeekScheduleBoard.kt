@@ -56,6 +56,7 @@ fun WeekScheduleBoard(
     cardAlpha: Float,
     cardHue: Float,
     onAddSlot: () -> Unit,
+    onCustomizeSlotCount: () -> Unit,
     onEntryClick: (TimetableEntry) -> Unit,
     onSlotClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
@@ -106,6 +107,10 @@ fun WeekScheduleBoard(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                GlassActionChip(
+                    label = "节数 ${slots.size}",
+                    onClick = onCustomizeSlotCount,
+                )
                 GlassActionChip(
                     label = "新增节次",
                     onClick = onAddSlot,
