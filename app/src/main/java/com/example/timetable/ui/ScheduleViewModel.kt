@@ -7,31 +7,42 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.timetable.data.IcsCalendar
 import com.example.timetable.data.TimetableEntry
+import com.example.timetable.data.TimetableRepository
 import com.example.timetable.data.formatMinutes
 import com.example.timetable.notify.CourseReminderScheduler
-import com.example.timetable.data.TimetableRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.LocalDate
 
-/**
- * 课程表视图模型
- * 管理课程数据的状态和业务逻辑，包括增删改查、导入导出等功能
- * 使用 Kotlin Flow + Room 数据库驱动数据流
- */
 class ScheduleViewModel(application: Application) : AndroidViewModel(application) {
 
-    // 真正的实时课程流直接暴露自 Repository (Room Database)
     val entries: StateFlow<List<TimetableEntry>> = TimetableRepository.getEntriesStream(application)
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
+            initialValue = emptyList(),
+        )
+
+    val entriesByDate: StateFlow<Map<LocalDate, List<TimetableEntry>>> = entries
+        .map { currentEntries ->
+            currentEntries
+                .mapNotNull { entry ->
+                    com.example.timetable.data.parseEntryDate(entry.date)?.let { date -> date to entry }
+                }
+                .groupBy(keySelector = { it.first }, valueTransform = { it.second })
+                .mapValues { (_, dayEntries) -> dayEntries.sortedBy { it.startMinutes } }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyMap(),
         )
 
     private val _messages = MutableSharedFlow<String>()
@@ -39,20 +50,15 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
 
     init {
         viewModelScope.launch {
-            // 平滑升级与兜底方案，完成迁移。
             TimetableRepository.ensureMigrated(getApplication())
-            
-            // 实时订阅 DB 更新，如果有任何增删操作影响了 Flow 数据，
-            // 就会自动触发提醒同步模块
+        }
+        viewModelScope.launch {
             entries.collect { currentEntries ->
                 syncReminders(currentEntries)
             }
         }
     }
 
-    /**
-     * 添加或更新课程条目
-     */
     fun upsertEntry(entry: TimetableEntry) {
         val normalized = normalizeEntry(entry)
         validateEntry(normalized)?.let {
@@ -63,20 +69,17 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
 
         viewModelScope.launch {
             TimetableRepository.upsertEntry(getApplication(), normalized)
-            
+
             if (conflict == null) {
                 postMessage("已保存课程")
             } else {
                 postMessage(
-                    "已保存课程（与 ${conflict.title} ${formatMinutes(conflict.startMinutes)}-${formatMinutes(conflict.endMinutes)} 时间重叠）"
+                    "已保存课程（与 ${conflict.title} ${formatMinutes(conflict.startMinutes)}-${formatMinutes(conflict.endMinutes)} 时间重叠）",
                 )
             }
         }
     }
 
-    /**
-     * 删除指定 ID 的课程条目
-     */
     fun deleteEntry(entryId: String) {
         viewModelScope.launch {
             TimetableRepository.deleteEntry(getApplication(), entryId)
@@ -84,14 +87,8 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    /**
-     * 导出课程表为 ICS 格式
-     */
     fun exportIcs(): String = IcsCalendar.write(entries.value)
 
-    /**
-     * 从 ICS 文件导入课程数据
-     */
     fun importFromIcs(contentResolver: ContentResolver, uri: Uri) {
         viewModelScope.launch {
             val text = readText(contentResolver, uri)
@@ -149,9 +146,9 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         }
 
         val conflictCount = countConflictPairs(validEntries)
-        
+
         TimetableRepository.replaceAllEntries(getApplication(), validEntries)
-        
+
         if (invalidCount == 0 && conflictCount == 0) {
             postMessage("已导入 ${validEntries.size} 条课程，并保存为当前课程表")
         } else {

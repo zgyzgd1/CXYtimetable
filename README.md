@@ -9,7 +9,6 @@
 - 课前提醒与接力式闹钟调度
 - 本地 Room 持久化与旧 JSON 数据迁移
 - 自定义背景图导入，并在应用重启后保持生效
-- 二维码分享能力
 
 ## 近期变化
 
@@ -43,7 +42,7 @@
 
 ### 2. 功能闭环完整
 
-- 课表编辑、按日浏览、导入导出、提醒、分享都已经串起来
+- 课表编辑、按日浏览、导入导出、提醒都已经串起来
 - 自定义背景图这样的偏个性化功能也已经接入持久化，不只是临时 UI 状态
 - 提醒逻辑采用“只保留最近一批提醒”的接力式策略，更符合 Android 后台限制
 
@@ -93,14 +92,12 @@ app/src/main/java/com/example/timetable/
 │   ├── IcsCalendar.kt
 │   ├── TimetableModels.kt
 │   ├── TimetableRepository.kt
-│   ├── TimetableShareCodec.kt
 │   └── room/
 ├── notify/
 │   ├── CourseReminderReceiver.kt
 │   ├── CourseReminderRescheduleReceiver.kt
 │   └── CourseReminderScheduler.kt
 └── ui/
-    ├── QrCode.kt
     ├── ScheduleBackground.kt
     ├── ScheduleScreen.kt
     ├── ScheduleViewModel.kt
@@ -119,7 +116,6 @@ app/src/main/java/com/example/timetable/
 - AndroidX Lifecycle
 - Room
 - Coroutines
-- ZXing
 
 ## 构建环境
 

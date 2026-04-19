@@ -63,6 +63,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
     val entries by viewModel.entries.collectAsStateWithLifecycle()
+    val entriesByDate by viewModel.entriesByDate.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -132,11 +133,17 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
         }
     }
 
-    val filteredEntries = remember(entries, selectedDate, isWeekMode, selectedWeekStart, selectedWeekEnd) {
-        entries.filter { entry ->
-            val entryDate = parseEntryDate(entry.date) ?: return@filter false
-            if (isWeekMode) entryDate in selectedWeekStart..selectedWeekEnd else entry.date == selectedDate
-        }.sortedWith(compareBy<TimetableEntry> { it.date }.thenBy { it.startMinutes })
+    val filteredEntries = remember(entriesByDate, selectedDate, isWeekMode, selectedWeekStart) {
+        if (isWeekMode) {
+            buildList {
+                for (offset in 0L..6L) {
+                    val date = selectedWeekStart.plusDays(offset)
+                    addAll(entriesByDate[date].orEmpty())
+                }
+            }
+        } else {
+            entriesByDate[selectedLocalDate].orEmpty()
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {

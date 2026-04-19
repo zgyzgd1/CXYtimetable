@@ -71,8 +71,14 @@ fun WeekScheduleBoard(
     val weekNumber = remember(selectedDate) {
         selectedDate.get(WeekFields.of(Locale.getDefault()).weekOfWeekBasedYear())
     }
-    val selectedDayEntries = remember(entries, selectedDate) {
-        entries.filter { entryDate(it) == selectedDate }
+    val entriesByDay = remember(entries) {
+        entries
+            .mapNotNull { entry -> entryDate(entry)?.let { date -> date to entry } }
+            .groupBy(keySelector = { it.first }, valueTransform = { it.second })
+            .mapValues { (_, dayEntries) -> dayEntries.sortedBy { it.startMinutes } }
+    }
+    val selectedDayEntries = remember(entriesByDay, selectedDate) {
+        entriesByDay[selectedDate].orEmpty()
     }
     val horizontalScrollState = rememberScrollState()
 
@@ -144,12 +150,9 @@ fun WeekScheduleBoard(
                     )
 
                     days.forEach { day ->
-                        val dayEntries = entries
-                            .filter { entryDate(it) == day }
-                            .sortedBy { it.startMinutes }
-                            .filter { entry ->
-                                entry.startMinutes < slot.endMinutes && slot.startMinutes < entry.endMinutes
-                            }
+                        val slotEntries = entriesByDay[day].orEmpty().filter { entry ->
+                            entry.startMinutes < slot.endMinutes && slot.startMinutes < entry.endMinutes
+                        }
 
                         Box(
                             modifier = Modifier
@@ -159,7 +162,7 @@ fun WeekScheduleBoard(
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(if (day == selectedDate) Color(0x22FFFFFF) else Color(0x14FFFFFF)),
                         ) {
-                            if (dayEntries.isEmpty()) {
+                            if (slotEntries.isEmpty()) {
                                 Box(modifier = Modifier.matchParentSize())
                             } else {
                                 Column(
@@ -168,7 +171,7 @@ fun WeekScheduleBoard(
                                         .padding(3.dp),
                                     verticalArrangement = Arrangement.spacedBy(4.dp),
                                 ) {
-                                    dayEntries.take(2).forEach { entry ->
+                                    slotEntries.take(2).forEach { entry ->
                                         val color = boardAccentColors[
                                             (entry.title.hashCode() and Int.MAX_VALUE) % boardAccentColors.size
                                         ]
@@ -180,9 +183,9 @@ fun WeekScheduleBoard(
                                             onClick = { onEntryClick(entry) },
                                         )
                                     }
-                                    if (dayEntries.size > 2) {
+                                    if (slotEntries.size > 2) {
                                         Text(
-                                            text = "+${dayEntries.size - 2}",
+                                            text = "+${slotEntries.size - 2}",
                                             modifier = Modifier
                                                 .align(Alignment.End)
                                                 .padding(end = 4.dp, top = 2.dp),
@@ -474,9 +477,7 @@ private fun WeekEntryBlock(
     }
 }
 
-private fun entryDate(entry: TimetableEntry): LocalDate? = runCatching {
-    LocalDate.parse(entry.date)
-}.getOrNull()
+private fun entryDate(entry: TimetableEntry): LocalDate? = com.example.timetable.data.parseEntryDate(entry.date)
 
 private fun chineseWeekday(dayOfWeek: DayOfWeek): String = when (dayOfWeek) {
     DayOfWeek.MONDAY -> "一"

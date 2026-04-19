@@ -5,7 +5,7 @@
 工程已经完整搭建，所有源代码、Gradle 配置、任务入口已经готов。
 
 **已完成：**
-- ✅ 核心功能实现（课程表 CRUD、iCalendar 导入导出、二维码分享）
+- ✅ 核心功能实现（课程表 CRUD、iCalendar 导入导出）
 - ✅ 完整的 Kotlin + Jetpack Compose UI 层
 - ✅ Gradle 8.7 自举脚本，JDK 17 自动配置
 - ✅ 所有依赖声明，仓库源已配置
@@ -75,12 +75,10 @@ VS Code 任务：
   - `ui/` - Compose 界面和业务逻辑
     - `ScheduleScreen.kt` - 主屏幕
     - `ScheduleViewModel.kt` - 数据和状态管理
-    - `QrCode.kt` - 二维码生成
     - `Theme.kt` - Material 3 主题
   - `data/` - 数据模型和导入导出
     - `TimetableModels.kt` - 课程表数据结构
     - `IcsCalendar.kt` - iCalendar 导入导出
-    - `TimetableShareCodec.kt` - 二维码编码
 
 ## 关键特性
 
@@ -94,11 +92,6 @@ VS Code 任务：
    - 自动生成周期规则（RRULE:FREQ=WEEKLY）
    - 支持导入多源课程表
 
-3. **二维码分享**
-   - ZXing 库生成高清 QR 码
-   - JSON 格式编码课程数据
-   - 扫码+点击导入，一键同步
-
 ## 依赖概览
 
 | 库 | 版本 | 用途 |
@@ -107,7 +100,6 @@ VS Code 任务：
 | Kotlin | 1.9.24 | 语言 |
 | Jetpack Compose | 2024.06.00 | UI 框架 |
 | Material 3 | 1.12.0 | 设计系统 |
-| ZXing | 3.5.3 | 二维码 |
 | Coroutines | 1.8.1 | 异步任务 |
 
 ## 下一步
@@ -115,7 +107,7 @@ VS Code 任务：
 编译完成后：
 
 1. **运行**：在模拟器或真机上选择`app`模块运行
-2. **测试**：创建几条课程，验证导入导出、二维码分享
+2. **测试**：创建几条课程，验证导入导出
 3. **扩展**：
    - 添加云同步（Firebase/自建 API）
    - 学期切换、教室冲突检测

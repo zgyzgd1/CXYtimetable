@@ -3,10 +3,11 @@ package com.example.timetable.data
 import android.content.Context
 import androidx.room.withTransaction
 import com.example.timetable.data.room.AppDatabase
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
-import java.io.File
+import org.json.JSONObject
 
 object TimetableRepository {
     private const val STORAGE_FILE_NAME = "timetable_entries.json"
@@ -38,14 +39,13 @@ object TimetableRepository {
         if (!file.exists()) return false
 
         val payload = runCatching { file.readText() }.getOrDefault("")
-        val persisted = TimetableShareCodec.decode(payload)
+        val persisted = decodeLegacyEntries(payload)
 
         if (persisted.isNotEmpty()) {
             dao.upsertEntries(persisted)
             markSampleEntriesSeeded(context)
         }
 
-        // 删除旧 JSON 缓存，此后均以 Room 数据库为源
         file.delete()
         return persisted.isNotEmpty()
     }
@@ -58,11 +58,6 @@ object TimetableRepository {
         markSampleEntriesSeeded(context)
     }
 
-    /**
-     * 迁移与初始化函数：在 ViewModel 启动时调用一次。
-     * 检测是否存在旧版的 JSON 文件，如果存在则解析内容并持久化进入 SQLite Room。
-     * 迁移完毕后安全删除旧版 JSON。如果连 DB 也是空的则插入模板数据。
-     */
     suspend fun ensureMigrated(context: Context) = withContext(Dispatchers.IO) {
         val dao = AppDatabase.getDatabase(context).timetableDao()
 
@@ -72,16 +67,10 @@ object TimetableRepository {
         }
     }
 
-    /**
-     * 获取数据库的实时响应流
-     */
     fun getEntriesStream(context: Context): Flow<List<TimetableEntry>> {
         return AppDatabase.getDatabase(context).timetableDao().getAllEntriesStream()
     }
 
-    /**
-     * 一次性获取挂起查询（后台广播接收器接力时使用此接口读取）
-     */
     suspend fun getEntriesNow(context: Context): List<TimetableEntry> {
         return withContext(Dispatchers.IO) {
             val dao = AppDatabase.getDatabase(context).timetableDao()
@@ -98,9 +87,6 @@ object TimetableRepository {
         AppDatabase.getDatabase(context).timetableDao().deleteEntry(entryId)
     }
 
-    /**
-     * 覆盖式替换所有的课表项，用于“导入 ICS 文件”动作
-     */
     suspend fun replaceAllEntries(context: Context, entries: List<TimetableEntry>) = withContext(Dispatchers.IO) {
         val db = AppDatabase.getDatabase(context)
         db.withTransaction {
@@ -108,5 +94,49 @@ object TimetableRepository {
             dao.deleteAll()
             dao.upsertEntries(entries)
         }
+    }
+
+    internal fun decodeLegacyEntries(payload: String): List<TimetableEntry> {
+        val root = runCatching { JSONObject(payload) }.getOrElse { return emptyList() }
+        if (root.optInt("version", 1) != 1) return emptyList()
+        val array = root.optJSONArray("entries") ?: return emptyList()
+
+        return buildList {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                parseLegacyEntry(item)?.let(::add)
+            }
+        }
+    }
+
+    private fun parseLegacyEntry(item: JSONObject): TimetableEntry? {
+        val title = item.optString("title").trim()
+        val dayOfWeek = item.optInt("dayOfWeek")
+        val date = item.optString("date").ifBlank { defaultDateForWeekday(dayOfWeek) }
+        val parsedDate = parseEntryDate(date) ?: return null
+        val startMinutes = item.optInt("startMinutes")
+        val endMinutes = item.optInt("endMinutes")
+
+        if (
+            title.isBlank() ||
+            startMinutes !in 0 until 24 * 60 ||
+            endMinutes !in 1..24 * 60 ||
+            startMinutes >= endMinutes
+        ) {
+            return null
+        }
+
+        return runCatching {
+            TimetableEntry(
+                id = item.optString("id").ifBlank { java.util.UUID.randomUUID().toString() },
+                title = title,
+                date = parsedDate.toString(),
+                dayOfWeek = parsedDate.dayOfWeek.value,
+                startMinutes = startMinutes,
+                endMinutes = endMinutes,
+                location = item.optString("location"),
+                note = item.optString("note"),
+            )
+        }.getOrNull()
     }
 }

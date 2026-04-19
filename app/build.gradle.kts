@@ -58,7 +58,6 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("com.google.android.material:material:1.13.0")
-    implementation("com.google.zxing:core:3.5.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     debugImplementation("androidx.compose.ui:ui-tooling")
