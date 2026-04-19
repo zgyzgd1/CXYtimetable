@@ -70,6 +70,7 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
 
     var weekCardAlpha by remember(context) { mutableStateOf(AppearanceStore.getWeekCardAlpha(context)) }
     var weekCardHue by remember(context) { mutableStateOf(AppearanceStore.getWeekCardHue(context)) }
+    var weekCardScale by remember(context) { mutableStateOf(AppearanceStore.getWeekCardScale(context)) }
     var weekTimeSlots by remember(context) { mutableStateOf(AppearanceStore.getWeekTimeSlots(context)) }
 
     val minDate = LocalDate.of(1970, 1, 1)
@@ -219,6 +220,7 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
                         slots = weekTimeSlots,
                         cardAlpha = weekCardAlpha,
                         cardHue = weekCardHue,
+                        cardScale = weekCardScale,
                         onAddSlot = { addingWeekSlot = true },
                         onCustomizeSlotCount = { editingWeekSlotCount = true },
                         onEntryClick = { editingEntry = it },
@@ -306,6 +308,11 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
                                 onWeekCardHueChange = { hue ->
                                     weekCardHue = hue
                                     AppearanceStore.setWeekCardHue(context, hue)
+                                },
+                                weekCardScale = weekCardScale,
+                                onWeekCardScaleChange = { scale ->
+                                    weekCardScale = scale
+                                    AppearanceStore.setWeekCardScale(context, scale)
                                 },
                             )
                         }

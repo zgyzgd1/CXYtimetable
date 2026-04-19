@@ -2,17 +2,17 @@ package com.example.timetable.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -21,7 +21,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.ui.draw.shadow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -61,6 +60,7 @@ fun WeekScheduleBoard(
     slots: List<WeekTimeSlot>,
     cardAlpha: Float,
     cardHue: Float,
+    cardScale: Float,
     onAddSlot: () -> Unit,
     onCustomizeSlotCount: () -> Unit,
     onEntryClick: (TimetableEntry) -> Unit,
@@ -74,11 +74,19 @@ fun WeekScheduleBoard(
     val selectedDayEntries = remember(entries, selectedDate) {
         entries.filter { entryDate(it) == selectedDate }
     }
+    val horizontalScrollState = rememberScrollState()
+
+    val timeColumnWidth = 58.dp
+    val dayColumnWidth = (94f * cardScale).dp
+    val headerHeight = (74f * cardScale.coerceAtLeast(1f)).dp
+    val slotHeight = (104f * cardScale).dp
+    val gutter = 4.dp
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(bottom = 12.dp),
+            .clip(RoundedCornerShape(28.dp))
+            .background(Color(0x72FFFFFF)),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         WeekOverviewHeader(
@@ -89,109 +97,98 @@ fun WeekScheduleBoard(
             weekEntries = entries,
             selectedDayEntries = selectedDayEntries,
             slotCount = slots.size,
+            cardScale = cardScale,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
             onCustomizeSlotCount = onCustomizeSlotCount,
         )
 
-        BoxWithConstraints(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .offset(y = (-10).dp)
-                .shadow(
-                    elevation = 12.dp,
-                    shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
-                    clip = false,
-                )
-                .clip(RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
-                .background(Color(0x72FFFFFF))
-                .padding(horizontal = 12.dp, vertical = 14.dp),
+                .horizontalScroll(horizontalScrollState)
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
-            val timeColumnWidth = 58.dp
-            val gutter = 4.dp
-            val dayColumnWidth = ((maxWidth - timeColumnWidth) / 7).coerceAtLeast(38.dp)
-            val headerHeight = 72.dp
-            val slotHeight = 104.dp
-
-            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    TimeColumnHeader(
-                        width = timeColumnWidth,
-                        onAddSlot = onAddSlot,
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TimeColumnHeader(
+                    width = timeColumnWidth,
+                    height = headerHeight,
+                    onAddSlot = onAddSlot,
+                )
+                days.forEach { day ->
+                    DayHeaderCell(
+                        day = day,
+                        width = dayColumnWidth,
+                        height = headerHeight,
+                        selected = day == selectedDate,
                     )
-                    days.forEach { day ->
-                        DayHeaderCell(
-                            day = day,
-                            width = dayColumnWidth,
-                            selected = day == selectedDate,
-                        )
-                    }
                 }
+            }
 
-                slots.forEachIndexed { index, slot ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(slotHeight),
-                        verticalAlignment = Alignment.Top,
-                    ) {
-                        TimeSlotCell(
-                            index = index,
-                            slot = slot,
-                            width = timeColumnWidth,
-                            onClick = { onSlotClick(index) },
-                        )
+            slots.forEachIndexed { index, slot ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(slotHeight),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    TimeSlotCell(
+                        index = index,
+                        slot = slot,
+                        width = timeColumnWidth,
+                        height = slotHeight,
+                        onClick = { onSlotClick(index) },
+                    )
 
-                        days.forEach { day ->
-                            val dayEntries = entries
-                                .filter { entryDate(it) == day }
-                                .sortedBy { it.startMinutes }
-                                .filter { entry ->
-                                    entry.startMinutes < slot.endMinutes && slot.startMinutes < entry.endMinutes
-                                }
+                    days.forEach { day ->
+                        val dayEntries = entries
+                            .filter { entryDate(it) == day }
+                            .sortedBy { it.startMinutes }
+                            .filter { entry ->
+                                entry.startMinutes < slot.endMinutes && slot.startMinutes < entry.endMinutes
+                            }
 
-                            Box(
-                                modifier = Modifier
-                                    .width(dayColumnWidth)
-                                    .height(slotHeight)
-                                    .padding(horizontal = gutter / 2, vertical = 4.dp)
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(
-                                        if (day == selectedDate) Color(0x22FFFFFF) else Color(0x14FFFFFF),
-                                    ),
-                            ) {
-                                if (dayEntries.isEmpty()) {
-                                    Box(modifier = Modifier.matchParentSize())
-                                } else {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(2.dp),
-                                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                                    ) {
-                                        dayEntries.take(2).forEach { entry ->
-                                            val color = boardAccentColors[
-                                                (entry.title.hashCode() and Int.MAX_VALUE) % boardAccentColors.size
-                                            ]
-                                            WeekEntryBlock(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                entry = entry,
-                                                color = colorWithHueShift(color, cardHue).copy(alpha = cardAlpha),
-                                                compact = true,
-                                                onClick = { onEntryClick(entry) },
-                                            )
-                                        }
-                                        if (dayEntries.size > 2) {
-                                            Text(
-                                                text = "+${dayEntries.size - 2}",
-                                                modifier = Modifier
-                                                    .align(Alignment.End)
-                                                    .padding(end = 4.dp, top = 2.dp),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = Color(0xFF4A5367),
-                                            )
-                                        }
+                        Box(
+                            modifier = Modifier
+                                .width(dayColumnWidth)
+                                .height(slotHeight)
+                                .padding(horizontal = gutter / 2, vertical = 4.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(if (day == selectedDate) Color(0x22FFFFFF) else Color(0x14FFFFFF)),
+                        ) {
+                            if (dayEntries.isEmpty()) {
+                                Box(modifier = Modifier.matchParentSize())
+                            } else {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(3.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    dayEntries.take(2).forEach { entry ->
+                                        val color = boardAccentColors[
+                                            (entry.title.hashCode() and Int.MAX_VALUE) % boardAccentColors.size
+                                        ]
+                                        WeekEntryBlock(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            entry = entry,
+                                            color = colorWithHueShift(color, cardHue).copy(alpha = cardAlpha),
+                                            compact = true,
+                                            onClick = { onEntryClick(entry) },
+                                        )
+                                    }
+                                    if (dayEntries.size > 2) {
+                                        Text(
+                                            text = "+${dayEntries.size - 2}",
+                                            modifier = Modifier
+                                                .align(Alignment.End)
+                                                .padding(end = 4.dp, top = 2.dp),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFF4A5367),
+                                        )
                                     }
                                 }
                             }
@@ -212,21 +209,11 @@ private fun WeekOverviewHeader(
     weekEntries: List<TimetableEntry>,
     selectedDayEntries: List<TimetableEntry>,
     slotCount: Int,
+    cardScale: Float,
     onCustomizeSlotCount: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xCCFFFFFF),
-                        Color(0x9AEEF2FF),
-                    ),
-                ),
-            )
-            .padding(horizontal = 18.dp, vertical = 20.dp),
-    ) {
+    Box(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -234,7 +221,7 @@ private fun WeekOverviewHeader(
         ) {
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
                     text = "${selectedDate.year}/${selectedDate.monthValue}/${selectedDate.dayOfMonth}",
@@ -243,7 +230,7 @@ private fun WeekOverviewHeader(
                 )
                 Text(
                     text = "第 $weekNumber 周  ${formatWeekRange(weekStart, weekEnd)}",
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     color = Color(0xFF3A4050),
                 )
                 Text(
@@ -252,14 +239,14 @@ private fun WeekOverviewHeader(
                     } else {
                         "本周 ${weekEntries.size} 节，今天 ${selectedDayEntries.size} 节"
                     },
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = Color(0xFF677086),
                 )
             }
 
             Column(
                 horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 GlassActionChip(
                     label = "节数 $slotCount",
@@ -268,6 +255,7 @@ private fun WeekOverviewHeader(
                 WeekMiniStats(
                     selectedCount = selectedDayEntries.size,
                     weekCount = weekEntries.size,
+                    scalePercent = (cardScale * 100).toInt(),
                 )
             }
         }
@@ -278,10 +266,12 @@ private fun WeekOverviewHeader(
 private fun WeekMiniStats(
     selectedCount: Int,
     weekCount: Int,
+    scalePercent: Int,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         SummaryPill(label = "今日", value = selectedCount.toString())
         SummaryPill(label = "本周", value = weekCount.toString())
+        SummaryPill(label = "大小", value = "$scalePercent%")
     }
 }
 
@@ -316,12 +306,13 @@ private fun SummaryPill(
 @Composable
 private fun TimeColumnHeader(
     width: androidx.compose.ui.unit.Dp,
+    height: androidx.compose.ui.unit.Dp,
     onAddSlot: () -> Unit,
 ) {
     Box(
         modifier = Modifier
             .width(width)
-            .height(72.dp)
+            .height(height)
             .padding(end = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -347,12 +338,13 @@ private fun TimeColumnHeader(
 private fun DayHeaderCell(
     day: LocalDate,
     width: androidx.compose.ui.unit.Dp,
+    height: androidx.compose.ui.unit.Dp,
     selected: Boolean,
 ) {
     Column(
         modifier = Modifier
             .width(width)
-            .height(72.dp)
+            .height(height)
             .padding(horizontal = 2.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(if (selected) Color(0x42FFFFFF) else Color.Transparent),
@@ -377,12 +369,13 @@ private fun TimeSlotCell(
     index: Int,
     slot: WeekTimeSlot,
     width: androidx.compose.ui.unit.Dp,
+    height: androidx.compose.ui.unit.Dp,
     onClick: () -> Unit,
 ) {
     Box(
         modifier = Modifier
             .width(width)
-            .height(104.dp)
+            .height(height)
             .padding(end = 4.dp, top = 4.dp, bottom = 4.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(Color(0x44FFFFFF))
