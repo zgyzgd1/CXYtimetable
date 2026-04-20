@@ -134,6 +134,7 @@ app/src/main/java/com/example/timetable/
 
 ## 适合的下一步
 
+- 参考 [GITHUB_UI_RESEARCH.md](/e:/vswenjian_workspace_copy/GITHUB_UI_RESEARCH.md:1) 评估可接入的 Compose 周历 / 周选择器库
 - 补正式 release 签名配置
 - 为关键交互增加 Compose UI 测试
 - 增加无障碍语义和更完整的内容描述

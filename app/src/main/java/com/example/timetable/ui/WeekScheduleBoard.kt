@@ -479,7 +479,7 @@ private fun WeekEntryBlock(
 
 private fun entryDate(entry: TimetableEntry): LocalDate? = com.example.timetable.data.parseEntryDate(entry.date)
 
-private fun chineseWeekday(dayOfWeek: DayOfWeek): String = when (dayOfWeek) {
+internal fun chineseWeekday(dayOfWeek: DayOfWeek): String = when (dayOfWeek) {
     DayOfWeek.MONDAY -> "一"
     DayOfWeek.TUESDAY -> "二"
     DayOfWeek.WEDNESDAY -> "三"

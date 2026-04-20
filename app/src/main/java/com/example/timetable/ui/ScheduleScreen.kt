@@ -8,9 +8,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -193,46 +195,61 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
             },
         ) { padding ->
             if (isWeekMode) {
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .pointerInput(selectedDate, isWeekMode) {
-                            var totalHorizontalDrag = 0f
-                            detectHorizontalDragGestures(
-                                onHorizontalDrag = { _, dragAmount -> totalHorizontalDrag += dragAmount },
-                                onDragEnd = {
-                                    when {
-                                        totalHorizontalDrag > 80f -> {
-                                            val previousDate = selectedLocalDate.minusDays(7)
-                                            if (previousDate >= minDate) selectedDate = previousDate.toString()
-                                        }
-                                        totalHorizontalDrag < -80f -> {
-                                            val nextDate = selectedLocalDate.plusDays(7)
-                                            if (nextDate <= maxDate) selectedDate = nextDate.toString()
-                                        }
-                                    }
-                                    totalHorizontalDrag = 0f
-                                },
-                            )
-                        }
                         .padding(padding)
-                        .padding(horizontal = 0.dp, vertical = 0.dp)
-                        .verticalScroll(rememberScrollState()),
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    WeekScheduleBoard(
+                    WeekCalendarStrip(
                         selectedDate = selectedLocalDate,
-                        weekStart = selectedWeekStart,
-                        weekEnd = selectedWeekEnd,
-                        entries = filteredEntries,
-                        slots = weekTimeSlots,
-                        cardAlpha = weekCardAlpha,
-                        cardHue = weekCardHue,
-                        cardScale = weekCardScale,
-                        onAddSlot = { addingWeekSlot = true },
-                        onCustomizeSlotCount = { editingWeekSlotCount = true },
-                        onEntryClick = { editingEntry = it },
-                        onSlotClick = { editingWeekSlotIndex = it },
+                        onDateSelected = { date ->
+                            if (date in minDate..maxDate) {
+                                selectedDate = date.toString()
+                            }
+                        },
                     )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .pointerInput(selectedDate, isWeekMode) {
+                                var totalHorizontalDrag = 0f
+                                detectHorizontalDragGestures(
+                                    onHorizontalDrag = { _, dragAmount -> totalHorizontalDrag += dragAmount },
+                                    onDragEnd = {
+                                        when {
+                                            totalHorizontalDrag > 80f -> {
+                                                val previousDate = selectedLocalDate.minusDays(7)
+                                                if (previousDate >= minDate) selectedDate = previousDate.toString()
+                                            }
+                                            totalHorizontalDrag < -80f -> {
+                                                val nextDate = selectedLocalDate.plusDays(7)
+                                                if (nextDate <= maxDate) selectedDate = nextDate.toString()
+                                            }
+                                        }
+                                        totalHorizontalDrag = 0f
+                                    },
+                                )
+                            }
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        WeekScheduleBoard(
+                            selectedDate = selectedLocalDate,
+                            weekStart = selectedWeekStart,
+                            weekEnd = selectedWeekEnd,
+                            entries = filteredEntries,
+                            slots = weekTimeSlots,
+                            cardAlpha = weekCardAlpha,
+                            cardHue = weekCardHue,
+                            cardScale = weekCardScale,
+                            onAddSlot = { addingWeekSlot = true },
+                            onCustomizeSlotCount = { editingWeekSlotCount = true },
+                            onEntryClick = { editingEntry = it },
+                            onSlotClick = { editingWeekSlotIndex = it },
+                        )
+                    }
                 }
             } else {
                 Box(
