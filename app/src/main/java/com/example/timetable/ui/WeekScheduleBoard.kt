@@ -5,10 +5,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,9 +32,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.timetable.data.TimetableEntry
 import com.example.timetable.data.WeekTimeSlot
@@ -60,7 +65,6 @@ fun WeekScheduleBoard(
     slots: List<WeekTimeSlot>,
     cardAlpha: Float,
     cardHue: Float,
-    cardScale: Float,
     onAddSlot: () -> Unit,
     onCustomizeSlotCount: () -> Unit,
     onEntryClick: (TimetableEntry) -> Unit,
@@ -82,18 +86,18 @@ fun WeekScheduleBoard(
     }
     val horizontalScrollState = rememberScrollState()
 
-    val timeColumnWidth = 58.dp
-    val dayColumnWidth = (94f * cardScale).dp
-    val headerHeight = (74f * cardScale.coerceAtLeast(1f)).dp
-    val slotHeight = (104f * cardScale).dp
-    val gutter = 4.dp
+    val timeColumnWidth = 60.dp
+    val dayColumnWidth = 116.dp
+    val headerHeight = 80.dp
+    val slotHeight = 120.dp
+    val slotGap = 8.dp
+    val laneHeight = calculateLaneHeight(slots.size, slotHeight, slotGap)
 
     Column(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(28.dp))
             .background(Color(0x72FFFFFF)),
-        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         WeekOverviewHeader(
             selectedDate = selectedDate,
@@ -103,9 +107,8 @@ fun WeekScheduleBoard(
             weekEntries = entries,
             selectedDayEntries = selectedDayEntries,
             slotCount = slots.size,
-            cardScale = cardScale,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
             onCustomizeSlotCount = onCustomizeSlotCount,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
         )
 
         Column(
@@ -113,7 +116,6 @@ fun WeekScheduleBoard(
                 .fillMaxWidth()
                 .horizontalScroll(horizontalScrollState)
                 .padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -134,69 +136,31 @@ fun WeekScheduleBoard(
                 }
             }
 
-            slots.forEachIndexed { index, slot ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(slotHeight),
-                    verticalAlignment = Alignment.Top,
-                ) {
-                    TimeSlotCell(
-                        index = index,
-                        slot = slot,
-                        width = timeColumnWidth,
-                        height = slotHeight,
-                        onClick = { onSlotClick(index) },
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top,
+            ) {
+                TimeSlotColumn(
+                    width = timeColumnWidth,
+                    slots = slots,
+                    slotHeight = slotHeight,
+                    slotGap = slotGap,
+                    onSlotClick = onSlotClick,
+                )
+                days.forEach { day ->
+                    WeekDayLane(
+                        day = day,
+                        selected = day == selectedDate,
+                        entries = entriesByDay[day].orEmpty(),
+                        slots = slots,
+                        width = dayColumnWidth,
+                        laneHeight = laneHeight,
+                        slotHeight = slotHeight,
+                        slotGap = slotGap,
+                        cardAlpha = cardAlpha,
+                        cardHue = cardHue,
+                        onEntryClick = onEntryClick,
                     )
-
-                    days.forEach { day ->
-                        val slotEntries = entriesByDay[day].orEmpty().filter { entry ->
-                            entry.startMinutes < slot.endMinutes && slot.startMinutes < entry.endMinutes
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .width(dayColumnWidth)
-                                .height(slotHeight)
-                                .padding(horizontal = gutter / 2, vertical = 4.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(if (day == selectedDate) Color(0x22FFFFFF) else Color(0x14FFFFFF)),
-                        ) {
-                            if (slotEntries.isEmpty()) {
-                                Box(modifier = Modifier.matchParentSize())
-                            } else {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(3.dp),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                                ) {
-                                    slotEntries.take(2).forEach { entry ->
-                                        val color = boardAccentColors[
-                                            (entry.title.hashCode() and Int.MAX_VALUE) % boardAccentColors.size
-                                        ]
-                                        WeekEntryBlock(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            entry = entry,
-                                            color = colorWithHueShift(color, cardHue).copy(alpha = cardAlpha),
-                                            compact = true,
-                                            onClick = { onEntryClick(entry) },
-                                        )
-                                    }
-                                    if (slotEntries.size > 2) {
-                                        Text(
-                                            text = "+${slotEntries.size - 2}",
-                                            modifier = Modifier
-                                                .align(Alignment.End)
-                                                .padding(end = 4.dp, top = 2.dp),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = Color(0xFF4A5367),
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -212,7 +176,6 @@ private fun WeekOverviewHeader(
     weekEntries: List<TimetableEntry>,
     selectedDayEntries: List<TimetableEntry>,
     slotCount: Int,
-    cardScale: Float,
     onCustomizeSlotCount: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -258,7 +221,6 @@ private fun WeekOverviewHeader(
                 WeekMiniStats(
                     selectedCount = selectedDayEntries.size,
                     weekCount = weekEntries.size,
-                    scalePercent = (cardScale * 100).toInt(),
                 )
             }
         }
@@ -269,12 +231,10 @@ private fun WeekOverviewHeader(
 private fun WeekMiniStats(
     selectedCount: Int,
     weekCount: Int,
-    scalePercent: Int,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         SummaryPill(label = "今日", value = selectedCount.toString())
         SummaryPill(label = "本周", value = weekCount.toString())
-        SummaryPill(label = "大小", value = "$scalePercent%")
     }
 }
 
@@ -308,8 +268,8 @@ private fun SummaryPill(
 
 @Composable
 private fun TimeColumnHeader(
-    width: androidx.compose.ui.unit.Dp,
-    height: androidx.compose.ui.unit.Dp,
+    width: Dp,
+    height: Dp,
     onAddSlot: () -> Unit,
 ) {
     Box(
@@ -338,10 +298,36 @@ private fun TimeColumnHeader(
 }
 
 @Composable
+private fun TimeSlotColumn(
+    width: Dp,
+    slots: List<WeekTimeSlot>,
+    slotHeight: Dp,
+    slotGap: Dp,
+    onSlotClick: (Int) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .width(width)
+            .padding(end = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(slotGap),
+    ) {
+        slots.forEachIndexed { index, slot ->
+            TimeSlotCell(
+                index = index,
+                slot = slot,
+                width = width,
+                height = slotHeight,
+                onClick = { onSlotClick(index) },
+            )
+        }
+    }
+}
+
+@Composable
 private fun DayHeaderCell(
     day: LocalDate,
-    width: androidx.compose.ui.unit.Dp,
-    height: androidx.compose.ui.unit.Dp,
+    width: Dp,
+    height: Dp,
     selected: Boolean,
 ) {
     Column(
@@ -368,18 +354,87 @@ private fun DayHeaderCell(
 }
 
 @Composable
+private fun WeekDayLane(
+    day: LocalDate,
+    selected: Boolean,
+    entries: List<TimetableEntry>,
+    slots: List<WeekTimeSlot>,
+    width: Dp,
+    laneHeight: Dp,
+    slotHeight: Dp,
+    slotGap: Dp,
+    cardAlpha: Float,
+    cardHue: Float,
+    onEntryClick: (TimetableEntry) -> Unit,
+) {
+    BoxWithConstraints(
+        modifier = Modifier
+            .width(width)
+            .height(laneHeight)
+            .padding(horizontal = 3.dp),
+    ) {
+        val density = LocalDensity.current
+        val laneWidthPx = with(density) { maxWidth.toPx() }
+        val slotHeightPx = with(density) { slotHeight.toPx() }
+        val slotGapPx = with(density) { slotGap.toPx() }
+        val layouts = remember(entries, slots, laneWidthPx, slotHeightPx, slotGapPx) {
+            buildWeekEntryLayouts(
+                entries = entries,
+                slots = slots,
+                laneWidthPx = laneWidthPx,
+                slotHeightPx = slotHeightPx,
+                slotGapPx = slotGapPx,
+            )
+        }
+
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(slotGap),
+        ) {
+            slots.forEach {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(slotHeight)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(if (selected) Color(0x22FFFFFF) else Color(0x14FFFFFF)),
+                )
+            }
+        }
+
+        layouts.forEach { layout ->
+            val color = boardAccentColors[
+                (layout.entry.title.hashCode() and Int.MAX_VALUE) % boardAccentColors.size
+            ]
+            WeekEntryBlock(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset(
+                        x = with(density) { layout.leftPx.toDp() },
+                        y = with(density) { layout.topPx.toDp() },
+                    )
+                    .width(with(density) { layout.widthPx.toDp() })
+                    .height(with(density) { layout.heightPx.toDp() }),
+                entry = layout.entry,
+                color = colorWithHueShift(color, cardHue).copy(alpha = cardAlpha),
+                onClick = { onEntryClick(layout.entry) },
+            )
+        }
+    }
+}
+
+@Composable
 private fun TimeSlotCell(
     index: Int,
     slot: WeekTimeSlot,
-    width: androidx.compose.ui.unit.Dp,
-    height: androidx.compose.ui.unit.Dp,
+    width: Dp,
+    height: Dp,
     onClick: () -> Unit,
 ) {
     Box(
         modifier = Modifier
             .width(width)
             .height(height)
-            .padding(end = 4.dp, top = 4.dp, bottom = 4.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(Color(0x44FFFFFF))
             .clickable(onClick = onClick)
@@ -434,48 +489,91 @@ private fun WeekEntryBlock(
     modifier: Modifier,
     entry: TimetableEntry,
     color: Color,
-    compact: Boolean,
     onClick: () -> Unit,
 ) {
-    Box(
+    BoxWithConstraints(
         modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(18.dp))
             .background(color)
             .clickable(onClick = onClick),
     ) {
+        val showLocation = entry.location.isNotBlank() && maxHeight >= 88.dp
+        val showNote = entry.note.isNotBlank() && maxHeight >= 170.dp
+        val largeCard = maxHeight >= 120.dp
+        val titleLines = when {
+            maxHeight >= 220.dp -> 8
+            maxHeight >= 140.dp -> 6
+            else -> 4
+        }
+
         Column(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 10.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
                 text = entry.title,
-                style = if (compact) {
-                    MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
+                style = if (largeCard) {
+                    MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
                 } else {
-                    MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                    MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
                 },
                 color = Color.White,
-                maxLines = if (compact) 2 else 4,
+                maxLines = titleLines,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (!compact && entry.location.isNotBlank()) {
+            if (showLocation) {
                 Text(
                     text = entry.location,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.95f),
-                    maxLines = 3,
+                    maxLines = if (showNote) 4 else 3,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            if (showNote) {
+                Text(
+                    text = entry.note,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.92f),
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(modifier = Modifier.weight(1f))
             Text(
                 text = "${formatMinutes(entry.startMinutes)}-${formatMinutes(entry.endMinutes)}",
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.White.copy(alpha = 0.92f),
-                textAlign = TextAlign.Start,
             )
         }
     }
 }
+
+internal data class WeekEntryLayout(
+    val entry: TimetableEntry,
+    val topPx: Float,
+    val heightPx: Float,
+    val leftPx: Float,
+    val widthPx: Float,
+)
+
+private data class EntryColumnAssignment(
+    val entry: TimetableEntry,
+    val columnIndex: Int,
+    val columnCount: Int,
+)
+
+private data class MutableEntryColumnAssignment(
+    val entry: TimetableEntry,
+    val columnIndex: Int,
+)
+
+private data class TimeAnchor(
+    val minute: Int,
+    val positionPx: Float,
+)
 
 private fun entryDate(entry: TimetableEntry): LocalDate? = com.example.timetable.data.parseEntryDate(entry.date)
 
@@ -495,6 +593,143 @@ private fun formatWeekRange(start: LocalDate, end: LocalDate): String {
     } else {
         "${start.monthValue}/${start.dayOfMonth} - ${end.monthValue}/${end.dayOfMonth}"
     }
+}
+
+private fun calculateLaneHeight(slotCount: Int, slotHeight: Dp, slotGap: Dp): Dp {
+    if (slotCount <= 0) return 0.dp
+    return slotHeight * slotCount.toFloat() + slotGap * (slotCount - 1).toFloat()
+}
+
+internal fun buildWeekEntryLayouts(
+    entries: List<TimetableEntry>,
+    slots: List<WeekTimeSlot>,
+    laneWidthPx: Float,
+    slotHeightPx: Float,
+    slotGapPx: Float,
+): List<WeekEntryLayout> {
+    if (entries.isEmpty() || slots.isEmpty() || laneWidthPx <= 0f) return emptyList()
+
+    val sortedSlots = slots.sortedBy { it.startMinutes }
+    val firstMinute = sortedSlots.first().startMinutes
+    val lastMinute = sortedSlots.last().endMinutes
+    val anchors = buildLaneTimeAnchors(sortedSlots, slotHeightPx, slotGapPx)
+    val columnGapPx = 6f
+
+    return assignEntryColumns(
+        entries = entries.filter { it.endMinutes > firstMinute && it.startMinutes < lastMinute },
+    ).map { assignment ->
+        val top = mapMinuteToLanePosition(
+            minute = assignment.entry.startMinutes.coerceAtLeast(firstMinute),
+            anchors = anchors,
+        )
+        val bottom = mapMinuteToLanePosition(
+            minute = assignment.entry.endMinutes.coerceAtMost(lastMinute),
+            anchors = anchors,
+        )
+        val columnCount = assignment.columnCount.coerceAtLeast(1)
+        val totalGapPx = columnGapPx * (columnCount - 1)
+        val widthPx = ((laneWidthPx - totalGapPx) / columnCount).coerceAtLeast(1f)
+
+        WeekEntryLayout(
+            entry = assignment.entry,
+            topPx = top,
+            heightPx = (bottom - top).coerceAtLeast(1f),
+            leftPx = assignment.columnIndex * (widthPx + columnGapPx),
+            widthPx = widthPx,
+        )
+    }.sortedWith(compareBy<WeekEntryLayout> { it.topPx }.thenBy { it.leftPx })
+}
+
+private fun buildLaneTimeAnchors(
+    slots: List<WeekTimeSlot>,
+    slotHeightPx: Float,
+    slotGapPx: Float,
+): List<TimeAnchor> {
+    if (slots.isEmpty()) return emptyList()
+
+    val anchors = mutableListOf<TimeAnchor>()
+    slots.forEachIndexed { index, slot ->
+        anchors += TimeAnchor(
+            minute = slot.startMinutes,
+            positionPx = index * (slotHeightPx + slotGapPx),
+        )
+    }
+
+    val lastTopPx = (slots.lastIndex) * (slotHeightPx + slotGapPx)
+    anchors += TimeAnchor(
+        minute = slots.last().endMinutes,
+        positionPx = lastTopPx + slotHeightPx,
+    )
+    return anchors
+}
+
+private fun mapMinuteToLanePosition(
+    minute: Int,
+    anchors: List<TimeAnchor>,
+): Float {
+    if (anchors.isEmpty()) return 0f
+
+    val clampedMinute = minute.coerceIn(anchors.first().minute, anchors.last().minute)
+    for (index in 0 until anchors.lastIndex) {
+        val start = anchors[index]
+        val end = anchors[index + 1]
+        if (clampedMinute <= end.minute) {
+            if (end.minute <= start.minute) return end.positionPx
+            val fraction = (clampedMinute - start.minute).toFloat() / (end.minute - start.minute).toFloat()
+            return start.positionPx + (end.positionPx - start.positionPx) * fraction
+        }
+    }
+    return anchors.last().positionPx
+}
+
+private fun assignEntryColumns(entries: List<TimetableEntry>): List<EntryColumnAssignment> {
+    if (entries.isEmpty()) return emptyList()
+
+    val sortedEntries = entries.sortedWith(
+        compareBy<TimetableEntry> { it.startMinutes }
+            .thenBy { it.endMinutes }
+            .thenBy { it.id },
+    )
+    val assignments = mutableListOf<EntryColumnAssignment>()
+    val currentGroup = mutableListOf<MutableEntryColumnAssignment>()
+    val columnEnds = mutableListOf<Int>()
+    var groupMaxEnd = Int.MIN_VALUE
+
+    fun flushGroup() {
+        if (currentGroup.isEmpty()) return
+        val columnCount = columnEnds.size.coerceAtLeast(1)
+        currentGroup.forEach { assignment ->
+            assignments += EntryColumnAssignment(
+                entry = assignment.entry,
+                columnIndex = assignment.columnIndex,
+                columnCount = columnCount,
+            )
+        }
+        currentGroup.clear()
+        columnEnds.clear()
+        groupMaxEnd = Int.MIN_VALUE
+    }
+
+    sortedEntries.forEach { entry ->
+        if (currentGroup.isNotEmpty() && entry.startMinutes >= groupMaxEnd) {
+            flushGroup()
+        }
+
+        val reusableColumn = columnEnds.indexOfFirst { columnEnd -> columnEnd <= entry.startMinutes }
+        val columnIndex = if (reusableColumn >= 0) {
+            columnEnds[reusableColumn] = entry.endMinutes
+            reusableColumn
+        } else {
+            columnEnds += entry.endMinutes
+            columnEnds.lastIndex
+        }
+
+        currentGroup += MutableEntryColumnAssignment(entry = entry, columnIndex = columnIndex)
+        groupMaxEnd = maxOf(groupMaxEnd, entry.endMinutes)
+    }
+
+    flushGroup()
+    return assignments
 }
 
 internal fun colorWithHueShift(base: Color, hueShift: Float): Color {

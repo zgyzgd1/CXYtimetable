@@ -6,11 +6,9 @@ object AppearanceStore {
     private const val PREFS_NAME = "appearance_prefs"
     private const val KEY_WEEK_CARD_ALPHA = "week_card_alpha"
     private const val KEY_WEEK_CARD_HUE = "week_card_hue"
-    private const val KEY_WEEK_CARD_SCALE = "week_card_scale"
     private const val KEY_WEEK_TIME_SLOTS = "week_time_slots"
     private const val DEFAULT_WEEK_CARD_ALPHA = 0.90f
     private const val DEFAULT_WEEK_CARD_HUE = 0f
-    private const val DEFAULT_WEEK_CARD_SCALE = 1.0f
 
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -31,15 +29,6 @@ object AppearanceStore {
 
     fun setWeekCardHue(context: Context, value: Float) {
         prefs(context).edit().putFloat(KEY_WEEK_CARD_HUE, value.coerceIn(0f, 360f)).apply()
-    }
-
-    fun getWeekCardScale(context: Context): Float {
-        return prefs(context).getFloat(KEY_WEEK_CARD_SCALE, DEFAULT_WEEK_CARD_SCALE)
-            .coerceIn(0.85f, 1.45f)
-    }
-
-    fun setWeekCardScale(context: Context, value: Float) {
-        prefs(context).edit().putFloat(KEY_WEEK_CARD_SCALE, value.coerceIn(0.85f, 1.45f)).apply()
     }
 
     fun getWeekTimeSlots(context: Context): List<WeekTimeSlot> {

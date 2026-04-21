@@ -62,8 +62,6 @@ fun HeroSection(
     onWeekCardAlphaChange: (Float) -> Unit,
     weekCardHue: Float,
     onWeekCardHueChange: (Float) -> Unit,
-    weekCardScale: Float,
-    onWeekCardScaleChange: (Float) -> Unit,
 ) {
     var showReminderSheet by remember { mutableStateOf(false) }
     var showAppearanceDialog by remember { mutableStateOf(false) }
@@ -156,8 +154,6 @@ fun HeroSection(
             onWeekCardAlphaChange = onWeekCardAlphaChange,
             weekCardHue = weekCardHue,
             onWeekCardHueChange = onWeekCardHueChange,
-            weekCardScale = weekCardScale,
-            onWeekCardScaleChange = onWeekCardScaleChange,
         )
     }
 }
@@ -210,8 +206,6 @@ private fun AppearanceDialog(
     onWeekCardAlphaChange: (Float) -> Unit,
     weekCardHue: Float,
     onWeekCardHueChange: (Float) -> Unit,
-    weekCardScale: Float,
-    onWeekCardScaleChange: (Float) -> Unit,
 ) {
     val previewColor = remember(weekCardHue, weekCardAlpha) {
         colorWithHueShift(Color(0xFFE98AA9), weekCardHue).copy(alpha = weekCardAlpha)
@@ -256,31 +250,6 @@ private fun AppearanceDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                }
-
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ColorLens,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Text("色卡大小", style = MaterialTheme.typography.titleSmall)
-                    }
-                    Slider(
-                        value = weekCardScale,
-                        onValueChange = onWeekCardScaleChange,
-                        valueRange = 0.85f..1.45f,
-                    )
-                    Text(
-                        text = "当前大小 ${(weekCardScale * 100).toInt()}%",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
