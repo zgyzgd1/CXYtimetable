@@ -1,17 +1,61 @@
 package com.example.timetable.data
 
 import android.content.Context
+import android.content.SharedPreferences
+
+enum class AppBackgroundMode(val storageValue: String) {
+    BUNDLED_IMAGE("bundled_image"),
+    CUSTOM_IMAGE("custom_image"),
+    GRADIENT("gradient");
+
+    companion object {
+        fun fromStorageValue(value: String?): AppBackgroundMode {
+            return entries.firstOrNull { it.storageValue == value } ?: BUNDLED_IMAGE
+        }
+    }
+}
+
+data class BackgroundAppearance(
+    val mode: AppBackgroundMode,
+    val revision: Long,
+)
 
 object AppearanceStore {
     private const val PREFS_NAME = "appearance_prefs"
+    private const val KEY_BACKGROUND_MODE = "background_mode"
+    private const val KEY_BACKGROUND_REVISION = "background_revision"
     private const val KEY_WEEK_CARD_ALPHA = "week_card_alpha"
     private const val KEY_WEEK_CARD_HUE = "week_card_hue"
     private const val KEY_WEEK_TIME_SLOTS = "week_time_slots"
-    private const val DEFAULT_WEEK_CARD_ALPHA = 0.90f
+    private const val DEFAULT_BACKGROUND_REVISION = 0L
+    private const val DEFAULT_WEEK_CARD_ALPHA = 0.82f
     private const val DEFAULT_WEEK_CARD_HUE = 0f
 
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    private fun nextBackgroundRevision(store: SharedPreferences): Long {
+        return maxOf(
+            System.currentTimeMillis(),
+            store.getLong(KEY_BACKGROUND_REVISION, DEFAULT_BACKGROUND_REVISION) + 1L,
+        )
+    }
+
+    fun getBackgroundAppearance(context: Context): BackgroundAppearance {
+        val store = prefs(context)
+        return BackgroundAppearance(
+            mode = AppBackgroundMode.fromStorageValue(store.getString(KEY_BACKGROUND_MODE, null)),
+            revision = store.getLong(KEY_BACKGROUND_REVISION, DEFAULT_BACKGROUND_REVISION),
+        )
+    }
+
+    fun setBackgroundMode(context: Context, mode: AppBackgroundMode) {
+        val store = prefs(context)
+        store.edit()
+            .putString(KEY_BACKGROUND_MODE, mode.storageValue)
+            .putLong(KEY_BACKGROUND_REVISION, nextBackgroundRevision(store))
+            .apply()
+    }
 
     fun getWeekCardAlpha(context: Context): Float {
         return prefs(context).getFloat(KEY_WEEK_CARD_ALPHA, DEFAULT_WEEK_CARD_ALPHA)

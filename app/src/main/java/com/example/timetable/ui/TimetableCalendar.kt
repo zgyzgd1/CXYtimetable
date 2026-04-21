@@ -3,6 +3,7 @@ package com.example.timetable.ui
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -82,7 +83,8 @@ fun PerpetualCalendar(
 
     Card(
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f)),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
@@ -133,7 +135,7 @@ fun PerpetualCalendar(
                         targetValue = when {
                             isSelected -> MaterialTheme.colorScheme.primary
                             isToday -> MaterialTheme.colorScheme.primaryContainer
-                            else -> MaterialTheme.colorScheme.surfaceVariant
+                            else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
                         },
                         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
                         label = "calendarContainer",

@@ -50,7 +50,9 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.timetable.data.AppBackgroundMode
 import com.example.timetable.data.AppearanceStore
+import com.example.timetable.data.BackgroundImageManager
 import com.example.timetable.data.TimetableEntry
 import com.example.timetable.data.WeekTimeSlot
 import com.example.timetable.data.formatDateLabel
@@ -59,7 +61,9 @@ import com.example.timetable.notify.CourseReminderScheduler
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.TemporalAdjusters
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,6 +75,7 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
     val context = LocalContext.current
     val listState = rememberLazyListState()
 
+    var backgroundAppearance by remember(context) { mutableStateOf(AppearanceStore.getBackgroundAppearance(context)) }
     var weekCardAlpha by remember(context) { mutableStateOf(AppearanceStore.getWeekCardAlpha(context)) }
     var weekCardHue by remember(context) { mutableStateOf(AppearanceStore.getWeekCardHue(context)) }
     var weekTimeSlots by remember(context) { mutableStateOf(AppearanceStore.getWeekTimeSlots(context)) }
@@ -134,6 +139,26 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
         }
     }
 
+    val backgroundImageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent(),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                try {
+                    withContext(Dispatchers.IO) {
+                        BackgroundImageManager.saveCustomBackground(context, context.contentResolver, uri)
+                    }
+                    backgroundAppearance = AppearanceStore.getBackgroundAppearance(context)
+                    snackbarHostState.showSnackbar("已更新背景图片")
+                } catch (error: Exception) {
+                    snackbarHostState.showSnackbar(
+                        "背景图片设置失败：${error.message ?: "未知错误"}",
+                    )
+                }
+            }
+        }
+    }
+
     val filteredEntries = remember(entriesByDate, selectedDate, isWeekMode, selectedWeekStart) {
         if (isWeekMode) {
             buildList {
@@ -148,7 +173,7 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        AppBackgroundLayer()
+        AppBackgroundLayer(backgroundAppearance = backgroundAppearance)
 
         Scaffold(
             modifier = Modifier.safeDrawingPadding(),
@@ -165,7 +190,7 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = Color.Transparent,
-                            scrolledContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.88f),
+                            scrolledContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.68f),
                             titleContentColor = MaterialTheme.colorScheme.onBackground,
                         ),
                     )
@@ -173,6 +198,8 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
             },
             floatingActionButton = {
                 FloatingActionButton(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.86f),
+                    contentColor = MaterialTheme.colorScheme.onSurface,
                     onClick = {
                         editingEntry = TimetableEntry(
                             title = "",
@@ -320,6 +347,29 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
                                 onReminderMinutesChange = { minutes ->
                                     reminderMinutes = minutes
                                     viewModel.updateReminderMinutes(minutes)
+                                },
+                                backgroundMode = backgroundAppearance.mode,
+                                hasCustomBackground = BackgroundImageManager.hasCustomBackground(context),
+                                onSelectBackgroundImage = {
+                                    backgroundImageLauncher.launch("image/*")
+                                },
+                                onUseBundledBackground = {
+                                    AppearanceStore.setBackgroundMode(context, AppBackgroundMode.BUNDLED_IMAGE)
+                                    backgroundAppearance = AppearanceStore.getBackgroundAppearance(context)
+                                    scope.launch { snackbarHostState.showSnackbar("已切换到默认背景") }
+                                },
+                                onUseGradientBackground = {
+                                    AppearanceStore.setBackgroundMode(context, AppBackgroundMode.GRADIENT)
+                                    backgroundAppearance = AppearanceStore.getBackgroundAppearance(context)
+                                    scope.launch { snackbarHostState.showSnackbar("已关闭图片背景") }
+                                },
+                                onClearCustomBackground = {
+                                    BackgroundImageManager.clearCustomBackground(context)
+                                    if (backgroundAppearance.mode == AppBackgroundMode.CUSTOM_IMAGE) {
+                                        AppearanceStore.setBackgroundMode(context, AppBackgroundMode.BUNDLED_IMAGE)
+                                    }
+                                    backgroundAppearance = AppearanceStore.getBackgroundAppearance(context)
+                                    scope.launch { snackbarHostState.showSnackbar("已清除自定义背景") }
                                 },
                                 weekCardAlpha = weekCardAlpha,
                                 onWeekCardAlphaChange = { alpha ->

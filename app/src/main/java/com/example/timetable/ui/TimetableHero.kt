@@ -1,5 +1,6 @@
 package com.example.timetable.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -48,6 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.timetable.data.AppBackgroundMode
 
 @Composable
 fun HeroSection(
@@ -58,6 +60,12 @@ fun HeroSection(
     reminderMinutes: Int,
     reminderOptions: List<Int>,
     onReminderMinutesChange: (Int) -> Unit,
+    backgroundMode: AppBackgroundMode,
+    hasCustomBackground: Boolean,
+    onSelectBackgroundImage: () -> Unit,
+    onUseBundledBackground: () -> Unit,
+    onUseGradientBackground: () -> Unit,
+    onClearCustomBackground: () -> Unit,
     weekCardAlpha: Float,
     onWeekCardAlphaChange: (Float) -> Unit,
     weekCardHue: Float,
@@ -69,7 +77,8 @@ fun HeroSection(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.84f)),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(
@@ -123,7 +132,7 @@ fun HeroSection(
                 )
                 HeroActionChip(
                     icon = Icons.Default.ColorLens,
-                    label = "色卡",
+                    label = "背景",
                     onClick = { showAppearanceDialog = true },
                     modifier = Modifier.weight(1f),
                 )
@@ -150,6 +159,12 @@ fun HeroSection(
     if (showAppearanceDialog) {
         AppearanceDialog(
             onDismiss = { showAppearanceDialog = false },
+            backgroundMode = backgroundMode,
+            hasCustomBackground = hasCustomBackground,
+            onSelectBackgroundImage = onSelectBackgroundImage,
+            onUseBundledBackground = onUseBundledBackground,
+            onUseGradientBackground = onUseGradientBackground,
+            onClearCustomBackground = onClearCustomBackground,
             weekCardAlpha = weekCardAlpha,
             onWeekCardAlphaChange = onWeekCardAlphaChange,
             weekCardHue = weekCardHue,
@@ -202,6 +217,12 @@ private fun HeroActionChip(
 @Composable
 private fun AppearanceDialog(
     onDismiss: () -> Unit,
+    backgroundMode: AppBackgroundMode,
+    hasCustomBackground: Boolean,
+    onSelectBackgroundImage: () -> Unit,
+    onUseBundledBackground: () -> Unit,
+    onUseGradientBackground: () -> Unit,
+    onClearCustomBackground: () -> Unit,
     weekCardAlpha: Float,
     onWeekCardAlphaChange: (Float) -> Unit,
     weekCardHue: Float,
@@ -210,12 +231,62 @@ private fun AppearanceDialog(
     val previewColor = remember(weekCardHue, weekCardAlpha) {
         colorWithHueShift(Color(0xFFE98AA9), weekCardHue).copy(alpha = weekCardAlpha)
     }
+    val backgroundSummary = when (backgroundMode) {
+        AppBackgroundMode.BUNDLED_IMAGE -> "当前使用默认背景图"
+        AppBackgroundMode.CUSTOM_IMAGE -> "当前使用自定义背景图"
+        AppBackgroundMode.GRADIENT -> "当前只显示渐变背景"
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("色卡设置", style = MaterialTheme.typography.titleMedium) },
+        title = { Text("背景与色卡", style = MaterialTheme.typography.titleMedium) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("背景图片", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        text = backgroundSummary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "自定义图片会保存在本地，重启后仍会保留。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f),
+                    )
+                    Button(
+                        onClick = {
+                            onDismiss()
+                            onSelectBackgroundImage()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("选择自定义图片")
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedButton(
+                            onClick = onUseBundledBackground,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text("默认图片")
+                        }
+                        OutlinedButton(
+                            onClick = onUseGradientBackground,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text("仅渐变")
+                        }
+                    }
+                    if (hasCustomBackground) {
+                        TextButton(onClick = onClearCustomBackground) {
+                            Text("清除自定义图片")
+                        }
+                    }
+                }
+
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -227,7 +298,7 @@ private fun AppearanceDialog(
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(18.dp),
                         )
-                        Text("色卡主色调", style = MaterialTheme.typography.titleSmall)
+                        Text("周视图色相", style = MaterialTheme.typography.titleSmall)
                     }
                     Slider(
                         value = weekCardHue,
@@ -263,7 +334,7 @@ private fun AppearanceDialog(
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(18.dp),
                         )
-                        Text("色卡透明度", style = MaterialTheme.typography.titleSmall)
+                        Text("周视图透明度", style = MaterialTheme.typography.titleSmall)
                     }
                     Slider(
                         value = weekCardAlpha,
@@ -299,7 +370,7 @@ private fun ReminderPickerDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = "选择课程开始前多久接到提醒通知",
+                    text = "选择课程开始前多久接收到提醒通知",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -366,7 +437,7 @@ fun ViewModeSwitcher(
     isWeekMode: Boolean,
     onModeChange: (Boolean) -> Unit,
 ) {
-    NavigationBar(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)) {
+    NavigationBar(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.80f)) {
         NavigationBarItem(
             selected = !isWeekMode,
             onClick = { onModeChange(false) },

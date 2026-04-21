@@ -1,5 +1,6 @@
 package com.example.timetable.ui
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -97,7 +98,12 @@ fun WeekScheduleBoard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(28.dp))
-            .background(Color(0x72FFFFFF)),
+            .background(Color(0x40FFFFFF))
+            .border(
+                width = 1.dp,
+                color = Color.White.copy(alpha = 0.18f),
+                shape = RoundedCornerShape(28.dp),
+            ),
     ) {
         WeekOverviewHeader(
             selectedDate = selectedDate,
@@ -244,7 +250,7 @@ private fun SummaryPill(
     value: String,
 ) {
     Surface(
-        color = Color(0x48FFFFFF),
+        color = Color(0x36FFFFFF),
         contentColor = Color(0xFF111319),
         shape = RoundedCornerShape(16.dp),
     ) {
@@ -282,7 +288,7 @@ private fun TimeColumnHeader(
         Surface(
             onClick = onAddSlot,
             shape = CircleShape,
-            color = Color(0x52FFFFFF),
+            color = Color(0x40FFFFFF),
             contentColor = Color(0xFF111319),
             modifier = Modifier.size(36.dp),
         ) {
@@ -397,7 +403,7 @@ private fun WeekDayLane(
                         .fillMaxWidth()
                         .height(slotHeight)
                         .clip(RoundedCornerShape(18.dp))
-                        .background(if (selected) Color(0x22FFFFFF) else Color(0x14FFFFFF)),
+                        .background(if (selected) Color(0x18FFFFFF) else Color(0x10FFFFFF)),
                 )
             }
         }
@@ -436,7 +442,7 @@ private fun TimeSlotCell(
             .width(width)
             .height(height)
             .clip(RoundedCornerShape(16.dp))
-            .background(Color(0x44FFFFFF))
+            .background(Color(0x2CFFFFFF))
             .clickable(onClick = onClick)
             .padding(horizontal = 4.dp, vertical = 8.dp),
     ) {
@@ -471,7 +477,7 @@ private fun GlassActionChip(
 ) {
     Surface(
         onClick = onClick,
-        color = Color(0x52FFFFFF),
+        color = Color(0x3CFFFFFF),
         contentColor = Color(0xFF111319),
         shape = RoundedCornerShape(16.dp),
         shadowElevation = 0.dp,
@@ -494,6 +500,11 @@ private fun WeekEntryBlock(
     BoxWithConstraints(
         modifier = modifier
             .clip(RoundedCornerShape(18.dp))
+            .border(
+                width = 1.dp,
+                color = Color.White.copy(alpha = 0.16f),
+                shape = RoundedCornerShape(18.dp),
+            )
             .background(color)
             .clickable(onClick = onClick),
     ) {

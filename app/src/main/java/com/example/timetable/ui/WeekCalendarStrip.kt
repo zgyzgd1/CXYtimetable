@@ -1,5 +1,6 @@
 package com.example.timetable.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -76,8 +77,9 @@ fun WeekCalendarStrip(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.80f),
         ),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
@@ -117,7 +119,7 @@ private fun WeekCalendarDayCell(
     val containerColor = when {
         selected -> MaterialTheme.colorScheme.primary
         today -> MaterialTheme.colorScheme.primaryContainer
-        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f)
     }
     val contentColor = when {
         selected -> MaterialTheme.colorScheme.onPrimary
