@@ -69,7 +69,7 @@ function Update-ArchiveReadme {
         [Parameter(Mandatory = $true)][string]$AssetName
     )
 
-    $versionLine = "- `v$Version` -> `$AssetName`"
+    $versionLine = '- `v{0}` -> `{1}`' -f $Version, $AssetName
     $content = Get-Content $ReadmePath
     if ($content -contains $versionLine) {
         return
