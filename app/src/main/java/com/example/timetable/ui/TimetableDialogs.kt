@@ -20,8 +20,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.example.timetable.data.FixedWeekScheduleConfig
 import com.example.timetable.data.TimetableEntry
 import com.example.timetable.data.WeekTimeSlot
+import com.example.timetable.data.buildWeekTimeSlotsFromFixedSchedule
 import com.example.timetable.data.formatMinutes
 import com.example.timetable.data.parseEntryDate
 import com.example.timetable.data.parseMinutes
@@ -303,4 +305,160 @@ fun WeekSlotCountDialog(
             }
         },
     )
+}
+
+@Composable
+fun FixedWeekScheduleDialog(
+    initialConfig: FixedWeekScheduleConfig,
+    onDismiss: () -> Unit,
+    onSave: (FixedWeekScheduleConfig) -> Unit,
+) {
+    var firstStartTime by rememberSaveable(initialConfig) {
+        mutableStateOf(formatMinutes(initialConfig.firstStartMinutes))
+    }
+    var lessonDurationText by rememberSaveable(initialConfig) {
+        mutableStateOf(initialConfig.lessonDurationMinutes.toString())
+    }
+    var breakDurationText by rememberSaveable(initialConfig) {
+        mutableStateOf(initialConfig.breakDurationMinutes.toString())
+    }
+    var slotCountText by rememberSaveable(initialConfig) {
+        mutableStateOf(initialConfig.slotCount.toString())
+    }
+    var errorText by remember { mutableStateOf<String?>(null) }
+
+    val previewSlots = remember(firstStartTime, lessonDurationText, breakDurationText, slotCountText) {
+        val start = parseMinutes(firstStartTime)
+        val lessonDuration = lessonDurationText.toIntOrNull()
+        val breakDuration = breakDurationText.toIntOrNull()
+        val slotCount = slotCountText.toIntOrNull()
+        if (start == null || lessonDuration == null || breakDuration == null || slotCount == null || start >= 24 * 60) {
+            emptyList()
+        } else {
+            runCatching {
+                buildWeekTimeSlotsFromFixedSchedule(
+                    FixedWeekScheduleConfig(
+                        firstStartMinutes = start,
+                        lessonDurationMinutes = lessonDuration,
+                        breakDurationMinutes = breakDuration,
+                        slotCount = slotCount,
+                    ),
+                )
+            }.getOrDefault(emptyList())
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("固定上课时间") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                AppTextField(
+                    value = firstStartTime,
+                    onValueChange = {
+                        firstStartTime = it
+                        errorText = null
+                    },
+                    label = "首节开始时间",
+                    placeholder = "08:00",
+                    singleLine = true,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AppTextField(
+                        value = lessonDurationText,
+                        onValueChange = {
+                            lessonDurationText = it
+                            errorText = null
+                        },
+                        label = "单节时长(分钟)",
+                        keyboardType = KeyboardType.Number,
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    AppTextField(
+                        value = breakDurationText,
+                        onValueChange = {
+                            breakDurationText = it
+                            errorText = null
+                        },
+                        label = "节间休息(分钟)",
+                        keyboardType = KeyboardType.Number,
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                AppTextField(
+                    value = slotCountText,
+                    onValueChange = {
+                        slotCountText = it
+                        errorText = null
+                    },
+                    label = "总节数",
+                    keyboardType = KeyboardType.Number,
+                    singleLine = true,
+                )
+                if (previewSlots.isNotEmpty()) {
+                    Text(
+                        text = buildPreviewText(previewSlots),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                errorText?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val parsedStart = parseMinutes(firstStartTime)
+                    val parsedLessonDuration = lessonDurationText.toIntOrNull()
+                    val parsedBreakDuration = breakDurationText.toIntOrNull()
+                    val parsedSlotCount = slotCountText.toIntOrNull()
+                    when {
+                        parsedStart == null || parsedStart >= 24 * 60 -> errorText = "请输入合法的首节开始时间，例如 08:00"
+                        parsedLessonDuration == null -> errorText = "请输入单节时长"
+                        parsedBreakDuration == null -> errorText = "请输入节间休息时间"
+                        parsedSlotCount == null -> errorText = "请输入总节数"
+                        parsedLessonDuration !in 1..240 -> errorText = "单节时长范围为 1 到 240 分钟"
+                        parsedBreakDuration !in 0..120 -> errorText = "节间休息范围为 0 到 120 分钟"
+                        parsedSlotCount !in 1..20 -> errorText = "总节数范围为 1 到 20"
+                        else -> {
+                            val config = FixedWeekScheduleConfig(
+                                firstStartMinutes = parsedStart,
+                                lessonDurationMinutes = parsedLessonDuration,
+                                breakDurationMinutes = parsedBreakDuration,
+                                slotCount = parsedSlotCount,
+                            )
+                            val generatedSlots = buildWeekTimeSlotsFromFixedSchedule(config)
+                            if (generatedSlots.size != parsedSlotCount) {
+                                errorText = "当天时间不足以排下这么多节，请缩短时长或减少节数"
+                            } else {
+                                onSave(config)
+                            }
+                        }
+                    }
+                },
+            ) {
+                Text("应用")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        },
+    )
+}
+
+private fun buildPreviewText(slots: List<WeekTimeSlot>): String {
+    val previewLines = slots.take(4).mapIndexed { index, slot ->
+        "第${index + 1}节 ${formatMinutes(slot.startMinutes)}-${formatMinutes(slot.endMinutes)}"
+    }.toMutableList()
+    if (slots.size > 4) {
+        previewLines += "..."
+        previewLines += "第${slots.size}节 ${formatMinutes(slots.last().startMinutes)}-${formatMinutes(slots.last().endMinutes)}"
+    }
+    return previewLines.joinToString("\n")
 }

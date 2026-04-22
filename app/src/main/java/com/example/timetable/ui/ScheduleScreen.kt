@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,6 +29,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -53,6 +55,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.timetable.data.AppBackgroundMode
 import com.example.timetable.data.AppearanceStore
 import com.example.timetable.data.BackgroundImageManager
+import com.example.timetable.data.buildWeekTimeSlotsFromFixedSchedule
+import com.example.timetable.data.inferFixedWeekScheduleConfig
+import com.example.timetable.data.syncWeekTimeSlotsWithEntryChange
 import com.example.timetable.data.TimetableEntry
 import com.example.timetable.data.WeekTimeSlot
 import com.example.timetable.data.formatDateLabel
@@ -100,6 +105,7 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
     var editingWeekSlotIndex by remember { mutableStateOf<Int?>(null) }
     var addingWeekSlotInitial by remember { mutableStateOf<WeekTimeSlot?>(null) }
     var editingWeekSlotCount by remember { mutableStateOf(false) }
+    var editingFixedWeekSchedule by remember { mutableStateOf(false) }
     var showBackgroundAdjustDialog by remember { mutableStateOf(false) }
     var reminderMinutes by remember { mutableStateOf(CourseReminderScheduler.getReminderMinutes(context)) }
     val reminderOptions = remember { CourseReminderScheduler.reminderMinuteOptions() }
@@ -242,6 +248,14 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
                             }
                         },
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        OutlinedButton(onClick = { editingFixedWeekSchedule = true }) {
+                            Text("固定时间")
+                        }
+                    }
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -454,12 +468,36 @@ fun ScheduleApp(viewModel: ScheduleViewModel = viewModel()) {
         )
     }
 
+    if (editingFixedWeekSchedule) {
+        FixedWeekScheduleDialog(
+            initialConfig = inferFixedWeekScheduleConfig(weekTimeSlots),
+            onDismiss = { editingFixedWeekSchedule = false },
+            onSave = { config ->
+                val generatedSlots = buildWeekTimeSlotsFromFixedSchedule(config)
+                weekTimeSlots = generatedSlots
+                AppearanceStore.setWeekTimeSlots(context, generatedSlots)
+                editingFixedWeekSchedule = false
+                scope.launch { snackbarHostState.showSnackbar("已按固定上课时间生成周视图节次") }
+            },
+        )
+    }
+
     editingEntry?.let { entry ->
+        val existingEntry = entries.any { it.id == entry.id }
         EntryEditorDialog(
             initial = entry,
             onDismiss = { editingEntry = null },
-            onSave = {
-                viewModel.upsertEntry(it)
+            onSave = { updatedEntry ->
+                viewModel.upsertEntry(updatedEntry)
+                val syncedWeekTimeSlots = syncWeekTimeSlotsWithEntryChange(
+                    currentSlots = weekTimeSlots,
+                    originalEntry = entry.takeIf { existingEntry },
+                    updatedEntry = updatedEntry,
+                )
+                if (syncedWeekTimeSlots != weekTimeSlots) {
+                    weekTimeSlots = syncedWeekTimeSlots
+                    AppearanceStore.setWeekTimeSlots(context, syncedWeekTimeSlots)
+                }
                 editingEntry = null
             },
         )
