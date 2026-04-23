@@ -6,6 +6,11 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -167,6 +172,7 @@ fun ScheduleApp(
     var reminderMinutes by remember { mutableStateOf(CourseReminderScheduler.getReminderMinutesSet(context)) }
     var exactAlarmEnabled by remember { mutableStateOf(CourseReminderScheduler.canScheduleExactAlarms(context)) }
     val reminderOptions = remember { CourseReminderScheduler.reminderMinuteOptions() }
+    var deletingEntry by remember { mutableStateOf<TimetableEntry?>(null) }
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -291,7 +297,11 @@ fun ScheduleApp(
                 }
             },
             floatingActionButton = {
-                if (!isSettingsPage) {
+                AnimatedVisibility(
+                    visible = !isSettingsPage,
+                    enter = scaleIn() + fadeIn(),
+                    exit = scaleOut() + fadeOut(),
+                ) {
                     FloatingActionButton(
                         containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.86f),
                         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -352,12 +362,13 @@ fun ScheduleApp(
                                 detectHorizontalDragGestures(
                                     onHorizontalDrag = { _, dragAmount -> totalHorizontalDrag += dragAmount },
                                     onDragEnd = {
+                                        val swipeThresholdPx = density * 48f
                                         when {
-                                            totalHorizontalDrag > 80f -> {
+                                            totalHorizontalDrag > swipeThresholdPx -> {
                                                 val previousDate = selectedLocalDate.minusDays(7)
                                                 if (previousDate >= minDate) selectedDate = previousDate.toString()
                                             }
-                                            totalHorizontalDrag < -80f -> {
+                                            totalHorizontalDrag < -swipeThresholdPx -> {
                                                 val nextDate = selectedLocalDate.plusDays(7)
                                                 if (nextDate <= maxDate) selectedDate = nextDate.toString()
                                             }
@@ -402,12 +413,13 @@ fun ScheduleApp(
                             detectHorizontalDragGestures(
                                 onHorizontalDrag = { _, dragAmount -> totalHorizontalDrag += dragAmount },
                                 onDragEnd = {
+                                    val swipeThresholdPx = density * 48f
                                     when {
-                                        totalHorizontalDrag > 80f -> {
+                                        totalHorizontalDrag > swipeThresholdPx -> {
                                             val previousDate = selectedLocalDate.minusDays(1)
                                             if (previousDate >= minDate) selectedDate = previousDate.toString()
                                         }
-                                        totalHorizontalDrag < -80f -> {
+                                        totalHorizontalDrag < -swipeThresholdPx -> {
                                             val nextDate = selectedLocalDate.plusDays(1)
                                             if (nextDate <= maxDate) selectedDate = nextDate.toString()
                                         }
@@ -556,7 +568,8 @@ fun ScheduleApp(
                                             snackbarHostState.showSnackbar("已复制课程，确认后保存")
                                         }
                                     },
-                                    onDelete = { viewModel.deleteEntry(entry.id) },
+                                    onDelete = { deletingEntry = entry },
+                                    modifier = Modifier.animateItem(),
                                 )
                             }
                         }
@@ -597,6 +610,29 @@ fun ScheduleApp(
                 }
             }
         }
+    }
+
+    deletingEntry?.let { toDelete ->
+        AlertDialog(
+            onDismissRequest = { deletingEntry = null },
+            title = { Text("确认删除") },
+            text = {
+                Text(
+                    "确定要删除课程「${toDelete.title.ifBlank { "未命名" }}」吗？\n此操作无法撤销。",
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteEntry(toDelete.id)
+                        deletingEntry = null
+                    },
+                ) { Text("删除") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { deletingEntry = null }) { Text("取消") }
+            },
+        )
     }
 
     if (showBackgroundAdjustDialog) {

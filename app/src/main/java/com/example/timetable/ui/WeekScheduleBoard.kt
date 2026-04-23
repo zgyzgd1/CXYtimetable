@@ -50,16 +50,7 @@ import java.time.LocalDate
 import java.time.temporal.WeekFields
 import java.util.Locale
 
-private val boardAccentColors = listOf(
-    Color(0xFFF2B6CF),
-    Color(0xFFE98AA9),
-    Color(0xFF82A7F4),
-    Color(0xFFF3BE6E),
-    Color(0xFFE88974),
-    Color(0xFF78D8CB),
-    Color(0xFFB69AF8),
-    Color(0xFF6F9ED6),
-)
+// Course accent colors are now unified via accentColorFor() from TimetableCards.kt
 
 @Composable
 fun WeekScheduleBoard(
@@ -99,10 +90,10 @@ fun WeekScheduleBoard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(28.dp))
-            .background(Color(0x40FFFFFF))
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.25f))
             .border(
                 width = 1.dp,
-                color = Color.White.copy(alpha = 0.18f),
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
                 shape = RoundedCornerShape(28.dp),
             ),
     ) {
@@ -199,12 +190,12 @@ private fun WeekOverviewHeader(
                 Text(
                     text = "${selectedDate.year}/${selectedDate.monthValue}/${selectedDate.dayOfMonth}",
                     style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Normal),
-                    color = Color(0xFF111319),
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     text = "第 $weekNumber 周  ${formatWeekRange(weekStart, weekEnd)}",
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color(0xFF3A4050),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     text = if (weekEntries.isEmpty()) {
@@ -213,7 +204,7 @@ private fun WeekOverviewHeader(
                         "本周 ${weekEntries.size} 节，今天 ${selectedDayEntries.size} 节"
                     },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF677086),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                 )
             }
 
@@ -251,8 +242,8 @@ private fun SummaryPill(
     value: String,
 ) {
     Surface(
-        color = Color(0x36FFFFFF),
-        contentColor = Color(0xFF111319),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(16.dp),
     ) {
         Column(
@@ -263,7 +254,7 @@ private fun SummaryPill(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFF667085),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 text = value,
@@ -289,8 +280,8 @@ private fun TimeColumnHeader(
         Surface(
             onClick = onAddSlot,
             shape = CircleShape,
-            color = Color(0x40FFFFFF),
-            contentColor = Color(0xFF111319),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+            contentColor = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.size(36.dp),
         ) {
             Box(contentAlignment = Alignment.Center) {
@@ -343,19 +334,19 @@ private fun DayHeaderCell(
             .height(height)
             .padding(horizontal = 2.dp)
             .clip(RoundedCornerShape(18.dp))
-            .background(if (selected) Color(0x42FFFFFF) else Color.Transparent),
+            .background(if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else Color.Transparent),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
             text = chineseWeekday(day.dayOfWeek),
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-            color = Color(0xFF495164),
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
             text = "${day.monthValue}/${day.dayOfMonth}",
             style = MaterialTheme.typography.bodySmall,
-            color = Color(0xFF778096),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -404,15 +395,13 @@ private fun WeekDayLane(
                         .fillMaxWidth()
                         .height(slotHeight)
                         .clip(RoundedCornerShape(18.dp))
-                        .background(if (selected) Color(0x18FFFFFF) else Color(0x10FFFFFF)),
+                        .background(if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.08f)),
                 )
             }
         }
 
         layouts.forEach { layout ->
-            val color = boardAccentColors[
-                (layout.entry.title.hashCode() and Int.MAX_VALUE) % boardAccentColors.size
-            ]
+            val color = accentColorFor(layout.entry.title)
             WeekEntryBlock(
                 modifier = Modifier
                     .align(Alignment.TopStart)
@@ -443,7 +432,7 @@ private fun TimeSlotCell(
             .width(width)
             .height(height)
             .clip(RoundedCornerShape(16.dp))
-            .background(Color(0x2CFFFFFF))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
             .semantics {
                 role = Role.Button
                 contentDescription = buildTimeSlotContentDescription(index, slot)
@@ -459,17 +448,17 @@ private fun TimeSlotCell(
             Text(
                 text = (index + 1).toString(),
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = Color(0xFF10131A),
+                color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 text = formatMinutes(slot.startMinutes),
                 style = MaterialTheme.typography.labelMedium,
-                color = Color(0xFF2E3442),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 text = formatMinutes(slot.endMinutes),
                 style = MaterialTheme.typography.labelMedium,
-                color = Color(0xFF2E3442),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -482,8 +471,8 @@ private fun GlassActionChip(
 ) {
     Surface(
         onClick = onClick,
-        color = Color(0x3CFFFFFF),
-        contentColor = Color(0xFF111319),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(16.dp),
         shadowElevation = 0.dp,
     ) {

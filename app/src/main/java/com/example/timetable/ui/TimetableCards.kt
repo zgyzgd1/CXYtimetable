@@ -5,6 +5,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,7 +49,7 @@ import com.example.timetable.data.TimetableEntry
 import com.example.timetable.data.dayLabel
 import com.example.timetable.data.formatMinutes
 
-private val courseAccentColors = listOf(
+internal val courseAccentColors = listOf(
     Color(0xFF7986CB),
     Color(0xFF4DB6AC),
     Color(0xFFFF8A65),
@@ -68,7 +69,7 @@ data class NextCourseCardState(
     val statusText: String,
 )
 
-private fun accentColorFor(title: String): Color =
+internal fun accentColorFor(title: String): Color =
     courseAccentColors[(title.hashCode() and Int.MAX_VALUE) % courseAccentColors.size]
 
 @Composable
@@ -77,11 +78,14 @@ fun EntryCard(
     onEdit: () -> Unit,
     onDuplicate: () -> Unit,
     onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val accent = remember(entry.title) { accentColorFor(entry.title) }
 
     Card(
-        modifier = Modifier.animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)),
+        modifier = modifier
+            .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+            .clickable(onClick = onEdit),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.80f)),
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),

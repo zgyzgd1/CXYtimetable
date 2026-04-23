@@ -17,10 +17,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Opacity
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -610,19 +613,19 @@ fun ViewModeSwitcher(
         NavigationBarItem(
             selected = currentDestination == AppDestination.DAY,
             onClick = { onDestinationChange(AppDestination.DAY) },
-            icon = {},
+            icon = { Icon(Icons.Default.CalendarToday, contentDescription = null) },
             label = { Text("日视图") },
         )
         NavigationBarItem(
             selected = currentDestination == AppDestination.WEEK,
             onClick = { onDestinationChange(AppDestination.WEEK) },
-            icon = {},
+            icon = { Icon(Icons.Default.DateRange, contentDescription = null) },
             label = { Text("周视图") },
         )
         NavigationBarItem(
             selected = currentDestination == AppDestination.SETTINGS,
             onClick = { onDestinationChange(AppDestination.SETTINGS) },
-            icon = {},
+            icon = { Icon(Icons.Default.Settings, contentDescription = null) },
             label = { Text("设置") },
         )
     }

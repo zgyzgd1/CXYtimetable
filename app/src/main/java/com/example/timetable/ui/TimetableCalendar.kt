@@ -52,8 +52,7 @@ import com.example.timetable.data.entriesByDateInRange
 import com.example.timetable.data.parseEntryDate
 import java.time.LocalDate
 import java.time.YearMonth
-import java.time.format.TextStyle
-import java.util.Locale
+
 
 @Composable
 fun PerpetualCalendar(
@@ -196,7 +195,7 @@ fun PerpetualCalendar(
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             Text(
-                                text = date.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.CHINESE),
+                                text = chineseWeekday(date.dayOfWeek),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = textColor.copy(alpha = 0.8f),
                                 textAlign = TextAlign.Center,
