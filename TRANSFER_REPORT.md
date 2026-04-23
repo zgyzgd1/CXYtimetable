@@ -51,14 +51,27 @@
 - `TimetableWidgetUpdaterTest.kt` 补充：进行中课程的小组件状态测试
 - `scripts/env-doctor.ps1` 改为按 `gradle-wrapper.properties` 自动识别 Gradle 版本与分发地址，修复版本写死导致的误报
 - `COMPILE.md` 已同步更新为当前 wrapper 版本说明（Gradle 9.3.1）
+- `AndroidManifest.xml` / `ScheduleScreen.kt` / `TimetableHero.kt` / `CourseReminderScheduler.kt` 已补齐精确闹钟权限声明、状态感知与系统设置跳转入口
+- `TimetableRepository.kt` 已把遗留 JSON 迁移与首次样例数据注入收敛到仓库级 `Mutex` + 数据库事务，消除启动阶段并发迁移窗口
+- `CourseReminderScheduler.kt` 已改为持久化提醒签名，仅取消失效提醒、仅重下发发生变化的提醒；通知标题/地点变化也会触发重下发
+- `ScheduleViewModel.kt` 已新增提醒同步 / 小组件刷新的去重 token，避免启动空数据发射、相同数据重复 collect 和相同提醒档位重复保存导致的无效重算
+- `TimetableRepository.kt` 已修正遗留 JSON 存在但解码失败时的处理：不再误注入样例课表，也不会删除原始旧文件
+- `ScheduleViewModel.kt` 的提醒 / 小组件去重 token 已改为 JSON 序列化，避免标题、地点包含分隔符时发生 token 碰撞
+- `CourseReminderScheduler.kt` 的精确闹钟设置页跳转已改为真实可解析 fallback：优先请求精确闹钟设置页，否则回退到应用详情页
+- 新增 `app/src/test/java/com/example/timetable/ui/ScheduleViewModelSyncTokenTest.kt`
 
 ### 3.3 主要涉及文件
 - `app/src/main/java/com/example/timetable/data/TimetableSnapshots.kt`
+- `app/src/main/java/com/example/timetable/data/TimetableRepository.kt`
+- `app/src/main/java/com/example/timetable/notify/CourseReminderScheduler.kt`
 - `app/src/main/java/com/example/timetable/ui/ScheduleScreen.kt`
 - `app/src/main/java/com/example/timetable/ui/ScheduleViewModel.kt`
+- `app/src/main/java/com/example/timetable/ui/TimetableHero.kt`
 - `app/src/main/java/com/example/timetable/ui/TimetableCalendar.kt`
 - `app/src/main/java/com/example/timetable/ui/WeekScheduleBoard.kt`
 - `app/src/test/java/com/example/timetable/data/TimetableSnapshotsTest.kt`
+- `app/src/test/java/com/example/timetable/notify/CourseReminderSchedulerTest.kt`
+- `app/src/test/java/com/example/timetable/ui/ScheduleViewModelSyncTokenTest.kt`
 - `app/src/test/java/com/example/timetable/ui/ScheduleScreenTest.kt`
 
 ## 4. 本轮审查与发布结果
@@ -102,13 +115,13 @@
 
 #### 已知风险的现状评估
 根据 CODE_REVIEW.md 列举的 5 大风险，本轮审查确认：
-1. **闹铃机制失效**（Android 14+ 精准闹钟权限缺失）- 未修复，标记为下阶段改进
-2. **本地存储竞态条件**（多协程并行读写文件）- 未修复，标记为下阶段改进
-3. **系统级耗电与 CPU 开销**（syncReminders 暴力全量校验）- 未修复，但本轮线性选择避免排序，略微降低 CPU 开销
+1. **闹铃机制失效**（Android 14+ 精准闹钟权限缺失）- 已部分修复：Manifest 权限、UI 状态提示、系统授权跳转与授权返回后的强制重同步已落地；仍缺更强的 fallback 策略
+2. **本地存储竞态条件**（多协程并行读写文件）- 已收口：主存储已是 Room，遗留 JSON 迁移与种子数据注入已补仓库级串行化与事务保护；遗留文件解码失败时不再误删原始数据或误注入样例
+3. **系统级耗电与 CPU 开销**（syncReminders 暴力全量校验）- 已部分修复：提醒调度改为签名增量下发，ViewModel 层新增提醒/小组件去重 token，且 token 已改为结构化序列化避免碰撞；仍保留“全量扫描课程求最近提醒”的计算路径，可作为下一阶段继续优化
 4. **硬编码与时区灾难**（中文硬编码、北京时区写死）- 未修复，标记为下阶段改进
 5. **Compose 巨型类问题**（ScheduleScreen ~1000 行）- 未修复，标记为下阶段改进
 
-**结论**：本轮未发现新的高/中风险问题，优化代码安全合规。已知的 5 大架构风险可作为后续改进清单。
+**结论**：本轮新增审查发现的 3 个具体漏洞已完成修复：旧文件迁移失败误删数据、同步 token 分隔符碰撞、精确闹钟设置页伪 fallback。剩余高优先事项主要是“最近提醒候选仍需全量扫描”的计算路径以及更强的提醒 fallback。
 
 ## 5. 验证结果
 - 已执行：
@@ -117,6 +130,11 @@
   - `.\gradlew.bat --offline --no-daemon assembleDebug --rerun-tasks`
   - `.\gradlew.bat --offline --no-daemon assembleRelease --rerun-tasks`
   - `.\gradlew.bat --offline --no-daemon testDebugUnitTest --tests com.example.timetable.data.TimetableSnapshotsTest --tests com.example.timetable.notify.CourseReminderSchedulerTest --tests com.example.timetable.widget.TimetableWidgetUpdaterTest --tests com.example.timetable.ui.ScheduleScreenTest --rerun-tasks`
+  - `.\gradlew.bat :app:compileDebugKotlin`
+  - `.\gradlew.bat --offline --no-daemon testDebugUnitTest --tests com.example.timetable.data.TimetableRepositoryTest --tests com.example.timetable.ui.ScheduleScreenTest --tests com.example.timetable.notify.CourseReminderSchedulerTest --rerun-tasks`
+  - `.\gradlew.bat --offline --no-daemon testDebugUnitTest --tests com.example.timetable.notify.CourseReminderSchedulerTest --rerun-tasks`
+  - `.\gradlew.bat --offline --no-daemon testDebugUnitTest --tests com.example.timetable.ui.ScheduleViewModelSyncTokenTest --tests com.example.timetable.notify.CourseReminderSchedulerTest --rerun-tasks`
+  - `.\gradlew.bat --offline --no-daemon testDebugUnitTest --tests com.example.timetable.data.TimetableRepositoryTest --tests com.example.timetable.ui.ScheduleViewModelSyncTokenTest --tests com.example.timetable.notify.CourseReminderSchedulerTest --rerun-tasks`
   - VS Code 任务 `assembleDebug`
   - VS Code 任务 `envDoctor`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish-release.ps1`
@@ -125,6 +143,7 @@
   - `assembleRelease` 构建通过
   - `v1.21` Release 与 APK 上传通过
   - `assembleDebug` 构建通过
+  - `:app:compileDebugKotlin` 通过
   - `envDoctor` 在脚本修正后通过
   - 仅保留既有的 Android SDK XML warning
 
@@ -135,11 +154,11 @@
 - 阶段 4：
   - 任务 1 `关键回归测试`：已补强
   - 任务 2 `可访问性补强`：关键路径已完成一轮
-  - 任务 3 `性能和边界治理`：继续推进中；目前已完成范围索引复用、UI 侧重复入口收口、小组件刷新串行化、停用逻辑物理删除和边界测试补齐
+  - 任务 3 `性能和边界治理`：继续推进中；目前已完成范围索引复用、UI 侧重复入口收口、小组件刷新串行化、停用逻辑物理删除、精确提醒权限链路、提醒增量调度、迁移竞态收口、提醒/小组件同步去重和边界测试补齐
 
 ## 7. 当前工作区状态
 - 当前分支：`main`
-- 当前工作区：clean
+- 当前工作区：dirty（已完成但未提交）
 - 当前基线：`c8849c3` / `v1.21`
 
 ## 8. 建议下一步
@@ -155,25 +174,24 @@
 
 **优先度 P0（功能正确性）**：
 1. **闹铃机制失效 (Android 14+ 精准闹钟权限缺失)**
-   - 影响范围：提醒功能核心，现代 Android 系统可能无法触发提醒
+   - 当前状态：已补权限声明、设置页跳转和授权返回重同步；提醒不再静默缺口
    - 修复方向：
-     - 在 `AndroidManifest.xml` 添加 `<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>`
-     - 动态申请权限（Android 12+）
-     - 改进 fallback 策略，使用 `WorkManager` 配合 ExactAlarmDispatcher
+     - 补更强的 fallback 策略，使用 `WorkManager` 配合 ExactAlarmDispatcher
+     - 覆盖权限被系统回收 / 关闭后的自动降级与提示路径
+     - 增加相关 UI / 调度测试
 
 2. **本地存储竞态条件 (多协程并行读写导致数据损坏)**
-   - 影响范围：用户课表数据可能损坏清空，直接影响体验
+   - 当前状态：主存储已是 Room；遗留 JSON 迁移窗口已补串行化与事务保护
    - 修复方向：
-     - 引入 `Mutex` 互斥锁确保文件读写单线程化
-     - 或迁移到官方推荐的 `Room Database` / `DataStore`
-     - 补完整的竞态条件单测
+     - 如需进一步加固，可补仓库初始化并发单测
+     - 评估是否彻底删除遗留 JSON 兼容代码，减少维护面
 
 **优先度 P1（性能与体验）**：
 3. **系统级耗电与 CPU 开销 (syncReminders 暴力全量校验)**
-   - 影响范围：续航时间、系统流畅度，高定制 ROM（ColorOS/MIUI）易被强杀
+   - 当前状态：已完成签名增量下发与 ViewModel 层去重，显著减少重复 AlarmManager IPC 与重复刷新
    - 修复方向：
-     - 改进闹钟增量更新机制，持久化每个 Entry 的 RequestCode
-     - 或切换到 `WorkManager` 处理 PeriodicWork
+     - 继续把“最近提醒候选”从全量扫描收敛到更轻的增量入口
+     - 评估是否需要切换到 `WorkManager` 处理更长周期的兜底调度
      - 进行电池消耗采样验证
 
 **优先度 P2（可维护性与国际化）**：
@@ -190,4 +208,3 @@
      - 拆分 Hero 组件、长列表、弹窗等独立 Composable 文件
      - 按职责划分为 UI 层多个模块
      - 预计可降低每次重组的耗时 5-15%
-

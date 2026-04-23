@@ -37,6 +37,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 
 private const val MAX_ICS_IMPORT_BYTES = 1024 * 1024
 
@@ -55,9 +57,11 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
     private val reminderSyncMutex = Mutex()
     private var reminderSyncGeneration = 0L
     private var reminderSyncJob: Job? = null
+    private var lastReminderSyncToken: String? = null
     private val widgetRefreshMutex = Mutex()
     private var widgetRefreshGeneration = 0L
     private var widgetRefreshJob: Job? = null
+    private var lastWidgetRefreshToken: String? = null
 
     init {
         viewModelScope.launch {
@@ -151,9 +155,15 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
     fun updateReminderMinutes(minutes: Iterable<Int>) {
         val normalizedMinutes = CourseReminderScheduler.normalizeReminderMinutes(minutes)
         if (normalizedMinutes.isEmpty()) return
+        val currentMinutes = CourseReminderScheduler.getReminderMinutesSet(getApplication())
+        if (normalizedMinutes == currentMinutes) return
         CourseReminderScheduler.setReminderMinutes(getApplication(), normalizedMinutes)
         syncReminders(entries.value)
         postMessage("已设置为提前 ${CourseReminderScheduler.formatReminderSelection(normalizedMinutes)} 提醒")
+    }
+
+    fun resyncReminderSchedule() {
+        syncReminders(entries.value, force = true)
     }
 
     private suspend fun readText(contentResolver: ContentResolver, uri: Uri): String {
@@ -296,13 +306,19 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         return pairs
     }
 
-    private fun syncReminders(entriesList: List<TimetableEntry>) {
+    private fun syncReminders(entriesList: List<TimetableEntry>, force: Boolean = false) {
         val generation = ++reminderSyncGeneration
         reminderSyncJob?.cancel()
         reminderSyncJob = viewModelScope.launch(Dispatchers.IO) {
             reminderSyncMutex.withLock {
                 if (generation != reminderSyncGeneration) return@launch
+                val syncToken = reminderSyncToken(
+                    entries = entriesList,
+                    reminderMinutes = CourseReminderScheduler.getReminderMinutesSet(getApplication()),
+                )
+                if (!force && syncToken == lastReminderSyncToken) return@launch
                 CourseReminderScheduler.sync(getApplication(), entriesList)
+                lastReminderSyncToken = syncToken
             }
         }
     }
@@ -313,7 +329,10 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         widgetRefreshJob = viewModelScope.launch(Dispatchers.IO) {
             widgetRefreshMutex.withLock {
                 if (generation != widgetRefreshGeneration) return@launch
+                val refreshToken = widgetRefreshToken(entriesList)
+                if (refreshToken == lastWidgetRefreshToken) return@launch
                 TimetableWidgetUpdater.refreshAll(getApplication(), entriesList)
+                lastWidgetRefreshToken = refreshToken
             }
         }
     }
@@ -486,4 +505,35 @@ private fun relevantSearchWeeks(entry: TimetableEntry): Int {
         customWeeks.maxOrNull() ?: 0,
         skippedWeeks.maxOrNull() ?: 0,
     )
+}
+
+internal fun reminderSyncToken(
+    entries: List<TimetableEntry>,
+    reminderMinutes: List<Int>,
+): String {
+    val normalizedReminderMinutes = CourseReminderScheduler.normalizeReminderMinutes(reminderMinutes)
+    return JSONObject()
+        .put("reminderMinutes", JSONArray(normalizedReminderMinutes))
+        .put("entries", JSONArray(entries.map(::entryTokenJson)))
+        .toString()
+}
+
+internal fun widgetRefreshToken(entries: List<TimetableEntry>): String {
+    return JSONArray(entries.map(::entryTokenJson)).toString()
+}
+
+private fun entryTokenJson(entry: TimetableEntry): JSONObject {
+    return JSONObject()
+        .put("id", entry.id)
+        .put("title", entry.title)
+        .put("location", entry.location)
+        .put("date", entry.date)
+        .put("dayOfWeek", entry.dayOfWeek)
+        .put("startMinutes", entry.startMinutes)
+        .put("endMinutes", entry.endMinutes)
+        .put("recurrenceType", entry.recurrenceType)
+        .put("semesterStartDate", entry.semesterStartDate)
+        .put("weekRule", entry.weekRule)
+        .put("customWeekList", entry.customWeekList)
+        .put("skipWeekList", entry.skipWeekList)
 }

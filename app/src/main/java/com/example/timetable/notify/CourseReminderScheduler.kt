@@ -5,10 +5,13 @@ import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.core.content.ContextCompat
 import com.example.timetable.data.TimetableEntry
 import com.example.timetable.data.nextOccurrenceDate
@@ -35,6 +38,7 @@ object CourseReminderScheduler {
     private const val ACTION_COURSE_REMINDER = "com.example.timetable.ACTION_COURSE_REMINDER"
     private const val PREFS_NAME = "course_reminder_prefs"
     private const val KEY_CODES = "scheduled_codes"
+    private const val KEY_SCHEDULE_SIGNATURES = "scheduled_signatures"
     private const val KEY_REMINDER_MINUTES = "reminder_minutes"
     private const val KEY_REMINDER_MINUTES_SET = "reminder_minutes_set"
     private const val DEFAULT_REMINDER_MINUTES = 20
@@ -50,6 +54,7 @@ object CourseReminderScheduler {
     internal data class SchedulePlan(
         val newSchedules: Map<Int, ScheduledReminder>,
         val codesToCancel: Set<Int>,
+        val schedulesToSchedule: Map<Int, ScheduledReminder>,
     )
 
     internal data class ScheduledReminder(
@@ -68,19 +73,24 @@ object CourseReminderScheduler {
         val alarmManager = appContext.getSystemService(AlarmManager::class.java) ?: return
         val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val oldCodes = prefs.getStringSet(KEY_CODES, emptySet()).orEmpty().mapNotNull { it.toIntOrNull() }.toSet()
+        val oldSignatures = prefs.getStringSet(KEY_SCHEDULE_SIGNATURES, emptySet())
+            .orEmpty()
+            .mapNotNull(::decodeScheduledSignature)
+            .toMap()
 
         val plan = buildSchedulePlan(
             entries = entries,
             reminderMinutesOptions = reminderMinutes,
             nowMillis = System.currentTimeMillis(),
             oldCodes = oldCodes,
+            oldSignatures = oldSignatures,
         )
 
         plan.codesToCancel.forEach { code ->
             cancelAlarm(appContext, alarmManager, code)
         }
 
-        plan.newSchedules.forEach { (requestCode, scheduled) ->
+        plan.schedulesToSchedule.forEach { (requestCode, scheduled) ->
             val pendingIntent = createPendingIntent(
                 context = appContext,
                 entry = scheduled.entry,
@@ -93,7 +103,10 @@ object CourseReminderScheduler {
             scheduleAlarm(alarmManager, scheduled.triggerAtMillis, pendingIntent)
         }
 
-        prefs.edit().putStringSet(KEY_CODES, plan.newSchedules.keys.map { it.toString() }.toSet()).apply()
+        prefs.edit()
+            .putStringSet(KEY_CODES, plan.newSchedules.keys.map { it.toString() }.toSet())
+            .putStringSet(KEY_SCHEDULE_SIGNATURES, encodeScheduledSignatures(plan.newSchedules))
+            .apply()
     }
 
     internal fun buildSchedulePlan(
@@ -101,12 +114,14 @@ object CourseReminderScheduler {
         reminderMinutes: Int,
         nowMillis: Long,
         oldCodes: Set<Int>,
+        oldSignatures: Map<Int, String> = emptyMap(),
     ): SchedulePlan {
         return buildSchedulePlan(
             entries = entries,
             reminderMinutesOptions = listOf(reminderMinutes),
             nowMillis = nowMillis,
             oldCodes = oldCodes,
+            oldSignatures = oldSignatures,
         )
     }
 
@@ -115,12 +130,14 @@ object CourseReminderScheduler {
         reminderMinutesOptions: List<Int>,
         nowMillis: Long,
         oldCodes: Set<Int>,
+        oldSignatures: Map<Int, String> = emptyMap(),
     ): SchedulePlan {
         val normalizedReminderMinutes = normalizeReminderMinutes(reminderMinutesOptions)
         if (normalizedReminderMinutes.isEmpty()) {
             return SchedulePlan(
                 newSchedules = emptyMap(),
                 codesToCancel = oldCodes,
+                schedulesToSchedule = emptyMap(),
             )
         }
 
@@ -153,9 +170,13 @@ object CourseReminderScheduler {
         }
 
         val newCodes = newSchedules.keys
+        val schedulesToSchedule = newSchedules.filter { (requestCode, scheduled) ->
+            oldSignatures[requestCode] != scheduleSignature(scheduled)
+        }
         return SchedulePlan(
             newSchedules = newSchedules,
             codesToCancel = oldCodes - newCodes,
+            schedulesToSchedule = schedulesToSchedule,
         )
     }
 
@@ -238,6 +259,31 @@ object CourseReminderScheduler {
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
     }
 
+    fun exactAlarmPermissionRequired(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
+    fun canScheduleExactAlarms(context: Context): Boolean {
+        if (!exactAlarmPermissionRequired()) return true
+        val alarmManager = context.applicationContext.getSystemService(AlarmManager::class.java) ?: return false
+        return alarmManager.canScheduleExactAlarms()
+    }
+
+    fun buildExactAlarmSettingsIntent(context: Context): Intent? {
+        if (!exactAlarmPermissionRequired()) return null
+        val packageUri = Uri.parse("package:${context.packageName}")
+        val packageManager = context.packageManager
+        val requestExactAlarmIntent = try {
+            Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, packageUri)
+        } catch (_: ActivityNotFoundException) {
+            null
+        }
+        if (requestExactAlarmIntent?.resolveActivity(packageManager) != null) {
+            return requestExactAlarmIntent
+        }
+
+        val appDetailsIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, packageUri)
+        return appDetailsIntent.takeIf { it.resolveActivity(packageManager) != null }
+    }
+
     fun ensureNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
 
@@ -300,6 +346,34 @@ object CourseReminderScheduler {
 
     private fun requestCodeFor(entry: TimetableEntry, reminderMinutes: Int): Int {
         return "${entry.id}|${entry.date}|${entry.startMinutes}|$reminderMinutes".hashCode()
+    }
+
+    private fun scheduleSignature(scheduled: ScheduledReminder): String {
+        return listOf(
+            scheduled.triggerAtMillis.toString(),
+            scheduled.occurrenceDate.toString(),
+            scheduled.reminderMinutes.toString(),
+            scheduled.entry.id,
+            scheduled.entry.title,
+            scheduled.entry.location,
+            scheduled.entry.date,
+            scheduled.entry.startMinutes.toString(),
+        ).joinToString("|")
+    }
+
+    private fun encodeScheduledSignatures(schedules: Map<Int, ScheduledReminder>): Set<String> {
+        return schedules.map { (requestCode, scheduled) ->
+            "$requestCode=${scheduleSignature(scheduled)}"
+        }.toSet()
+    }
+
+    private fun decodeScheduledSignature(encoded: String): Pair<Int, String>? {
+        val separatorIndex = encoded.indexOf('=')
+        if (separatorIndex <= 0 || separatorIndex == encoded.lastIndex) return null
+        val requestCode = encoded.substring(0, separatorIndex).toIntOrNull() ?: return null
+        val signature = encoded.substring(separatorIndex + 1)
+        if (signature.isBlank()) return null
+        return requestCode to signature
     }
 
     private fun cancelAlarm(context: Context, alarmManager: AlarmManager, requestCode: Int) {

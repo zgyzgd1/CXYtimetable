@@ -197,6 +197,97 @@ class CourseReminderSchedulerTest {
     }
 
     @Test
+    fun buildSchedulePlanSkipsReschedulingWhenExistingAlarmSignatureMatches() {
+        val zone = ZoneId.systemDefault()
+        val courseDate = LocalDate.of(2099, 1, 5)
+        val nowMillis = courseDate.minusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        val entry = course("entry-a", courseDate, 8 * 60, 9 * 60)
+
+        val initialPlan = CourseReminderScheduler.buildSchedulePlan(
+            entries = listOf(entry),
+            reminderMinutes = 20,
+            nowMillis = nowMillis,
+            oldCodes = emptySet(),
+        )
+
+        val unchangedPlan = CourseReminderScheduler.buildSchedulePlan(
+            entries = listOf(entry),
+            reminderMinutes = 20,
+            nowMillis = nowMillis,
+            oldCodes = initialPlan.newSchedules.keys,
+            oldSignatures = initialPlan.newSchedules.mapValues { (_, scheduled) ->
+                signatureOf(scheduled)
+            },
+        )
+
+        assertEquals(initialPlan.newSchedules.keys, unchangedPlan.newSchedules.keys)
+        assertTrue(unchangedPlan.codesToCancel.isEmpty())
+        assertTrue(unchangedPlan.schedulesToSchedule.isEmpty())
+    }
+
+    @Test
+    fun buildSchedulePlanReschedulesWhenExistingAlarmSignatureChanged() {
+        val zone = ZoneId.systemDefault()
+        val courseDate = LocalDate.of(2099, 1, 5)
+        val nowMillis = courseDate.minusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        val entry = course("entry-a", courseDate, 8 * 60, 9 * 60)
+
+        val initialPlan = CourseReminderScheduler.buildSchedulePlan(
+            entries = listOf(entry),
+            reminderMinutes = 20,
+            nowMillis = nowMillis,
+            oldCodes = emptySet(),
+        )
+
+        val changedPlan = CourseReminderScheduler.buildSchedulePlan(
+            entries = listOf(entry),
+            reminderMinutes = 20,
+            nowMillis = nowMillis,
+            oldCodes = initialPlan.newSchedules.keys,
+            oldSignatures = initialPlan.newSchedules.keys.associateWith { "stale-signature" },
+        )
+
+        assertEquals(initialPlan.newSchedules.keys, changedPlan.schedulesToSchedule.keys)
+        assertTrue(changedPlan.codesToCancel.isEmpty())
+    }
+
+    @Test
+    fun buildSchedulePlanReschedulesWhenNotificationContentChanged() {
+        val zone = ZoneId.systemDefault()
+        val courseDate = LocalDate.of(2099, 1, 5)
+        val nowMillis = courseDate.minusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        val originalEntry = course("entry-a", courseDate, 8 * 60, 9 * 60).copy(
+            title = "Original Title",
+            location = "A-101",
+        )
+
+        val initialPlan = CourseReminderScheduler.buildSchedulePlan(
+            entries = listOf(originalEntry),
+            reminderMinutes = 20,
+            nowMillis = nowMillis,
+            oldCodes = emptySet(),
+        )
+
+        val updatedEntry = originalEntry.copy(
+            title = "Updated Title",
+            location = "B-202",
+        )
+        val updatedPlan = CourseReminderScheduler.buildSchedulePlan(
+            entries = listOf(updatedEntry),
+            reminderMinutes = 20,
+            nowMillis = nowMillis,
+            oldCodes = initialPlan.newSchedules.keys,
+            oldSignatures = initialPlan.newSchedules.mapValues { (_, scheduled) ->
+                signatureOf(scheduled)
+            },
+        )
+
+        assertEquals(initialPlan.newSchedules.keys, updatedPlan.newSchedules.keys)
+        assertEquals(updatedPlan.newSchedules.keys, updatedPlan.schedulesToSchedule.keys)
+        assertTrue(updatedPlan.codesToCancel.isEmpty())
+    }
+
+    @Test
     fun normalizeReminderMinutesSortsDeduplicatesAndLimitsSelectionCount() {
         assertEquals(
             listOf(5, 10, 20, 30, 45),
@@ -237,5 +328,18 @@ class CourseReminderSchedulerTest {
             startMinutes = startMinutes,
             endMinutes = endMinutes,
         )
+    }
+
+    private fun signatureOf(scheduled: CourseReminderScheduler.ScheduledReminder): String {
+        return listOf(
+            scheduled.triggerAtMillis.toString(),
+            scheduled.occurrenceDate.toString(),
+            scheduled.reminderMinutes.toString(),
+            scheduled.entry.id,
+            scheduled.entry.title,
+            scheduled.entry.location,
+            scheduled.entry.date,
+            scheduled.entry.startMinutes.toString(),
+        ).joinToString("|")
     }
 }

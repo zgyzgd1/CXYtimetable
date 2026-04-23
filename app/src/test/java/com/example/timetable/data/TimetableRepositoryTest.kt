@@ -74,4 +74,38 @@ class TimetableRepositoryTest {
 
         assertTrue(decoded.isEmpty())
     }
+
+    @Test
+    fun shouldNotSeedSampleEntriesWhenLegacyPayloadExistsButDecodingFailed() {
+        val legacyLoadResult = TimetableRepository.LegacyLoadResult(
+            file = java.io.File("legacy.json"),
+            payload = """{"version":999,"entries":[{"title":"broken"}]}""",
+            entries = emptyList(),
+        )
+
+        val shouldSeed = TimetableRepository.shouldSeedSampleEntriesAfterLegacyLoad(
+            legacyLoadResult = legacyLoadResult,
+            hasEntries = false,
+            hasSeededSampleEntries = false,
+        )
+
+        assertFalse(shouldSeed)
+    }
+
+    @Test
+    fun shouldSeedSampleEntriesWhenLegacyPayloadIsBlankAndDatabaseIsEmpty() {
+        val legacyLoadResult = TimetableRepository.LegacyLoadResult(
+            file = java.io.File("legacy.json"),
+            payload = "",
+            entries = emptyList(),
+        )
+
+        val shouldSeed = TimetableRepository.shouldSeedSampleEntriesAfterLegacyLoad(
+            legacyLoadResult = legacyLoadResult,
+            hasEntries = false,
+            hasSeededSampleEntries = false,
+        )
+
+        assertTrue(shouldSeed)
+    }
 }

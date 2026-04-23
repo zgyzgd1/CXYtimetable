@@ -65,6 +65,9 @@ fun HeroSection(
     onImport: () -> Unit,
     onExport: () -> Unit,
     onEnableNotifications: () -> Unit,
+    exactAlarmPermissionRequired: Boolean,
+    exactAlarmEnabled: Boolean,
+    onOpenExactAlarmSettings: () -> Unit,
     reminderMinutes: List<Int>,
     reminderOptions: List<Int>,
     onReminderMinutesChange: (List<Int>) -> Unit,
@@ -153,6 +156,8 @@ fun HeroSection(
         ReminderPickerDialog(
             reminderMinutes = reminderMinutes,
             reminderOptions = reminderOptions,
+            exactAlarmPermissionRequired = exactAlarmPermissionRequired,
+            exactAlarmEnabled = exactAlarmEnabled,
             onDismiss = { showReminderSheet = false },
             onSelect = {
                 onReminderMinutesChange(it)
@@ -160,6 +165,10 @@ fun HeroSection(
             },
             onEnableNotifications = {
                 onEnableNotifications()
+                showReminderSheet = false
+            },
+            onOpenExactAlarmSettings = {
+                onOpenExactAlarmSettings()
                 showReminderSheet = false
             },
         )
@@ -392,9 +401,12 @@ private fun AppearanceDialog(
 private fun ReminderPickerDialog(
     reminderMinutes: List<Int>,
     reminderOptions: List<Int>,
+    exactAlarmPermissionRequired: Boolean,
+    exactAlarmEnabled: Boolean,
     onDismiss: () -> Unit,
     onSelect: (List<Int>) -> Unit,
     onEnableNotifications: () -> Unit,
+    onOpenExactAlarmSettings: () -> Unit,
 ) {
     var selectedReminderMinutes by remember(reminderMinutes) {
         mutableStateOf(
@@ -463,6 +475,29 @@ private fun ReminderPickerDialog(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (exactAlarmPermissionRequired) {
+                    Text(
+                        text = if (exactAlarmEnabled) {
+                            "精确提醒：已开启"
+                        } else {
+                            "精确提醒：未开启，系统可能延后提醒"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (exactAlarmEnabled) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
+                    )
+                    if (!exactAlarmEnabled) {
+                        OutlinedButton(
+                            onClick = onOpenExactAlarmSettings,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("开启精确提醒")
+                        }
+                    }
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

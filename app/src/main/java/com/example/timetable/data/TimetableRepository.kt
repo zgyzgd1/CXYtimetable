@@ -6,6 +6,8 @@ import com.example.timetable.data.room.AppDatabase
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
@@ -13,6 +15,16 @@ object TimetableRepository {
     private const val STORAGE_FILE_NAME = "timetable_entries.json"
     private const val PREFS_NAME = "timetable_repository_prefs"
     private const val KEY_SAMPLE_ENTRIES_SEEDED = "sample_entries_seeded"
+    private val bootstrapMutex = Mutex()
+
+    internal data class LegacyLoadResult(
+        val file: File,
+        val payload: String,
+        val entries: List<TimetableEntry>,
+    ) {
+        val hasPayload: Boolean
+            get() = payload.isNotBlank()
+    }
 
     private fun getLegacyStorageFile(context: Context): File = File(context.filesDir, STORAGE_FILE_NAME)
 
@@ -31,23 +43,27 @@ object TimetableRepository {
         return !hasEntries && !hasSeededSampleEntries
     }
 
-    private suspend fun migrateLegacyStorageIfPresent(
-        context: Context,
-        dao: com.example.timetable.data.room.TimetableDao,
+    internal fun shouldSeedSampleEntriesAfterLegacyLoad(
+        legacyLoadResult: LegacyLoadResult?,
+        hasEntries: Boolean,
+        hasSeededSampleEntries: Boolean,
     ): Boolean {
+        if (legacyLoadResult != null && legacyLoadResult.hasPayload && legacyLoadResult.entries.isEmpty()) {
+            return false
+        }
+        return shouldSeedSampleEntries(hasEntries, hasSeededSampleEntries)
+    }
+
+    private fun loadLegacyEntriesIfPresent(context: Context): LegacyLoadResult? {
         val file = getLegacyStorageFile(context)
-        if (!file.exists()) return false
+        if (!file.exists()) return null
 
         val payload = runCatching { file.readText() }.getOrDefault("")
-        val persisted = decodeLegacyEntries(payload)
-
-        if (persisted.isNotEmpty()) {
-            dao.upsertEntries(persisted)
-            markSampleEntriesSeeded(context)
-        }
-
-        file.delete()
-        return persisted.isNotEmpty()
+        return LegacyLoadResult(
+            file = file,
+            payload = payload,
+            entries = decodeLegacyEntries(payload),
+        )
     }
 
     private suspend fun seedSampleEntriesIfNeeded(context: Context, dao: com.example.timetable.data.room.TimetableDao) {
@@ -58,13 +74,40 @@ object TimetableRepository {
         markSampleEntriesSeeded(context)
     }
 
-    suspend fun ensureMigrated(context: Context) = withContext(Dispatchers.IO) {
-        val dao = AppDatabase.getDatabase(context).timetableDao()
-
-        val migrated = migrateLegacyStorageIfPresent(context, dao)
-        if (!migrated) {
-            seedSampleEntriesIfNeeded(context, dao)
+    private suspend fun ensureRoomBackedStorageReady(context: Context) {
+        bootstrapMutex.withLock {
+            val appContext = context.applicationContext
+            val db = AppDatabase.getDatabase(appContext)
+            val legacyMigration = loadLegacyEntriesIfPresent(appContext)
+            var shouldDeleteLegacyFile = false
+            db.withTransaction {
+                val dao = db.timetableDao()
+                val migratedEntries = legacyMigration?.entries.orEmpty()
+                val migrated = migratedEntries.isNotEmpty()
+                if (migrated) {
+                    dao.upsertEntries(migratedEntries)
+                    markSampleEntriesSeeded(appContext)
+                }
+                if (
+                    !migrated &&
+                    shouldSeedSampleEntriesAfterLegacyLoad(
+                        legacyLoadResult = legacyMigration,
+                        hasEntries = dao.getAllEntries().isNotEmpty(),
+                        hasSeededSampleEntries = hasSeededSampleEntries(appContext),
+                    )
+                ) {
+                    seedSampleEntriesIfNeeded(appContext, dao)
+                }
+                shouldDeleteLegacyFile = legacyMigration != null && (!legacyMigration.hasPayload || migrated)
+            }
+            if (shouldDeleteLegacyFile) {
+                legacyMigration?.file?.delete()
+            }
         }
+    }
+
+    suspend fun ensureMigrated(context: Context) = withContext(Dispatchers.IO) {
+        ensureRoomBackedStorageReady(context)
     }
 
     fun getEntriesStream(context: Context): Flow<List<TimetableEntry>> {
@@ -73,8 +116,8 @@ object TimetableRepository {
 
     suspend fun getEntriesNow(context: Context): List<TimetableEntry> {
         return withContext(Dispatchers.IO) {
+            ensureRoomBackedStorageReady(context)
             val dao = AppDatabase.getDatabase(context).timetableDao()
-            migrateLegacyStorageIfPresent(context, dao)
             dao.getAllEntries()
         }
     }

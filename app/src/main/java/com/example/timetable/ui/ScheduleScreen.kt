@@ -1,6 +1,7 @@
 package com.example.timetable.ui
 
 import android.Manifest
+import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -164,6 +165,7 @@ fun ScheduleApp(
     var showBackgroundAdjustDialog by remember { mutableStateOf(false) }
     var clearingCache by remember { mutableStateOf(false) }
     var reminderMinutes by remember { mutableStateOf(CourseReminderScheduler.getReminderMinutesSet(context)) }
+    var exactAlarmEnabled by remember { mutableStateOf(CourseReminderScheduler.canScheduleExactAlarms(context)) }
     val reminderOptions = remember { CourseReminderScheduler.reminderMinuteOptions() }
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -173,6 +175,22 @@ fun ScheduleApp(
             snackbarHostState.showSnackbar(
                 if (granted) "已开启通知提醒" else "未授予通知权限，可能无法收到提醒",
             )
+        }
+    }
+    val exactAlarmSettingsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        val enabled = CourseReminderScheduler.canScheduleExactAlarms(context)
+        exactAlarmEnabled = enabled
+        scope.launch {
+            if (enabled) {
+                viewModel.resyncReminderSchedule()
+                snackbarHostState.showSnackbar("已开启精确提醒")
+            } else if (result.resultCode == Activity.RESULT_CANCELED) {
+                snackbarHostState.showSnackbar("未开启精确提醒，系统可能延后提醒")
+            } else {
+                snackbarHostState.showSnackbar("精确提醒仍未开启，系统可能延后提醒")
+            }
         }
     }
 
@@ -439,6 +457,18 @@ fun ScheduleApp(
                                             }
                                         }
                                         else -> notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    }
+                                },
+                                exactAlarmPermissionRequired = CourseReminderScheduler.exactAlarmPermissionRequired(),
+                                exactAlarmEnabled = exactAlarmEnabled,
+                                onOpenExactAlarmSettings = {
+                                    val intent = CourseReminderScheduler.buildExactAlarmSettingsIntent(context)
+                                    if (intent == null) {
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar("当前系统版本无需额外精确提醒授权")
+                                        }
+                                    } else {
+                                        exactAlarmSettingsLauncher.launch(intent)
                                     }
                                 },
                                 reminderMinutes = reminderMinutes,
