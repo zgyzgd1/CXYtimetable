@@ -60,9 +60,9 @@ import com.example.timetable.data.AppBackgroundMode
 import com.example.timetable.data.AppCacheManager
 import com.example.timetable.data.AppearanceStore
 import com.example.timetable.data.BackgroundImageManager
+import com.example.timetable.data.DateRangeEntriesCache
 import com.example.timetable.data.NextCourseSnapshot
 import com.example.timetable.data.areWeekTimeSlotsNonOverlapping
-import com.example.timetable.data.entriesByDateInRange
 import com.example.timetable.data.findNextCourseSnapshot
 import com.example.timetable.data.inferFixedWeekScheduleConfig
 import com.example.timetable.data.syncWeekTimeSlotsWithEntryChange
@@ -147,11 +147,13 @@ fun ScheduleApp(
     val selectedWeekEnd = remember(selectedWeekStart) { selectedWeekStart.plusDays(6) }
     val today = LocalDate.now()
     val nowMinutes = LocalTime.now().let { it.hour * 60 + it.minute }
-    val nextCourseSnapshot = findNextCourseSnapshot(
-        entries = entries,
-        nowDate = today,
-        nowMinutes = nowMinutes,
-    )
+    val nextCourseSnapshot = remember(entries, today, nowMinutes) {
+        findNextCourseSnapshot(
+            entries = entries,
+            nowDate = today,
+            nowMinutes = nowMinutes,
+        )
+    }
 
     var editingEntry by remember { mutableStateOf<TimetableEntry?>(null) }
     var pendingConflict by remember { mutableStateOf<PendingEntryConflict?>(null) }
@@ -225,11 +227,14 @@ fun ScheduleApp(
         }
     }
 
-    val visibleEntriesByDate = remember(entries, isWeekMode, selectedLocalDate, selectedWeekStart, selectedWeekEnd) {
+    val dateRangeEntriesCache = remember(entries) {
+        DateRangeEntriesCache(entries)
+    }
+    val visibleEntriesByDate = remember(dateRangeEntriesCache, isWeekMode, selectedLocalDate, selectedWeekStart, selectedWeekEnd) {
         if (isWeekMode) {
-            entriesByDateInRange(entries, selectedWeekStart, selectedWeekEnd)
+            dateRangeEntriesCache.resolve(selectedWeekStart, selectedWeekEnd)
         } else {
-            entriesByDateInRange(entries, selectedLocalDate, selectedLocalDate)
+            dateRangeEntriesCache.resolve(selectedLocalDate, selectedLocalDate)
         }
     }
     val selectedDayEntries = remember(visibleEntriesByDate, selectedLocalDate) {
@@ -492,6 +497,7 @@ fun ScheduleApp(
                             PerpetualCalendar(
                                 selectedDate = selectedDate,
                                 entries = entries,
+                                entriesByDateResolver = dateRangeEntriesCache::resolve,
                                 onDateChanged = { selectedDate = it },
                             )
                         }

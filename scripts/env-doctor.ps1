@@ -25,6 +25,25 @@ function Write-Check {
 $gradleWrapper = Join-Path $projectRoot "gradlew.bat"
 Write-Check "Gradle wrapper" (Test-Path $gradleWrapper) $gradleWrapper
 
+$wrapperPropertiesPath = Join-Path $projectRoot "gradle\wrapper\gradle-wrapper.properties"
+$hasWrapperProperties = Test-Path $wrapperPropertiesPath
+Write-Check "gradle-wrapper.properties" $hasWrapperProperties $wrapperPropertiesPath
+
+$expectedGradleVersion = $null
+$gradleDistributionUrl = $null
+if ($hasWrapperProperties) {
+    $distributionLine = Get-Content $wrapperPropertiesPath |
+        Where-Object { $_ -match '^distributionUrl=' } |
+        Select-Object -First 1
+    if ($null -ne $distributionLine) {
+        $gradleDistributionUrl = ($distributionLine -split '=', 2)[1].Replace('\:', ':')
+        $versionMatch = [regex]::Match($gradleDistributionUrl, 'gradle-([0-9]+(?:\.[0-9]+){1,2})-')
+        if ($versionMatch.Success) {
+            $expectedGradleVersion = $versionMatch.Groups[1].Value
+        }
+    }
+}
+
 # Check local.properties and sdk.dir.
 $localProperties = Join-Path $projectRoot "local.properties"
 $hasLocalProperties = Test-Path $localProperties
@@ -52,8 +71,16 @@ if ($hasSdkDir) {
 # Check Gradle + JVM runtime.
 if (Test-Path $gradleWrapper) {
     $gradleVersionOutput = & $gradleWrapper --version 2>&1 | Out-String
-    $hasGradle87 = $gradleVersionOutput -match 'Gradle 8\.7'
-    Write-Check "Gradle version" $hasGradle87 "Expected Gradle 8.7"
+
+    if (-not [string]::IsNullOrWhiteSpace($expectedGradleVersion)) {
+        $expectedVersionPattern = "Gradle\s+$([regex]::Escape($expectedGradleVersion))(\s|$)"
+        $hasExpectedGradleVersion = $gradleVersionOutput -match $expectedVersionPattern
+        Write-Check "Gradle version" $hasExpectedGradleVersion "Expected Gradle $expectedGradleVersion"
+    }
+    else {
+        $hasGradleVersion = $gradleVersionOutput -match 'Gradle\s+[0-9]+'
+        Write-Check "Gradle version" $hasGradleVersion "Gradle version detected from wrapper runtime"
+    }
 
     $jdk17 = $gradleVersionOutput -match 'JVM:\s+17\.'
     Write-Check "JDK runtime" $jdk17 "Expected JVM 17"
@@ -61,11 +88,22 @@ if (Test-Path $gradleWrapper) {
 
 # Check Gradle distribution endpoint reachability (non-blocking in offline networks).
 try {
-    $response = Invoke-WebRequest -Uri "https://downloads.gradle.org/distributions/gradle-8.7-bin.zip" -Method Head -TimeoutSec 10 -UseBasicParsing
-    $reachable = ($response.StatusCode -ge 200 -and $response.StatusCode -lt 400)
-    Write-Output "[INFO] Gradle distribution URL - HTTP $($response.StatusCode)"
-    if (-not $reachable) {
-        Write-Output "[WARN] Gradle distribution URL returned non-2xx/3xx status."
+    if ([string]::IsNullOrWhiteSpace($gradleDistributionUrl)) {
+        if (-not [string]::IsNullOrWhiteSpace($expectedGradleVersion)) {
+            $gradleDistributionUrl = "https://downloads.gradle.org/distributions/gradle-$expectedGradleVersion-bin.zip"
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($gradleDistributionUrl)) {
+        Write-Output "[WARN] Gradle distribution URL unresolved from gradle-wrapper.properties"
+    }
+    else {
+        $response = Invoke-WebRequest -Uri $gradleDistributionUrl -Method Head -TimeoutSec 10 -UseBasicParsing
+        $reachable = ($response.StatusCode -ge 200 -and $response.StatusCode -lt 400)
+        Write-Output "[INFO] Gradle distribution URL - HTTP $($response.StatusCode)"
+        if (-not $reachable) {
+            Write-Output "[WARN] Gradle distribution URL returned non-2xx/3xx status."
+        }
     }
 }
 catch {

@@ -7,7 +7,7 @@
 **已完成：**
 - ✅ 核心功能实现（课程表 CRUD、iCalendar 导入导出）
 - ✅ 完整的 Kotlin + Jetpack Compose UI 层
-- ✅ Gradle 8.7 自举脚本，JDK 17 自动配置
+- ✅ Gradle Wrapper（当前 9.3.1）与 JDK 17 运行环境配置
 - ✅ 所有依赖声明，仓库源已配置
 
 **编译障碍：**
@@ -66,7 +66,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\env-doctor.ps1
 
 VS Code 任务：
 
-- `envDoctor`：检查 `gradlew.bat`、`local.properties`、`sdk.dir`、Android SDK 关键目录、Gradle 8.7 和 JVM 17。
+- `envDoctor`：检查 `gradlew.bat`、`gradle-wrapper.properties`、`local.properties`、`sdk.dir`、Android SDK 关键目录、与 wrapper 一致的 Gradle 版本和 JVM 17。
 
 ## 文件结构
 
@@ -133,6 +133,6 @@ VS Code 任务：
 **当前环境**
 - Windows 11, x64
 - JDK 17 (Eclipse Adoptium)
-- Gradle 8.7
+- Gradle 9.3.1（由 wrapper 控制）
 - 目标 SDK 36
 - 最小 SDK 26 (Android 8)

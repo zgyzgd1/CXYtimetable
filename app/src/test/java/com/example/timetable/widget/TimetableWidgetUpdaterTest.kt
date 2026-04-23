@@ -55,6 +55,23 @@ class TimetableWidgetUpdaterTest {
     }
 
     @Test
+    fun buildNextCourseWidgetStateShowsOngoingCourseStatus() {
+        val today = LocalDate.of(2026, 4, 23)
+        val entries = listOf(
+            entry(title = "高数", date = today, startMinutes = 9 * 60, endMinutes = 10 * 60, location = "A-101"),
+            entry(title = "英语", date = today, startMinutes = 11 * 60, endMinutes = 12 * 60),
+        )
+
+        val state = buildNextCourseWidgetState(entries, today = today, nowMinutes = 9 * 60 + 20)
+
+        assertEquals("高数", state.title)
+        assertTrue(state.statusText.contains("正在进行"))
+        assertTrue(state.timeLabel.startsWith("今天 09:00 - 10:00"))
+        assertEquals("A-101", state.locationText)
+        assertEquals(today, state.targetDate)
+    }
+
+    @Test
     fun buildNextCourseWidgetStateUsesTodayFallbackWhenScheduleExistsButNoUpcomingCourse() {
         val today = LocalDate.of(2026, 4, 23)
         val entries = listOf(

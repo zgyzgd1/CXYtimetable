@@ -53,7 +53,7 @@ internal fun findNextCourseSnapshot(
             val nextDate = nextOccurrenceDate(entry, nowDate.plusDays(1)) ?: return@mapNotNull null
             entry to nextDate
         }
-        .sortedWith(
+        .minWithOrNull(
             compareBy<Pair<TimetableEntry, LocalDate>>(
                 { it.second },
                 { it.first.startMinutes },
@@ -61,7 +61,6 @@ internal fun findNextCourseSnapshot(
                 { it.first.title },
             ),
         )
-        .firstOrNull()
         ?: return null
 
     val resolvedEntry = futureOccurrence.first
@@ -120,5 +119,35 @@ internal fun entriesByDateInRange(
 
     return groupedEntries.mapValues { (_, dayEntries) ->
         dayEntries.sortedBy { it.startMinutes }
+    }
+}
+
+internal class DateRangeEntriesCache(
+    private val entries: List<TimetableEntry>,
+    private val maxRanges: Int = 8,
+) {
+    private data class RangeKey(
+        val startDate: LocalDate,
+        val endDate: LocalDate,
+    )
+
+    private val rangeCache = object : LinkedHashMap<RangeKey, Map<LocalDate, List<TimetableEntry>>>(16, 0.75f, true) {
+        override fun removeEldestEntry(
+            eldest: MutableMap.MutableEntry<RangeKey, Map<LocalDate, List<TimetableEntry>>>?,
+        ): Boolean {
+            return size > maxRanges
+        }
+    }
+
+    fun resolve(startDate: LocalDate, endDate: LocalDate): Map<LocalDate, List<TimetableEntry>> {
+        if (endDate.isBefore(startDate)) return emptyMap()
+
+        val key = RangeKey(startDate, endDate)
+        val cached = rangeCache[key]
+        if (cached != null) return cached
+
+        val computed = entriesByDateInRange(entries, startDate, endDate)
+        rangeCache[key] = computed
+        return computed
     }
 }

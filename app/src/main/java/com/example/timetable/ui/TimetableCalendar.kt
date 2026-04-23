@@ -59,6 +59,9 @@ import java.util.Locale
 fun PerpetualCalendar(
     selectedDate: String,
     entries: List<TimetableEntry>,
+    entriesByDateResolver: (LocalDate, LocalDate) -> Map<LocalDate, List<TimetableEntry>> = { startDate, endDate ->
+        entriesByDateInRange(entries, startDate, endDate)
+    },
     onDateChanged: (String) -> Unit,
 ) {
     val today = LocalDate.now()
@@ -77,11 +80,11 @@ fun PerpetualCalendar(
         val start = visibleMonth.atDay(1)
         (0 until visibleMonth.lengthOfMonth()).map { start.plusDays(it.toLong()) }
     }
-    val entriesByVisibleDate = remember(entries, daysInMonth) {
+    val entriesByVisibleDate = remember(entriesByDateResolver, daysInMonth) {
         if (daysInMonth.isEmpty()) {
             emptyMap()
         } else {
-            entriesByDateInRange(entries, daysInMonth.first(), daysInMonth.last())
+            entriesByDateResolver(daysInMonth.first(), daysInMonth.last())
         }
     }
     val datesWithEntries = remember(entriesByVisibleDate, daysInMonth) {

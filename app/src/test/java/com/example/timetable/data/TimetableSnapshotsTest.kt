@@ -93,4 +93,51 @@ class TimetableSnapshotsTest {
         assertEquals(listOf("Operating Systems"), result.getValue(LocalDate.of(2026, 4, 20)).map { it.title })
         assertTrue(result.getValue(LocalDate.of(2026, 4, 27)).isEmpty())
     }
+
+    @Test
+    fun entriesByDateInRangeSupportsLargeRecurringWindow() {
+        val rangeStart = LocalDate.of(2026, 3, 2)
+        val rangeEnd = rangeStart.plusWeeks(59).plusDays(6)
+        val recurring = TimetableEntry(
+            title = "Large Window Course",
+            date = rangeStart.toString(),
+            dayOfWeek = 1,
+            startMinutes = 8 * 60,
+            endMinutes = 9 * 60,
+            recurrenceType = RecurrenceType.WEEKLY.name,
+            semesterStartDate = rangeStart.toString(),
+            weekRule = WeekRule.ALL.name,
+        )
+
+        val result = entriesByDateInRange(listOf(recurring), rangeStart, rangeEnd)
+        val daysWithEntries = result.filterValues { it.isNotEmpty() }.keys.sorted()
+
+        assertEquals(60, daysWithEntries.size)
+        assertEquals(rangeStart, daysWithEntries.first())
+        assertEquals(rangeStart.plusWeeks(59), daysWithEntries.last())
+    }
+
+    @Test
+    fun dateRangeEntriesCacheReusesAndEvictsRanges() {
+        val baseDate = LocalDate.of(2026, 4, 23)
+        val entries = listOf(
+            TimetableEntry(
+                title = "Compiler",
+                date = baseDate.toString(),
+                dayOfWeek = baseDate.dayOfWeek.value,
+                startMinutes = 8 * 60,
+                endMinutes = 9 * 60,
+            ),
+        )
+        val cache = DateRangeEntriesCache(entries = entries, maxRanges = 2)
+
+        val first = cache.resolve(baseDate, baseDate)
+        val firstAgain = cache.resolve(baseDate, baseDate)
+        cache.resolve(baseDate.plusDays(1), baseDate.plusDays(1))
+        cache.resolve(baseDate.plusDays(2), baseDate.plusDays(2))
+        val firstAfterEviction = cache.resolve(baseDate, baseDate)
+
+        assertTrue(first === firstAgain)
+        assertTrue(first !== firstAfterEviction)
+    }
 }

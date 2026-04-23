@@ -158,6 +158,45 @@ class CourseReminderSchedulerTest {
     }
 
     @Test
+    fun buildSchedulePlanHandlesLargeDatasetAndKeepsEarliestReminder() {
+        val zone = ZoneId.systemDefault()
+        val earliestDate = LocalDate.of(2099, 1, 5)
+        val nowMillis = earliestDate.minusDays(2).atStartOfDay(zone).toInstant().toEpochMilli()
+        val bulkEntries = (0 until 1500).map { index ->
+            val date = earliestDate.plusDays((index % 12).toLong())
+            val startMinutes = 12 * 60 + (index % 4) * 30
+            course(
+                id = "bulk-$index",
+                date = date,
+                startMinutes = startMinutes,
+                endMinutes = startMinutes + 45,
+            )
+        }
+        val earliest = course(
+            id = "earliest-entry",
+            date = earliestDate,
+            startMinutes = 8 * 60,
+            endMinutes = 9 * 60,
+        )
+
+        val plan = CourseReminderScheduler.buildSchedulePlan(
+            entries = bulkEntries + earliest,
+            reminderMinutesOptions = listOf(5, 20),
+            nowMillis = nowMillis,
+            oldCodes = emptySet(),
+        )
+
+        val scheduled = plan.newSchedules.values.single()
+        val expectedTrigger = earliestDate.atTime(7, 40).atZone(zone).toInstant().toEpochMilli()
+
+        assertEquals(1, plan.newSchedules.size)
+        assertEquals("earliest-entry", scheduled.entry.id)
+        assertEquals(earliestDate, scheduled.occurrenceDate)
+        assertEquals(20, scheduled.reminderMinutes)
+        assertEquals(expectedTrigger, scheduled.triggerAtMillis)
+    }
+
+    @Test
     fun normalizeReminderMinutesSortsDeduplicatesAndLimitsSelectionCount() {
         assertEquals(
             listOf(5, 10, 20, 30, 45),
