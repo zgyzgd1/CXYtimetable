@@ -145,10 +145,11 @@ object CourseReminderScheduler {
         val newSchedules = mutableMapOf<Int, ScheduledReminder>()
         var nextTriggerAtMillis: Long? = null
         val nextEntries = mutableListOf<ScheduledReminder>()
+        val nowDate = Instant.ofEpochMilli(nowMillis).atZone(systemZone).toLocalDate()
 
         entries.forEach { entry ->
             normalizedReminderMinutes.forEach { reminderMinutes ->
-                val scheduled = computeNextReminder(entry, reminderMinutes, nowMillis) ?: return@forEach
+                val scheduled = computeNextReminder(entry, reminderMinutes, nowMillis, nowDate) ?: return@forEach
                 val triggerAtMillis = scheduled.triggerAtMillis
                 if (triggerAtMillis <= nowMillis) return@forEach
 
@@ -307,8 +308,8 @@ object CourseReminderScheduler {
         entry: TimetableEntry,
         reminderMinutes: Int,
         nowMillis: Long,
+        nowDate: LocalDate,
     ): ScheduledReminder? {
-        val nowDate = Instant.ofEpochMilli(nowMillis).atZone(systemZone).toLocalDate()
         val firstDate = nextOccurrenceDate(entry, nowDate) ?: return null
         val firstTriggerAtMillis = computeTriggerAtMillis(firstDate, entry.startMinutes, reminderMinutes) ?: return null
         if (firstTriggerAtMillis > nowMillis) {
