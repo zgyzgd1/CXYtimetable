@@ -6,7 +6,9 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.timetable.R
 import com.example.timetable.data.IcsCalendar
+import com.example.timetable.data.MAX_EXPANDED_OCCURRENCES
 import com.example.timetable.data.RecurrenceType
 import com.example.timetable.data.TimetableEntry
 import com.example.timetable.data.TimetableRepository
@@ -14,6 +16,7 @@ import com.example.timetable.data.WeekRule
 import com.example.timetable.data.countConflictPairs
 import com.example.timetable.data.findConflictForEntry
 import com.example.timetable.data.formatMinutes
+import com.example.timetable.data.normalizeWeekListText
 import com.example.timetable.data.occursOnDate
 import com.example.timetable.data.parseEntryDate
 import com.example.timetable.data.parseWeekList
@@ -42,6 +45,13 @@ import org.json.JSONObject
 
 private const val MAX_ICS_IMPORT_BYTES = 1024 * 1024
 
+/**
+ * 课程表视图模型。
+ *
+ * 管理课程表数据的核心视图模型，负责处理课程的添加、编辑、删除、导入/导出等操作。
+ *
+ * @param application 应用实例
+ */
 class ScheduleViewModel(application: Application) : AndroidViewModel(application) {
 
     val entries: StateFlow<List<TimetableEntry>> = TimetableRepository.getEntriesStream(application)
@@ -74,29 +84,57 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    /**
+     * 预览课程冲突。
+     *
+     * 检查给定课程条目是否与现有课程冲突。
+     *
+     * @param entry 课程条目
+     * @return 冲突的课程条目，或 null 如果没有冲突
+     */
     fun previewConflict(entry: TimetableEntry): TimetableEntry? {
         val normalized = normalizeEntry(entry)
         if (validateEntry(normalized) != null) return null
         return findConflictForEntry(normalized, entries.value)
     }
 
+    /**
+     * 建议解决冲突的课程条目。
+     *
+     * 为给定的课程条目生成一个调整后的版本，以解决与现有课程的冲突。
+     *
+     * @param entry 课程条目
+     * @return 调整后的课程条目，或 null 如果无法解决冲突
+     */
     fun suggestResolvedEntry(entry: TimetableEntry): TimetableEntry? {
         val normalized = normalizeEntry(entry)
         if (validateEntry(normalized) != null) return null
         return suggestAdjustedEntryAfterConflicts(normalized, entries.value)
     }
 
+    /**
+     * 添加或更新课程条目。
+     *
+     * 验证并保存课程条目，处理冲突检测。
+     *
+     * @param entry 课程条目
+     * @param allowConflict 是否允许冲突
+     */
     fun upsertEntry(entry: TimetableEntry, allowConflict: Boolean = false) {
         val normalized = normalizeEntry(entry)
         validateEntry(normalized)?.let {
-            postMessage("保存失败：$it")
+            postMessage(getApplication<Application>().getString(R.string.vm_save_failed, it))
             return
         }
         val conflict = findConflictForEntry(normalized, entries.value)
         if (conflict != null && !allowConflict) {
             postMessage(
-                "检测到冲突：${conflict.title} " +
-                    "${formatMinutes(conflict.startMinutes)}-${formatMinutes(conflict.endMinutes)}，请调整后再保存",
+                getApplication<Application>().getString(
+                    R.string.vm_conflict_detected,
+                    conflict.title,
+                    formatMinutes(conflict.startMinutes),
+                    formatMinutes(conflict.endMinutes),
+                ),
             )
             return
         }
@@ -105,25 +143,43 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
             TimetableRepository.upsertEntry(getApplication(), normalized)
 
             if (conflict == null) {
-                postMessage("已保存课程")
+                postMessage(getApplication<Application>().getString(R.string.vm_entry_saved))
             } else {
                 postMessage(
-                    "已保存课程，但与 ${conflict.title} " +
-                        "${formatMinutes(conflict.startMinutes)}-${formatMinutes(conflict.endMinutes)} 时间重叠",
+                    getApplication<Application>().getString(
+                        R.string.vm_entry_saved_with_conflict,
+                        conflict.title,
+                        formatMinutes(conflict.startMinutes),
+                        formatMinutes(conflict.endMinutes),
+                    ),
                 )
             }
         }
     }
 
+    /**
+     * 删除课程条目。
+     *
+     * 根据 ID 删除课程条目。
+     *
+     * @param entryId 课程条目 ID
+     */
     fun deleteEntry(entryId: String) {
         viewModelScope.launch {
             TimetableRepository.deleteEntry(getApplication(), entryId)
-            postMessage("已删除课程")
+            postMessage(getApplication<Application>().getString(R.string.vm_entry_deleted))
         }
     }
 
+    /**
+     * 导出课程表为 ICS 格式。
+     *
+     * 将所有课程条目导出为 ICS 日历格式字符串。
+     *
+     * @return ICS 格式的日历字符串
+     */
     suspend fun exportIcs(): String = withContext(Dispatchers.Default) {
-        IcsCalendar.write(entries.value)
+        IcsCalendar.write(entries.value, getApplication<Application>().getString(R.string.default_calendar_name))
     }
 
     private val _importPreview = MutableSharedFlow<ImportPreview>(extraBufferCapacity = 1)
@@ -133,7 +189,7 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             val text = readText(contentResolver, uri)
             if (text.isBlank()) {
-                postMessage("导入失败：文件内容为空")
+                postMessage(getApplication<Application>().getString(R.string.vm_import_empty))
                 return@launch
             }
 
@@ -142,18 +198,22 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
                     IcsCalendar.parse(text)
                 }
             } catch (error: Exception) {
-                postMessage("导入失败：${error.message ?: "日历格式异常"}")
+                postMessage(getApplication<Application>().getString(R.string.vm_import_parse_failed, error.message ?: getApplication<Application>().getString(R.string.vm_calendar_format_error)))
                 emptyList()
             }
             if (imported.isEmpty()) {
-                postMessage("未识别到可导入的课程")
+                postMessage(getApplication<Application>().getString(R.string.vm_import_no_valid))
                 return@launch
             }
 
             val preview = buildImportPreview(imported)
             if (preview.validEntries.isEmpty()) {
-                postMessage("导入失败：未发现有效课程")
+                postMessage(getApplication<Application>().getString(R.string.vm_import_no_effective))
                 return@launch
+            }
+
+            if (preview.truncated) {
+                postMessage(getApplication<Application>().getString(R.string.vm_import_truncated, preview.totalParsed))
             }
 
             if (preview.conflictCount == 0) {
@@ -177,13 +237,17 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
     }
 
     private suspend fun commitImport(preview: ImportPreview) {
-        TimetableRepository.replaceAllEntries(getApplication(), preview.validEntries)
+        TimetableRepository.mergeEntries(getApplication(), preview.validEntries)
         if (preview.invalidCount == 0 && preview.conflictCount == 0) {
-            postMessage("已导入 ${preview.validEntries.size} 条课程，并保存为当前课表")
+            postMessage(getApplication<Application>().getString(R.string.vm_import_success, preview.validEntries.size))
         } else {
             postMessage(
-                "已导入 ${preview.validEntries.size} 条课程，跳过无效 ${preview.invalidCount} 条，" +
-                    "冲突 ${preview.conflictCount} 组",
+                getApplication<Application>().getString(
+                    R.string.vm_import_success_partial,
+                    preview.validEntries.size,
+                    preview.invalidCount,
+                    preview.conflictCount,
+                ),
             )
         }
     }
@@ -202,11 +266,13 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
             }
 
         val conflictCount = if (validEntries.isNotEmpty()) countConflictPairs(validEntries) else 0
+        val truncated = imported.size >= MAX_EXPANDED_OCCURRENCES
         return ImportPreview(
             validEntries = validEntries,
             invalidCount = invalidCount,
             conflictCount = conflictCount,
             totalParsed = imported.size,
+            truncated = truncated,
         )
     }
 
@@ -217,7 +283,7 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         if (normalizedMinutes == currentMinutes) return
         CourseReminderScheduler.setReminderMinutes(getApplication(), normalizedMinutes)
         syncReminders(entries.value)
-        postMessage("已设置为提前 ${CourseReminderScheduler.formatReminderSelection(normalizedMinutes)} 提醒")
+        postMessage(getApplication<Application>().getString(R.string.vm_reminder_updated, CourseReminderScheduler.formatReminderSelection(normalizedMinutes)))
     }
 
     fun resyncReminderSchedule() {
@@ -235,7 +301,7 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
                     readLimitedUtf8Text(stream, MAX_ICS_IMPORT_BYTES)
                 }.orEmpty()
             }.onFailure {
-                postMessage("读取文件失败：${it.message ?: "未知错误"}")
+                postMessage(getApplication<Application>().getString(R.string.vm_read_file_failed, it.message ?: getApplication<Application>().getString(R.string.msg_unknown_error)))
             }.getOrDefault("")
         }
     }
@@ -271,45 +337,41 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
     }
 
     private fun validateEntry(entry: TimetableEntry): String? {
-        val recurrence = resolveRecurrenceType(entry.recurrenceType) ?: return "重复规则无效"
-        val weekRule = resolveWeekRule(entry.weekRule) ?: return "周次规则无效"
-        val customWeeks = parseWeekList(entry.customWeekList) ?: return "自定义周次格式错误"
-        val skipWeeks = parseWeekList(entry.skipWeekList) ?: return "跳过周次格式错误"
-        val entryDate = parseEntryDate(entry.date) ?: return "课程日期无效"
+        val app = getApplication<Application>()
+        val recurrence = resolveRecurrenceType(entry.recurrenceType) ?: return app.getString(R.string.val_invalid_recurrence)
+        val weekRule = resolveWeekRule(entry.weekRule) ?: return app.getString(R.string.val_invalid_week_rule)
+        val customWeeks = parseWeekList(entry.customWeekList) ?: return app.getString(R.string.val_invalid_custom_weeks)
+        val skipWeeks = parseWeekList(entry.skipWeekList) ?: return app.getString(R.string.val_invalid_skip_weeks)
+        val entryDate = parseEntryDate(entry.date) ?: return app.getString(R.string.val_invalid_date)
         val semesterStartDate = entry.semesterStartDate.takeIf { it.isNotBlank() }?.let { parseEntryDate(it) }
         return when {
-            entry.title.isBlank() -> "课程名称不能为空"
-            entry.title.length > 64 -> "课程名称不能超过 64 个字符"
-            entry.location.length > 64 -> "地点不能超过 64 个字符"
-            entry.note.length > 256 -> "备注不能超过 256 个字符"
-            entry.startMinutes !in 0 until 24 * 60 -> "开始时间不合法"
-            entry.endMinutes !in 1..24 * 60 -> "结束时间不合法"
-            entry.startMinutes >= entry.endMinutes -> "结束时间需要晚于开始时间"
-            recurrence == RecurrenceType.WEEKLY && semesterStartDate == null -> "请设置合法的学期开学日期"
+            entry.title.isBlank() -> app.getString(R.string.val_empty_title)
+            entry.title.length > 64 -> app.getString(R.string.val_title_too_long)
+            entry.location.length > 64 -> app.getString(R.string.val_location_too_long)
+            entry.note.length > 256 -> app.getString(R.string.val_note_too_long)
+            entry.startMinutes !in 0 until 24 * 60 -> app.getString(R.string.val_invalid_start)
+            entry.endMinutes !in 1..24 * 60 -> app.getString(R.string.val_invalid_end)
+            entry.startMinutes >= entry.endMinutes -> app.getString(R.string.val_end_before_start)
+            recurrence == RecurrenceType.WEEKLY && semesterStartDate == null -> app.getString(R.string.val_invalid_semester_date)
             recurrence == RecurrenceType.WEEKLY && weekRule == WeekRule.CUSTOM && customWeeks.isEmpty() -> {
-                "自定义周次不能为空"
+                app.getString(R.string.val_empty_custom_weeks)
             }
             recurrence == RecurrenceType.WEEKLY && !occursOnDate(entry, entryDate) -> {
-                "首次上课日期不符合当前周次规则"
+                app.getString(R.string.val_week_mismatch)
             }
             recurrence != RecurrenceType.WEEKLY && weekRule != WeekRule.ALL -> {
-                "仅按周循环课程支持单双周或自定义周"
+                app.getString(R.string.val_non_weekly_odd_even)
             }
             recurrence != RecurrenceType.WEEKLY && customWeeks.isNotEmpty() -> {
-                "仅按周循环课程支持自定义周次"
+                app.getString(R.string.val_non_weekly_custom)
             }
             recurrence != RecurrenceType.WEEKLY && skipWeeks.isNotEmpty() -> {
-                "仅按周循环课程支持跳周"
+                app.getString(R.string.val_non_weekly_skip)
             }
             else -> null
         }
     }
 
-    private fun normalizeWeekListText(raw: String): String {
-        return raw.trim()
-            .replace('，', ',')
-            .replace(" ", "")
-    }
 
     private fun syncReminders(entriesList: List<TimetableEntry>, force: Boolean = false) {
         val generation = ++reminderSyncGeneration
@@ -417,14 +479,15 @@ private fun entryTokenJson(entry: TimetableEntry): JSONObject {
 }
 
 /**
- * 导入预览：解析完成但尚未写入数据库的导入结果。
+ * Import preview: parsed import results that have not yet been written to the database.
  *
- * 当检测到冲突时，由 ViewModel 通过 [ScheduleViewModel.importPreview] 发送给 UI，
- * 等用户确认后再调用 [ScheduleViewModel.confirmImport] 写入。
+ * When conflicts are detected, the ViewModel sends this to the UI via [ScheduleViewModel.importPreview],
+ * and writes to the database only after the user confirms via [ScheduleViewModel.confirmImport].
  */
 data class ImportPreview(
     val validEntries: List<TimetableEntry>,
     val invalidCount: Int,
     val conflictCount: Int,
     val totalParsed: Int,
+    val truncated: Boolean = false,
 )

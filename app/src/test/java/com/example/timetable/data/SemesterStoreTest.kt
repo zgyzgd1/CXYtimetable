@@ -30,11 +30,22 @@ class SemesterStoreTest {
     @Test
     fun currentWeekNumberReturnsNullBeforeSemesterStarts() {
         val semesterStart = LocalDate.of(2026, 9, 1)
-        val today = LocalDate.of(2026, 8, 31) // day before
+        val today = LocalDate.of(2026, 8, 25) // one week before semester week
         val weekIndex = weekIndexFromSemesterStart(semesterStart, today)
 
-        // Before semester should return null or non-positive
+        // Before semester week should return null
         assertNull(weekIndex)
+    }
+
+    @Test
+    fun currentWeekNumberReturnsOneOnDayBeforeSemesterStart() {
+        val semesterStart = LocalDate.of(2026, 9, 1) // Tuesday
+        val today = LocalDate.of(2026, 8, 31) // Monday, day before semester start
+        val weekIndex = weekIndexFromSemesterStart(semesterStart, today)
+
+        // Same week as semester start should be week 1
+        assertNotNull(weekIndex)
+        assertEquals(1, weekIndex)
     }
 
     @Test

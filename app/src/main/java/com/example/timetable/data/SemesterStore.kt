@@ -6,15 +6,15 @@ import java.time.LocalDate
 import java.time.temporal.TemporalAdjusters
 
 /**
- * 全局学期配置存储。
+ * Global semester configuration store.
  *
- * 提供学期开学日期的统一入口，用于：
- * - 新建/编辑周循环课程时自动填充默认学期开始日期
- * - 计算"当前第几周"
- * - 周视图中显示周次标签
+ * Provides a unified entry point for the semester start date, used for:
+ * - Auto-filling the default semester start date when creating/editing weekly courses
+ * - Computing "current week number"
+ * - Displaying week labels in the week view
  *
- * 当用户在课程编辑弹窗中设置学期开始日期时，同时更新此全局配置，
- * 使后续新建课程自动继承。
+ * When the user sets a semester start date in the course edit dialog,
+ * this global config is also updated so subsequent new courses inherit it.
  */
 object SemesterStore {
     private const val PREFS_NAME = "semester_prefs"
@@ -24,8 +24,7 @@ object SemesterStore {
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     /**
-     * 获取已保存的全局学期开学日期。
-     * 返回 null 表示用户尚未配置。
+     * Returns the saved global semester start date, or null if not configured.
      */
     fun getSemesterStartDate(context: Context): LocalDate? {
         val raw = prefs(context).getString(KEY_SEMESTER_START_DATE, null)
@@ -33,7 +32,7 @@ object SemesterStore {
     }
 
     /**
-     * 保存全局学期开学日期。
+     * Saves the global semester start date.
      */
     fun setSemesterStartDate(context: Context, date: LocalDate) {
         prefs(context).edit()
@@ -42,7 +41,7 @@ object SemesterStore {
     }
 
     /**
-     * 清除全局学期开学日期。
+     * Clears the global semester start date.
      */
     fun clearSemesterStartDate(context: Context) {
         prefs(context).edit()
@@ -51,8 +50,8 @@ object SemesterStore {
     }
 
     /**
-     * 计算当前是第几周（基于全局学期开始日期）。
-     * 返回 null 表示学期未配置或日期早于学期开始。
+     * Computes the current week number based on the global semester start date.
+     * Returns null if the semester is not configured or the date is before semester start.
      */
     fun getCurrentWeekNumber(context: Context, today: LocalDate = LocalDate.now()): Int? {
         val semesterStart = getSemesterStartDate(context) ?: return null
@@ -60,7 +59,7 @@ object SemesterStore {
     }
 
     /**
-     * 获取全局学期开学日期的周一（学期起始周的开始）。
+     * Returns the Monday of the week containing the global semester start date (start of semester week).
      */
     fun getSemesterWeekStart(context: Context): LocalDate? {
         val semesterStart = getSemesterStartDate(context) ?: return null

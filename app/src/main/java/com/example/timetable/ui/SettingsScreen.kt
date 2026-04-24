@@ -15,6 +15,8 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.example.timetable.R
 
 @Composable
 fun SettingsScreen(
@@ -40,12 +42,12 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
-                    text = "缓存管理",
+                    text = stringResource(R.string.title_cache_management),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "清除应用缓存和临时文件，不会删除课表数据、自定义背景和你的设置。",
+                    text = stringResource(R.string.hint_cache_description),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -53,7 +55,7 @@ fun SettingsScreen(
                     onClick = onClearCache,
                     enabled = !clearingCache,
                 ) {
-                    Text(if (clearingCache) "清理中..." else "清除缓存")
+                    Text(if (clearingCache) stringResource(R.string.action_clearing) else stringResource(R.string.action_clear_cache))
                 }
             }
         }

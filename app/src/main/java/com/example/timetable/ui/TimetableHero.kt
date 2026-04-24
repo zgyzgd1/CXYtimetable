@@ -46,10 +46,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -59,6 +61,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.timetable.R
 import com.example.timetable.data.AppBackgroundMode
 import com.example.timetable.notify.CourseReminderScheduler
 
@@ -112,12 +115,12 @@ fun HeroSection(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "课表助手",
+                    text = stringResource(R.string.hero_title),
                     style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
                 Text(
-                    text = "当前共 $courseCount 门课程，支持 .ics 导入 / 导出",
+                    text = stringResource(R.string.hero_subtitle, courseCount),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
                 )
@@ -129,25 +132,25 @@ fun HeroSection(
             ) {
                 HeroActionChip(
                     icon = Icons.Default.Download,
-                    label = "导入",
+                    label = stringResource(R.string.hero_import),
                     onClick = onImport,
                     modifier = Modifier.weight(1f),
                 )
                 HeroActionChip(
                     icon = Icons.Default.Upload,
-                    label = "导出",
+                    label = stringResource(R.string.hero_export),
                     onClick = onExport,
                     modifier = Modifier.weight(1f),
                 )
                 HeroActionChip(
                     icon = Icons.Default.NotificationsActive,
-                    label = "提醒 ${CourseReminderScheduler.formatReminderChipLabel(reminderMinutes)}",
+                    label = stringResource(R.string.hero_reminder, CourseReminderScheduler.formatReminderChipLabel(reminderMinutes)),
                     onClick = { showReminderSheet = true },
                     modifier = Modifier.weight(1f),
                 )
                 HeroActionChip(
                     icon = Icons.Default.ColorLens,
-                    label = "背景",
+                    label = stringResource(R.string.hero_background),
                     onClick = { showAppearanceDialog = true },
                     modifier = Modifier.weight(1f),
                 )
@@ -207,7 +210,7 @@ private fun HeroActionChip(
             .clip(RoundedCornerShape(14.dp))
             .semantics {
                 role = Role.Button
-                contentDescription = buildHeroActionContentDescription(label)
+                contentDescription = buildHeroActionContentDescription(LocalContext.current, label)
             }
             .clickable(onClick = onClick),
         color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.18f),
@@ -259,25 +262,25 @@ private fun AppearanceDialog(
         colorWithHueShift(Color(0xFFE98AA9), weekCardHue).copy(alpha = weekCardAlpha)
     }
     val backgroundSummary = when (backgroundMode) {
-        AppBackgroundMode.BUNDLED_IMAGE -> "当前使用默认背景图"
-        AppBackgroundMode.CUSTOM_IMAGE -> "当前使用自定义背景图"
-        AppBackgroundMode.GRADIENT -> "当前只显示渐变背景"
+        AppBackgroundMode.BUNDLED_IMAGE -> stringResource(R.string.bg_bundled)
+        AppBackgroundMode.CUSTOM_IMAGE -> stringResource(R.string.bg_custom)
+        AppBackgroundMode.GRADIENT -> stringResource(R.string.bg_gradient)
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("背景与色块", style = MaterialTheme.typography.titleMedium) },
+        title = { Text(stringResource(R.string.title_appearance), style = MaterialTheme.typography.titleMedium) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("背景图片", style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(R.string.label_background_image), style = MaterialTheme.typography.titleSmall)
                     Text(
                         text = backgroundSummary,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        text = "自定义图片会保存在本地，重启应用后仍会保留。",
+                        text = stringResource(R.string.bg_custom_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f),
                     )
@@ -288,7 +291,7 @@ private fun AppearanceDialog(
                         },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("选择自定义图片")
+                        Text(stringResource(R.string.action_select_custom_image))
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -298,13 +301,13 @@ private fun AppearanceDialog(
                             onClick = onUseBundledBackground,
                             modifier = Modifier.weight(1f),
                         ) {
-                            Text("默认图片")
+                            Text(stringResource(R.string.action_default_image))
                         }
                         OutlinedButton(
                             onClick = onUseGradientBackground,
                             modifier = Modifier.weight(1f),
                         ) {
-                            Text("仅渐变")
+                            Text(stringResource(R.string.action_gradient_only))
                         }
                     }
                     if (hasCustomBackground) {
@@ -319,13 +322,13 @@ private fun AppearanceDialog(
                                 },
                                 modifier = Modifier.weight(1f),
                             ) {
-                                Text("调整范围")
+                                Text(stringResource(R.string.action_adjust_range))
                             }
                             TextButton(
                                 onClick = onClearCustomBackground,
                                 modifier = Modifier.weight(1f),
                             ) {
-                                Text("清除自定义图片")
+                                Text(stringResource(R.string.action_clear_custom_image))
                             }
                         }
                     }
@@ -342,7 +345,7 @@ private fun AppearanceDialog(
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(18.dp),
                         )
-                        Text("周视图色相", style = MaterialTheme.typography.titleSmall)
+                        Text(stringResource(R.string.label_week_hue), style = MaterialTheme.typography.titleSmall)
                     }
                     Slider(
                         value = weekCardHue,
@@ -360,7 +363,7 @@ private fun AppearanceDialog(
                             modifier = Modifier.size(width = 56.dp, height = 32.dp),
                         ) {}
                         Text(
-                            text = "当前色相 ${weekCardHue.toInt()}°",
+                            text = stringResource(R.string.label_current_hue, weekCardHue.toInt()),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -378,7 +381,7 @@ private fun AppearanceDialog(
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(18.dp),
                         )
-                        Text("周视图透明度", style = MaterialTheme.typography.titleSmall)
+                        Text(stringResource(R.string.label_week_alpha), style = MaterialTheme.typography.titleSmall)
                     }
                     Slider(
                         value = weekCardAlpha,
@@ -386,7 +389,7 @@ private fun AppearanceDialog(
                         valueRange = 0.35f..1.0f,
                     )
                     Text(
-                        text = "当前透明度 ${(weekCardAlpha * 100).toInt()}%",
+                        text = stringResource(R.string.label_current_alpha, (weekCardAlpha * 100).toInt()),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -394,7 +397,7 @@ private fun AppearanceDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("完成") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_done)) }
         },
         shape = RoundedCornerShape(20.dp),
     )
@@ -421,6 +424,12 @@ private fun ReminderPickerDialog(
     var customReminderError by remember { mutableStateOf<String?>(null) }
     val maxReminderSelectionCount = CourseReminderScheduler.maxReminderSelectionCount()
 
+    // Pre-load string resources for use in non-@Composable local functions
+    val strMinReminder = stringResource(R.string.error_min_reminder_required)
+    val strMaxReminder = stringResource(R.string.error_max_reminder_reached, maxReminderSelectionCount)
+    val strCustomRange = stringResource(R.string.error_custom_reminder_range)
+    val strReminderExists = stringResource(R.string.error_reminder_exists)
+
     fun updateSelectedReminderMinutes(updatedMinutes: List<Int>) {
         selectedReminderMinutes = CourseReminderScheduler.normalizeReminderMinutes(updatedMinutes)
             .ifEmpty { CourseReminderScheduler.defaultReminderMinutesSet() }
@@ -430,7 +439,7 @@ private fun ReminderPickerDialog(
     fun toggleReminder(option: Int) {
         if (option in selectedReminderMinutes) {
             if (selectedReminderMinutes.size == 1) {
-                customReminderError = "至少保留 1 档提醒"
+                customReminderError = strMinReminder
                 return
             }
             updateSelectedReminderMinutes(selectedReminderMinutes - option)
@@ -438,7 +447,7 @@ private fun ReminderPickerDialog(
         }
 
         if (selectedReminderMinutes.size >= maxReminderSelectionCount) {
-            customReminderError = "最多选择 $maxReminderSelectionCount 档提醒"
+            customReminderError = strMaxReminder
             return
         }
 
@@ -448,15 +457,15 @@ private fun ReminderPickerDialog(
     fun submitCustomReminder() {
         val parsedMinutes = customReminderText.toIntOrNull()
         if (parsedMinutes == null || !CourseReminderScheduler.isReminderMinutesValid(parsedMinutes)) {
-            customReminderError = "请输入 1-180 分钟"
+            customReminderError = strCustomRange
             return
         }
         if (parsedMinutes in selectedReminderMinutes) {
-            customReminderError = "该提醒时间已存在"
+            customReminderError = strReminderExists
             return
         }
         if (selectedReminderMinutes.size >= maxReminderSelectionCount) {
-            customReminderError = "最多选择 $maxReminderSelectionCount 档提醒"
+            customReminderError = strMaxReminder
             return
         }
         customReminderText = ""
@@ -465,25 +474,25 @@ private fun ReminderPickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("课前提醒时间", style = MaterialTheme.typography.titleMedium) },
+        title = { Text(stringResource(R.string.title_reminder_picker), style = MaterialTheme.typography.titleMedium) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "可同时保存多档提醒时间，系统会按最近一次即将触发的提醒接力调度",
+                    text = stringResource(R.string.hint_reminder_multi),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = "当前已选：${CourseReminderScheduler.formatReminderSelection(selectedReminderMinutes)}",
+                    text = stringResource(R.string.label_selected_reminder, CourseReminderScheduler.formatReminderSelection(selectedReminderMinutes)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (exactAlarmPermissionRequired) {
                     Text(
                         text = if (exactAlarmEnabled) {
-                            "精确提醒：已开启"
+                            stringResource(R.string.label_exact_alarm_on)
                         } else {
-                            "精确提醒：未开启，系统可能延后提醒"
+                            stringResource(R.string.label_exact_alarm_off)
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = if (exactAlarmEnabled) {
@@ -497,7 +506,7 @@ private fun ReminderPickerDialog(
                             onClick = onOpenExactAlarmSettings,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Text("开启精确提醒")
+                            Text(stringResource(R.string.action_enable_exact_alarm))
                         }
                     }
                 }
@@ -542,7 +551,7 @@ private fun ReminderPickerDialog(
                     }
                 }
                 Text(
-                    text = "也可以输入 1-180 分钟的自定义提醒时间，最多保存 $maxReminderSelectionCount 档",
+                    text = stringResource(R.string.hint_custom_reminder, maxReminderSelectionCount),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -554,28 +563,28 @@ private fun ReminderPickerDialog(
                     },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    label = { Text("自定义分钟") },
+                    label = { Text(stringResource(R.string.label_custom_minutes)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     isError = customReminderError != null,
                     supportingText = {
-                        Text(customReminderError ?: "输入后点击“添加自定义提醒”加入当前选择")
+                        Text(customReminderError ?: stringResource(R.string.hint_add_custom_reminder))
                     },
                 )
                 OutlinedButton(
                     onClick = ::submitCustomReminder,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("添加自定义提醒")
+                    Text(stringResource(R.string.action_add_custom_reminder))
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSelect(selectedReminderMinutes) }) { Text("保存") }
+            TextButton(onClick = { onSelect(selectedReminderMinutes) }) { Text(stringResource(R.string.action_save)) }
         },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onEnableNotifications) { Text("开启权限") }
-                TextButton(onClick = onDismiss) { Text("关闭") }
+                TextButton(onClick = onEnableNotifications) { Text(stringResource(R.string.action_enable_permission)) }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
             }
         },
         shape = RoundedCornerShape(20.dp),
@@ -597,7 +606,7 @@ fun SectionHeader(title: String) {
             color = MaterialTheme.colorScheme.onBackground,
         )
         Text(
-            text = "按时间排序",
+            text = stringResource(R.string.label_sort_by_time),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -614,19 +623,19 @@ fun ViewModeSwitcher(
             selected = currentDestination == AppDestination.DAY,
             onClick = { onDestinationChange(AppDestination.DAY) },
             icon = { Icon(Icons.Default.CalendarToday, contentDescription = null) },
-            label = { Text("日视图") },
+            label = { Text(stringResource(R.string.nav_day_view)) },
         )
         NavigationBarItem(
             selected = currentDestination == AppDestination.WEEK,
             onClick = { onDestinationChange(AppDestination.WEEK) },
             icon = { Icon(Icons.Default.DateRange, contentDescription = null) },
-            label = { Text("周视图") },
+            label = { Text(stringResource(R.string.nav_week_view)) },
         )
         NavigationBarItem(
             selected = currentDestination == AppDestination.SETTINGS,
             onClick = { onDestinationChange(AppDestination.SETTINGS) },
             icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-            label = { Text("设置") },
+            label = { Text(stringResource(R.string.nav_settings)) },
         )
     }
 }

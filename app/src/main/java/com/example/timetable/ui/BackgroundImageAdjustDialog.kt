@@ -36,9 +36,11 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.example.timetable.R
 import com.example.timetable.data.BackgroundAppearance
 import com.example.timetable.data.BackgroundImageManager
 import com.example.timetable.data.BackgroundImageTransform
@@ -86,6 +88,13 @@ fun BackgroundImageAdjustDialog(
         ).normalized()
     }
 
+    // Pre-load string resources
+    val strBiasLeft = stringResource(R.string.label_bias_left)
+    val strBiasRight = stringResource(R.string.label_bias_right)
+    val strBiasTop = stringResource(R.string.label_bias_top)
+    val strBiasBottom = stringResource(R.string.label_bias_bottom)
+    val strCentered = stringResource(R.string.label_centered)
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
@@ -102,11 +111,11 @@ fun BackgroundImageAdjustDialog(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        text = "调整背景展示范围",
+                        text = stringResource(R.string.title_adjust_background),
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
                     )
                     Text(
-                        text = "缩放并移动自定义背景图，预览会同步显示最终效果。",
+                        text = stringResource(R.string.hint_background_adjust),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -160,7 +169,7 @@ fun BackgroundImageAdjustDialog(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(
-                            text = "未找到可预览的自定义背景图。",
+                            text = stringResource(R.string.msg_no_custom_background_preview),
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 16.dp),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -169,30 +178,30 @@ fun BackgroundImageAdjustDialog(
                 }
 
                 BackgroundTransformSlider(
-                    title = "缩放",
+                    title = stringResource(R.string.label_zoom),
                     value = scale,
                     valueLabel = "${(previewTransform.scale * 100).roundToInt() / 100f}x",
                     valueRange = BackgroundImageTransform.MIN_SCALE..BackgroundImageTransform.MAX_SCALE,
-                    startLabel = "完整",
-                    endLabel = "放大",
+                    startLabel = stringResource(R.string.label_full),
+                    endLabel = stringResource(R.string.label_zoom_in),
                     onValueChange = { scale = it },
                 )
                 BackgroundTransformSlider(
-                    title = "水平位置",
+                    title = stringResource(R.string.label_horizontal_position),
                     value = horizontalBias,
-                    valueLabel = biasLabel(horizontalBias, negativeLabel = "偏左", positiveLabel = "偏右"),
+                    valueLabel = biasLabel(horizontalBias, negativeLabel = strBiasLeft, positiveLabel = strBiasRight, centered = strCentered),
                     valueRange = -1f..1f,
-                    startLabel = "左侧",
-                    endLabel = "右侧",
+                    startLabel = stringResource(R.string.label_left),
+                    endLabel = stringResource(R.string.label_right),
                     onValueChange = { horizontalBias = it },
                 )
                 BackgroundTransformSlider(
-                    title = "垂直位置",
+                    title = stringResource(R.string.label_vertical_position),
                     value = verticalBias,
-                    valueLabel = biasLabel(verticalBias, negativeLabel = "偏上", positiveLabel = "偏下"),
+                    valueLabel = biasLabel(verticalBias, negativeLabel = strBiasTop, positiveLabel = strBiasBottom, centered = strCentered),
                     valueRange = -1f..1f,
-                    startLabel = "顶部",
-                    endLabel = "底部",
+                    startLabel = stringResource(R.string.label_top),
+                    endLabel = stringResource(R.string.label_bottom),
                     onValueChange = { verticalBias = it },
                 )
 
@@ -208,17 +217,17 @@ fun BackgroundImageAdjustDialog(
                             verticalBias = 0f
                         },
                     ) {
-                        Text("重置")
+                        Text(stringResource(R.string.action_reset))
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(onClick = onDismiss) {
-                            Text("取消")
+                            Text(stringResource(R.string.action_cancel))
                         }
                         Button(
                             onClick = { onSave(previewTransform) },
                             enabled = customBackground != null,
                         ) {
-                            Text("应用")
+                            Text(stringResource(R.string.action_apply))
                         }
                     }
                 }
@@ -277,9 +286,10 @@ private fun biasLabel(
     value: Float,
     negativeLabel: String,
     positiveLabel: String,
+    centered: String,
 ): String {
     return when {
-        abs(value) < 0.08f -> "居中"
+        abs(value) < 0.08f -> centered
         value < 0f -> negativeLabel
         else -> positiveLabel
     }

@@ -37,6 +37,13 @@ object TimetableWidgetUpdater {
         }
     }
 
+    /**
+     * Refreshes all home screen widgets.
+     *
+     * **Note: This method must be called from a background thread**, because
+     * AppWidgetManager.updateAppWidget() involves RemoteViews construction and
+     * cross-process communication that could cause ANR on the main thread.
+     */
     fun refreshAll(
         context: Context,
         entries: List<TimetableEntry>,
@@ -70,7 +77,7 @@ object TimetableWidgetUpdater {
         val appWidgetIds = appWidgetManager.getAppWidgetIds(ComponentName(context, NextCourseWidgetProvider::class.java))
         if (appWidgetIds.isEmpty()) return
 
-        val state = buildNextCourseWidgetState(entries, today, nowMinutes)
+        val state = buildNextCourseWidgetState(entries, today, nowMinutes, context)
         appWidgetIds.forEach { appWidgetId ->
             val views = buildNextCourseRemoteViews(context, appWidgetId, state)
             appWidgetManager.updateAppWidget(appWidgetId, views)
@@ -86,7 +93,7 @@ object TimetableWidgetUpdater {
         val appWidgetIds = appWidgetManager.getAppWidgetIds(ComponentName(context, TodayScheduleWidgetProvider::class.java))
         if (appWidgetIds.isEmpty()) return
 
-        val state = buildTodayScheduleWidgetState(entries, today)
+        val state = buildTodayScheduleWidgetState(entries, today, context)
         appWidgetIds.forEach { appWidgetId ->
             val views = buildTodayScheduleRemoteViews(context, appWidgetId, state)
             appWidgetManager.updateAppWidget(appWidgetId, views)
@@ -113,6 +120,7 @@ internal data class NextCourseWidgetState(
 internal fun buildTodayScheduleWidgetState(
     entries: List<TimetableEntry>,
     today: LocalDate = LocalDate.now(),
+    context: Context,
 ): TodayScheduleWidgetState {
     val todayEntries = entriesForDate(entries, today)
     val entryLines = todayEntries
@@ -123,7 +131,7 @@ internal fun buildTodayScheduleWidgetState(
                 append(" - ")
                 append(formatMinutes(entry.endMinutes))
                 append("  ")
-                append(entry.title.ifBlank { "未命名课程" })
+                append(entry.title.ifBlank { context.getString(R.string.label_unnamed_course) })
                 if (entry.location.isNotBlank()) {
                     append(" / ")
                     append(entry.location)
@@ -132,15 +140,15 @@ internal fun buildTodayScheduleWidgetState(
         }
 
     return TodayScheduleWidgetState(
-        dateLabel = formatWidgetDateLabel(today),
+        dateLabel = formatWidgetDateLabel(today, context),
         summaryText = if (todayEntries.isEmpty()) {
-            "今天暂无课程"
+            context.getString(R.string.widget_no_courses_today)
         } else {
-            "今天共 ${todayEntries.size} 节"
+            context.getString(R.string.widget_today_course_count, todayEntries.size)
         },
-        entryLines = if (entryLines.isEmpty()) listOf("点按打开课表并添加课程") else entryLines,
+        entryLines = if (entryLines.isEmpty()) listOf(context.getString(R.string.widget_tap_to_add)) else entryLines,
         overflowText = if (todayEntries.size > entryLines.size) {
-            "还有 ${todayEntries.size - entryLines.size} 节未显示"
+            context.getString(R.string.widget_more_hidden, todayEntries.size - entryLines.size)
         } else {
             ""
         },
@@ -152,24 +160,25 @@ internal fun buildNextCourseWidgetState(
     entries: List<TimetableEntry>,
     today: LocalDate = LocalDate.now(),
     nowMinutes: Int = LocalTime.now().let { it.hour * 60 + it.minute },
+    context: Context,
 ): NextCourseWidgetState {
-    val snapshot = findNextCourseSnapshot(entries, today, nowMinutes)
+    val snapshot = findNextCourseSnapshot(entries, today, nowMinutes, context)
     if (snapshot == null) {
-        val title = if (entries.isEmpty()) "课表还是空的" else "当前没有待上课程"
+        val title = if (entries.isEmpty()) context.getString(R.string.widget_empty_timetable) else context.getString(R.string.widget_no_upcoming)
         return NextCourseWidgetState(
-            statusText = "下一节课",
+            statusText = context.getString(R.string.widget_next_course),
             title = title,
-            timeLabel = formatWidgetDateLabel(today),
-            locationText = "点按打开完整课表",
+            timeLabel = formatWidgetDateLabel(today, context),
+            locationText = context.getString(R.string.widget_tap_to_open),
             targetDate = today,
         )
     }
 
     return NextCourseWidgetState(
         statusText = snapshot.statusText,
-        title = snapshot.entry.title.ifBlank { "未命名课程" },
-        timeLabel = buildNextCourseTimeLabel(snapshot, today),
-        locationText = snapshot.entry.location.ifBlank { "点按查看对应日期" },
+        title = snapshot.entry.title.ifBlank { context.getString(R.string.label_unnamed_course) },
+        timeLabel = buildNextCourseTimeLabel(snapshot, today, context),
+        locationText = snapshot.entry.location.ifBlank { context.getString(R.string.widget_tap_to_view_date) },
         targetDate = snapshot.occurrenceDate,
     )
 }
@@ -253,16 +262,17 @@ private fun createOpenAppPendingIntent(
 private fun buildNextCourseTimeLabel(
     snapshot: NextCourseSnapshot,
     today: LocalDate,
+    context: Context,
 ): String {
     val dateLabel = when (snapshot.occurrenceDate) {
-        today -> "今天"
-        today.plusDays(1) -> "明天"
-        today.plusDays(2) -> "后天"
-        else -> formatWidgetDateLabel(snapshot.occurrenceDate)
+        today -> context.getString(R.string.widget_today)
+        today.plusDays(1) -> context.getString(R.string.widget_tomorrow)
+        today.plusDays(2) -> context.getString(R.string.widget_day_after_tomorrow)
+        else -> formatWidgetDateLabel(snapshot.occurrenceDate, context)
     }
     return "$dateLabel ${formatMinutes(snapshot.entry.startMinutes)} - ${formatMinutes(snapshot.entry.endMinutes)}"
 }
 
-internal fun formatWidgetDateLabel(date: LocalDate): String {
-    return "${date.monthValue}月${date.dayOfMonth}日 ${dayLabel(date.dayOfWeek.value)}"
+internal fun formatWidgetDateLabel(date: LocalDate, context: Context): String {
+    return context.getString(R.string.widget_date_format, date.monthValue, date.dayOfMonth) + " " + dayLabel(date.dayOfWeek.value)
 }

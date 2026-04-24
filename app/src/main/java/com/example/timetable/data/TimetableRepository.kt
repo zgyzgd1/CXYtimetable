@@ -11,6 +11,13 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
+/**
+ * 课程表数据仓库。
+ *
+ * **注意：此类假设单进程执行。** 如果引入多进程组件（例如，带有 `android:process` 的小部件），
+ * 请使用 ContentProvider 或其他跨进程数据共享机制，而不是直接访问 Room；否则
+ * [bootstrapMutex] 和 SharedPreferences 状态无法跨进程同步。
+ */
 object TimetableRepository {
     private const val STORAGE_FILE_NAME = "timetable_entries.json"
     private const val PREFS_NAME = "timetable_repository_prefs"
@@ -139,6 +146,17 @@ object TimetableRepository {
         }
     }
 
+    /**
+     * Merge import: preserves existing entries and upserts new ones (by id).
+     * Unlike [replaceAllEntries], this method does not delete any existing data.
+     */
+    suspend fun mergeEntries(context: Context, entries: List<TimetableEntry>) = withContext(Dispatchers.IO) {
+        val db = AppDatabase.getDatabase(context)
+        db.withTransaction {
+            db.timetableDao().upsertEntries(entries)
+        }
+    }
+
     internal fun decodeLegacyEntries(payload: String): List<TimetableEntry> {
         val root = runCatching { JSONObject(payload) }.getOrElse { return emptyList() }
         if (root.optInt("version", 1) != 1) return emptyList()
@@ -170,7 +188,7 @@ object TimetableRepository {
         }
 
         return runCatching {
-            TimetableEntry(
+            TimetableEntry.create(
                 id = item.optString("id").ifBlank { java.util.UUID.randomUUID().toString() },
                 title = title,
                 date = parsedDate.toString(),

@@ -23,4 +23,304 @@
     <string name="msg_export_failed">导出失败：%s</string>
     <string name="msg_background_updated">已更新背景图片</string>
     <string name="msg_background_failed">背景图片设置失败：%s</string>
+
+    <!-- Schedule screen messages -->
+    <string name="msg_exact_alarm_still_disabled">精确提醒仍未开启，系统可能延后提醒</string>
+    <string name="msg_no_more_slots">当天已没有可新增的完整节次</string>
+    <string name="msg_entry_duplicated">已复制课程，确认后保存</string>
+    <string name="msg_cache_cleared">已清除 %1$s 缓存</string>
+    <string name="msg_cache_empty">没有可清理的缓存</string>
+    <string name="msg_cache_clear_failed">清除缓存失败：%s</string>
+    <string name="msg_background_range_updated">已更新背景展示范围</string>
+    <string name="msg_week_slots_updated">已更新周视图节次时间</string>
+    <string name="msg_no_deferrable_slot">当天没有可顺延的完整时间段</string>
+    <string name="msg_slot_time_overlap">节次时间不能重叠</string>
+    <string name="msg_slot_deleted">已删除第 %1$d 节</string>
+    <string name="msg_slot_added">已新增第 %1$d 节</string>
+    <string name="msg_slots_resized">已调整为 %1$d 节</string>
+    <string name="msg_slots_resize_limited">只能扩展到 %1$d 节，后续时间不足</string>
+    <string name="msg_unknown_error">未知错误</string>
+
+    <!-- Dialog titles and labels -->
+    <string name="title_import_conflict">导入冲突确认</string>
+    <string name="title_time_conflict">检测到时间冲突</string>
+    <string name="title_edit_slot">编辑第 %1$d 节时间</string>
+    <string name="title_add_slot">新增节次</string>
+    <string name="action_confirm_import">确认导入</string>
+    <string name="action_save_anyway">仍然保存</string>
+    <string name="action_defer_and_save">顺延并保存</string>
+    <string name="action_go_back_edit">返回修改</string>
+
+    <!-- Delete confirmation -->
+    <string name="msg_confirm_delete_entry">确定要删除课程「%1$s」吗？\n此操作无法撤销。</string>
+    <string name="label_unnamed">未命名</string>
+
+    <!-- Import preview -->
+    <string name="msg_import_parsed">解析到 %1$d 条课程，其中有效 %2$d 条。</string>
+    <string name="msg_import_skipped">跳过无效课程 %1$d 条。</string>
+    <string name="msg_import_conflicts">检测到 %1$d 组时间冲突，继续导入将替换当前课表。</string>
+
+    <!-- Conflict dialog -->
+    <string name="msg_conflict_overlap">与 %1$s（%2$s-%3$s）重叠。你可以返回修改，或继续保存。</string>
+
+    <!-- Week schedule board -->
+    <string name="label_week_number">第 %1$d 周</string>
+    <string name="label_week_no_courses">本周暂无课程</string>
+    <string name="label_week_course_count">本周 %1$d 节，今天 %2$d 节</string>
+    <string name="label_slot_count">节数 %1$d</string>
+    <string name="label_today">今日</string>
+    <string name="label_this_week">本周</string>
+    <string name="label_unnamed_course">未命名课程</string>
+
+    <!-- Day schedule list -->
+    <string name="msg_notifications_not_required">当前系统版本无需额外通知授权</string>
+    <string name="msg_exact_alarm_not_required">当前系统版本无需额外精确提醒授权</string>
+    <string name="msg_switched_default_background">已切换到默认背景</string>
+    <string name="msg_disabled_image_background">已关闭图片背景</string>
+    <string name="msg_cleared_custom_background">已清除自定义背景</string>
+    <string name="export_filename">课表导出.ics</string>
+
+    <!-- Widget -->
+    <string name="widget_no_courses_today">今天暂无课程</string>
+    <string name="widget_today_course_count">今天共 %1$d 节</string>
+    <string name="widget_tap_to_add">点按打开课表并添加课程</string>
+    <string name="widget_more_hidden">还有 %1$d 节未显示</string>
+    <string name="widget_empty_timetable">课表还是空的</string>
+    <string name="widget_no_upcoming">当前没有待上课程</string>
+    <string name="widget_next_course">下一节课</string>
+    <string name="widget_tap_to_open">点按打开完整课表</string>
+    <string name="widget_tap_to_view_date">点按查看对应日期</string>
+    <string name="widget_today">今天</string>
+    <string name="widget_tomorrow">明天</string>
+    <string name="widget_day_after_tomorrow">后天</string>
+    <string name="widget_date_format">%1$d月%2$d日</string>
+
+    <!-- Reminder notification -->
+    <string name="notify_channel_name">课程提醒</string>
+    <string name="notify_channel_description">上课前提醒通知</string>
+    <string name="notify_reminder_title">课程提醒</string>
+    <string name="notify_minutes_later">%1$d 分钟后上课</string>
+    <string name="notify_hours_later">%1$d 小时后上课</string>
+    <string name="notify_hours_minutes_later">%1$d 小时 %2$d 分钟后上课</string>
+
+    <!-- ViewModel messages -->
+    <string name="vm_save_failed">保存失败：%1$s</string>
+    <string name="vm_conflict_detected">检测到冲突：%1$s %2$s-%3$s，请调整后再保存</string>
+    <string name="vm_entry_saved">已保存课程</string>
+    <string name="vm_entry_saved_with_conflict">已保存课程，但与 %1$s %2$s-%3$s 时间重叠</string>
+    <string name="vm_entry_deleted">已删除课程</string>
+    <string name="vm_import_empty">导入失败：文件内容为空</string>
+    <string name="vm_import_parse_failed">导入失败：%1$s</string>
+    <string name="vm_import_no_valid">未识别到可导入的课程</string>
+    <string name="vm_import_no_effective">导入失败：未发现有效课程</string>
+    <string name="vm_import_success">已导入 %1$d 条课程，并保存为当前课表</string>
+    <string name="vm_import_success_partial">已导入 %1$d 条课程，跳过无效 %2$d 条，冲突 %3$d 组</string>
+    <string name="vm_import_truncated">注意：ICS 文件较大，解析到 %1$d 条条目后已截断，部分内容可能未导入</string>
+    <string name="vm_reminder_updated">已设置为提前 %1$s 提醒</string>
+    <string name="vm_read_file_failed">读取文件失败：%1$s</string>
+    <string name="vm_calendar_format_error">日历格式异常</string>
+
+    <!-- TimetableDialogs -->
+    <string name="title_new_course">新增课程</string>
+    <string name="title_edit_course">编辑课程</string>
+    <string name="label_course_name">课程名称</string>
+    <string name="label_date">日期</string>
+    <string name="label_location">地点</string>
+    <string name="label_note">备注</string>
+    <string name="label_start_time">开始时间</string>
+    <string name="label_end_time">结束时间</string>
+    <string name="label_semester_start_date">学期开学日期</string>
+    <string name="label_custom_weeks">自定义周次</string>
+    <string name="label_skip_weeks">跳过周次(可选)</string>
+    <string name="label_recurrence_rule">重复规则</string>
+    <string name="label_week_rule">周次规则</string>
+    <string name="recurrence_none">仅当天</string>
+    <string name="recurrence_weekly">按周循环</string>
+    <string name="week_rule_all">每周</string>
+    <string name="week_rule_odd">单周</string>
+    <string name="week_rule_even">双周</string>
+    <string name="week_rule_custom">自定义</string>
+    <string name="error_title_too_long">课程名称不能超过 64 个字符</string>
+    <string name="error_invalid_date">请输入合法日期，范围 1970-01-01 到 2100-12-31</string>
+    <string name="error_invalid_time">请输入合法时间，例如 08:00</string>
+    <string name="error_location_too_long">地点不能超过 64 个字符</string>
+    <string name="error_note_too_long">备注不能超过 256 个字符</string>
+    <string name="error_invalid_semester_date">请输入合法的学期开学日期</string>
+    <string name="error_invalid_custom_weeks">自定义周次格式错误，请使用 1,3,5 或 1-16</string>
+    <string name="error_invalid_skip_weeks">跳过周次格式错误，请使用 8,12 或 1-3</string>
+    <string name="error_empty_custom_weeks">自定义周次不能为空</string>
+    <string name="title_custom_slot_count">自定义节数</string>
+    <string name="label_total_slots">总节数</string>
+    <string name="hint_slot_resize">会保留前面的节次时间，多出来的节次自动补在后面，减少时从末尾裁剪。</string>
+    <string name="error_invalid_number">请输入数字</string>
+    <string name="error_slot_range">节数范围为 1 到 20</string>
+    <string name="title_fixed_schedule">固定上课时间</string>
+    <string name="label_first_start">首节开始时间</string>
+    <string name="label_lesson_duration">单节时长(分钟)</string>
+    <string name="label_break_duration">节间休息(分钟)</string>
+    <string name="label_generate_slots">生成节数</string>
+    <string name="hint_fixed_schedule">先用固定规则快速生成节次，再在下面逐节微调。每一节之间可以留空档，不要求连续。</string>
+    <string name="action_generate_by_rule">按固定规则生成</string>
+    <string name="label_current_slot_count">当前 %1$d 节</string>
+    <string name="label_slot_index">第%1$d节</string>
+    <string name="error_invalid_fixed_params">请先输入合法的固定时间参数</string>
+    <string name="error_incomplete_slots">请先把每一节的开始和结束时间填写完整，例如 08:00</string>
+    <string name="error_slot_end_before_start">每一节都需要满足结束时间晚于开始时间</string>
+    <string name="error_slots_crossing">节次时间不能交叉，后面的节次可以留空档，但不能早于上一节结束</string>
+    <string name="action_apply">应用</string>
+    <string name="label_slot_N">第%1$d节</string>
+
+    <!-- TimetableHero -->
+    <string name="hero_title">课表助手</string>
+    <string name="hero_subtitle">当前共 %1$d 门课程，支持 .ics 导入 / 导出</string>
+    <string name="hero_import">导入</string>
+    <string name="hero_export">导出</string>
+    <string name="hero_reminder">提醒 %1$s</string>
+    <string name="hero_background">背景</string>
+    <string name="title_appearance">背景与色块</string>
+    <string name="label_background_image">背景图片</string>
+    <string name="bg_bundled">当前使用默认背景图</string>
+    <string name="bg_custom">当前使用自定义背景图</string>
+    <string name="bg_gradient">当前只显示渐变背景</string>
+    <string name="bg_custom_hint">自定义图片会保存在本地，重启应用后仍会保留。</string>
+    <string name="action_select_custom_image">选择自定义图片</string>
+    <string name="action_default_image">默认图片</string>
+    <string name="action_gradient_only">仅渐变</string>
+    <string name="action_adjust_range">调整范围</string>
+    <string name="action_clear_custom_image">清除自定义图片</string>
+    <string name="label_week_hue">周视图色相</string>
+    <string name="label_current_hue">当前色相 %1$d°</string>
+    <string name="label_week_alpha">周视图透明度</string>
+    <string name="label_current_alpha">当前透明度 %1$d%%</string>
+    <string name="action_done">完成</string>
+    <string name="title_reminder_picker">课前提醒时间</string>
+    <string name="hint_reminder_multi">可同时保存多档提醒时间，系统会按最近一次即将触发的提醒接力调度</string>
+    <string name="label_selected_reminder">当前已选：%1$s</string>
+    <string name="label_exact_alarm_on">精确提醒：已开启</string>
+    <string name="label_exact_alarm_off">精确提醒：未开启，系统可能延后提醒</string>
+    <string name="action_enable_exact_alarm">开启精确提醒</string>
+    <string name="hint_custom_reminder">也可以输入 1-180 分钟的自定义提醒时间，最多保存 %1$d 档</string>
+    <string name="label_custom_minutes">自定义分钟</string>
+    <string name="hint_add_custom_reminder">输入后点击"添加自定义提醒"加入当前选择</string>
+    <string name="action_add_custom_reminder">添加自定义提醒</string>
+    <string name="error_custom_reminder_range">请输入 1-180 分钟</string>
+    <string name="error_reminder_exists">该提醒时间已存在</string>
+    <string name="error_max_reminder_reached">最多选择 %1$d 档提醒</string>
+    <string name="error_min_reminder_required">至少保留 1 档提醒</string>
+    <string name="action_enable_permission">开启权限</string>
+    <string name="action_close">关闭</string>
+    <string name="label_sort_by_time">按时间排序</string>
+    <string name="nav_day_view">日视图</string>
+    <string name="nav_week_view">周视图</string>
+    <string name="nav_settings">设置</string>
+
+    <!-- Weekday names -->
+    <string name="weekday_mon">一</string>
+    <string name="weekday_tue">二</string>
+    <string name="weekday_wed">三</string>
+    <string name="weekday_thu">四</string>
+    <string name="weekday_fri">五</string>
+    <string name="weekday_sat">六</string>
+    <string name="weekday_sun">日</string>
+
+    <!-- Placeholder hints -->
+    <string name="hint_custom_weeks_format">1,3,5 或 1-16</string>
+    <string name="hint_skip_weeks_format">如 8,12</string>
+
+    <!-- TimetableCards -->
+    <string name="card_next_course">下一节课</string>
+    <string name="card_view_day_schedule">查看当天课表</string>
+    <string name="card_no_courses_today">今天暂无课程</string>
+    <string name="card_edit">编辑</string>
+    <string name="card_copy">复制</string>
+    <string name="card_delete_content_desc">删除</string>
+
+    <!-- WeekCalendarStrip -->
+    <string name="label_week_selector">周选择</string>
+    <string name="label_today_short">今</string>
+
+    <!-- TimetableCalendar -->
+    <string name="label_prev_month">上月</string>
+    <string name="label_next_month">下月</string>
+
+    <!-- AccessibilityLabels -->
+    <string name="a11y_today">今天</string>
+    <string name="a11y_selected">已选中</string>
+    <string name="a11y_has_course">有课程</string>
+    <string name="a11y_currently_selected">当前选中</string>
+    <string name="a11y_tap_to_edit">点按编辑课程</string>
+    <string name="a11y_slot_index">第 %1$d 节，%2$s 到 %3$s，点按编辑节次时间</string>
+    <string name="a11y_location">地点 %1$s</string>
+    <string name="a11y_note">备注 %1$s</string>
+
+    <!-- SettingsScreen -->
+    <string name="title_cache_management">缓存管理</string>
+    <string name="hint_cache_description">清除应用缓存和临时文件，不会删除课表数据、自定义背景和你的设置。</string>
+    <string name="action_clearing">清理中…</string>
+    <string name="action_clear_cache">清除缓存</string>
+
+    <!-- BackgroundImageAdjustDialog -->
+    <string name="title_adjust_background">调整背景展示范围</string>
+    <string name="hint_background_adjust">缩放并移动自定义背景图，预览会同步显示最终效果。</string>
+    <string name="msg_no_custom_background_preview">未找到可预览的自定义背景图。</string>
+    <string name="label_zoom">缩放</string>
+    <string name="label_full">完整</string>
+    <string name="label_zoom_in">放大</string>
+    <string name="label_horizontal_position">水平位置</string>
+    <string name="label_vertical_position">垂直位置</string>
+    <string name="label_left">左侧</string>
+    <string name="label_right">右侧</string>
+    <string name="label_top">顶部</string>
+    <string name="label_bottom">底部</string>
+    <string name="label_bias_left">偏左</string>
+    <string name="label_bias_right">偏右</string>
+    <string name="label_bias_top">偏上</string>
+    <string name="label_bias_bottom">偏下</string>
+    <string name="label_centered">居中</string>
+    <string name="action_reset">重置</string>
+
+    <!-- ScheduleViewModel validateEntry -->
+    <string name="val_invalid_recurrence">重复规则无效</string>
+    <string name="val_invalid_week_rule">周次规则无效</string>
+    <string name="val_invalid_custom_weeks">自定义周次格式错误</string>
+    <string name="val_invalid_skip_weeks">跳过周次格式错误</string>
+    <string name="val_invalid_date">课程日期无效</string>
+    <string name="val_empty_title">课程名称不能为空</string>
+    <string name="val_title_too_long">课程名称不能超过 64 个字符</string>
+    <string name="val_location_too_long">地点不能超过 64 个字符</string>
+    <string name="val_note_too_long">备注不能超过 256 个字符</string>
+    <string name="val_invalid_start">开始时间不合法</string>
+    <string name="val_invalid_end">结束时间不合法</string>
+    <string name="val_end_before_start">结束时间需要晚于开始时间</string>
+    <string name="val_invalid_semester_date">请设置合法的学期开学日期</string>
+    <string name="val_empty_custom_weeks">自定义周次不能为空</string>
+    <string name="val_week_mismatch">首次上课日期不符合当前周次规则</string>
+    <string name="val_non_weekly_odd_even">仅按周循环课程支持单双周或自定义周</string>
+    <string name="val_non_weekly_custom">仅按周循环课程支持自定义周次</string>
+    <string name="val_non_weekly_skip">仅按周循环课程支持跳周</string>
+
+    <!-- TimetableCards additional -->
+    <string name="card_empty_title">今天暂无课程</string>
+    <string name="card_empty_hint">切换日期查看，或点击下方按钮添加课程</string>
+    <string name="card_add_course">添加课程</string>
+
+    <!-- TimetableCalendar -->
+    <string name="label_calendar_month">%1$d年%2$d月</string>
+
+    <!-- AccessibilityLabels date format -->
+    <string name="a11y_date_full">%1$d年%2$d月%3$d日 %4$s</string>
+    <string name="a11y_date_short">%1$d月%2$d日 %3$s</string>
+    <string name="a11y_time_to">%1$s 到 %2$s</string>
+    <string name="a11y_button">%1$s，按钮</string>
+
+    <!-- NextCourseSnapshot status -->
+    <string name="status_ongoing_remaining">正在进行，距离下课 %1$d 分钟</string>
+    <string name="status_ongoing">正在进行</string>
+    <string name="status_starting_soon">即将开始</string>
+    <string name="status_minutes_later">%1$d 分钟后开始</string>
+    <string name="status_day_start">%1$s %2$s 开始</string>
+    <string name="status_days_later">%1$d 天后</string>
+
+    <!-- IcsCalendar -->
+    <string name="default_calendar_name">课程表助手</string>
 </resources>

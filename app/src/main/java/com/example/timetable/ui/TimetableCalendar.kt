@@ -46,7 +46,10 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.example.timetable.R
 import com.example.timetable.data.TimetableEntry
 import com.example.timetable.data.entriesByDateInRange
 import com.example.timetable.data.parseEntryDate
@@ -122,19 +125,19 @@ fun PerpetualCalendar(
                 IconButton(onClick = { visibleMonth = visibleMonth.minusMonths(1) }, modifier = Modifier.size(34.dp)) {
                     Icon(
                         imageVector = Icons.Default.ChevronLeft,
-                        contentDescription = "上月",
+                        contentDescription = stringResource(R.string.label_prev_month),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Text(
-                    text = "${visibleMonth.year}年${visibleMonth.monthValue}月",
+                    text = stringResource(R.string.label_calendar_month, visibleMonth.year, visibleMonth.monthValue),
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 IconButton(onClick = { visibleMonth = visibleMonth.plusMonths(1) }, modifier = Modifier.size(34.dp)) {
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
-                        contentDescription = "下月",
+                        contentDescription = stringResource(R.string.label_next_month),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -149,6 +152,7 @@ fun PerpetualCalendar(
                     val isSelected = date == selected
                     val isToday = date == today
                     val hasCourse = datesWithEntries[date] == true
+                    val dayContext = LocalContext.current
 
                     val containerColor by animateColorAsState(
                         targetValue = when {
@@ -176,6 +180,7 @@ fun PerpetualCalendar(
                                 role = Role.Button
                                 this.selected = isSelected
                                 contentDescription = buildCalendarDayContentDescription(
+                                    context = dayContext,
                                     date = date,
                                     selected = isSelected,
                                     today = isToday,
@@ -195,7 +200,7 @@ fun PerpetualCalendar(
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             Text(
-                                text = chineseWeekday(date.dayOfWeek),
+                                text = chineseWeekday(date.dayOfWeek, LocalContext.current),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = textColor.copy(alpha = 0.8f),
                                 textAlign = TextAlign.Center,

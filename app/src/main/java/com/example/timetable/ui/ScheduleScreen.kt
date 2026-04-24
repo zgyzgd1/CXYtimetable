@@ -12,32 +12,17 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -47,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.Saver
@@ -70,13 +56,9 @@ import com.example.timetable.data.AppearanceStore
 import com.example.timetable.data.BackgroundImageManager
 import com.example.timetable.data.DateRangeEntriesCache
 import com.example.timetable.data.NextCourseSnapshot
-import com.example.timetable.data.areWeekTimeSlotsNonOverlapping
-import com.example.timetable.data.findNextCourseSnapshot
-import com.example.timetable.data.inferFixedWeekScheduleConfig
-import com.example.timetable.data.syncWeekTimeSlotsWithEntryChange
 import com.example.timetable.data.TimetableEntry
 import com.example.timetable.data.WeekTimeSlot
-import com.example.timetable.data.formatDateLabel
+import com.example.timetable.data.findNextCourseSnapshot
 import com.example.timetable.data.formatMinutes
 import com.example.timetable.data.parseEntryDate
 import com.example.timetable.notify.CourseReminderScheduler
@@ -86,6 +68,7 @@ import java.time.LocalTime
 import java.time.temporal.TemporalAdjusters
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -100,6 +83,14 @@ private val appDestinationNameStateSaver = Saver<String, Any>(
     },
 )
 
+/**
+ * 课程表应用主组件。
+ *
+ * 应用的主入口点，包含日视图、周视图和设置页面的切换逻辑。
+ *
+ * @param launchTarget 启动目标，包含初始日期和目标页面
+ * @param viewModel 课程表视图模型
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScheduleApp(
@@ -110,7 +101,6 @@ fun ScheduleApp(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val listState = rememberLazyListState()
 
     var backgroundAppearance by remember(context) { mutableStateOf(AppearanceStore.getBackgroundAppearance(context)) }
     var weekCardAlpha by remember(context) { mutableStateOf(AppearanceStore.getWeekCardAlpha(context)) }
@@ -153,14 +143,21 @@ fun ScheduleApp(
         selectedLocalDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
     }
     val selectedWeekEnd = remember(selectedWeekStart) { selectedWeekStart.plusDays(6) }
-    val today = LocalDate.now()
-    val nowMinutes = LocalTime.now().let { it.hour * 60 + it.minute }
-    val nextCourseSnapshot = remember(entries, today, nowMinutes) {
-        findNextCourseSnapshot(
-            entries = entries,
-            nowDate = today,
-            nowMinutes = nowMinutes,
-        )
+    val nextCourseSnapshot by produceState<NextCourseSnapshot?>(
+        initialValue = null,
+        key1 = entries,
+    ) {
+        while (true) {
+            val nowDate = LocalDate.now()
+            val nowMinutes = LocalTime.now().let { it.hour * 60 + it.minute }
+            value = findNextCourseSnapshot(
+                entries = entries,
+                nowDate = nowDate,
+                nowMinutes = nowMinutes,
+                context = context,
+            )
+            delay(30_000L) // Refresh next-course snapshot every 30 seconds
+        }
     }
 
     var editingEntry by remember { mutableStateOf<TimetableEntry?>(null) }
@@ -175,6 +172,7 @@ fun ScheduleApp(
     var exactAlarmEnabled by remember { mutableStateOf(CourseReminderScheduler.canScheduleExactAlarms(context)) }
     val reminderOptions = remember { CourseReminderScheduler.reminderMinuteOptions() }
     var deletingEntry by remember { mutableStateOf<TimetableEntry?>(null) }
+    var importPreviewState by remember { mutableStateOf<ImportPreview?>(null) }
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -197,7 +195,7 @@ fun ScheduleApp(
             } else if (result.resultCode == Activity.RESULT_CANCELED) {
                 snackbarHostState.showSnackbar(context.getString(R.string.msg_exact_alarm_disabled_warning))
             } else {
-                snackbarHostState.showSnackbar("精确提醒仍未开启，系统可能延后提醒")
+                snackbarHostState.showSnackbar(context.getString(R.string.msg_exact_alarm_still_disabled))
             }
         }
     }
@@ -226,7 +224,7 @@ fun ScheduleApp(
                     }
                     snackbarHostState.showSnackbar(context.getString(R.string.msg_export_success))
                 } catch (error: Exception) {
-                    snackbarHostState.showSnackbar(context.getString(R.string.msg_export_failed, error.message ?: "未知错误"))
+                    snackbarHostState.showSnackbar(context.getString(R.string.msg_export_failed, error.message ?: context.getString(R.string.msg_unknown_error)))
                 }
             }
         }
@@ -238,15 +236,13 @@ fun ScheduleApp(
         if (uri != null) {
             scope.launch {
                 try {
-                    withContext(Dispatchers.IO) {
-                        BackgroundImageManager.saveCustomBackground(context, context.contentResolver, uri)
-                    }
+                    BackgroundImageManager.saveCustomBackground(context, context.contentResolver, uri)
                     backgroundAppearance = AppearanceStore.getBackgroundAppearance(context)
                     showBackgroundAdjustDialog = true
                     snackbarHostState.showSnackbar(context.getString(R.string.msg_background_updated))
                 } catch (error: Exception) {
                     snackbarHostState.showSnackbar(
-                        context.getString(R.string.msg_background_failed, error.message ?: "未知错误"),
+                        context.getString(R.string.msg_background_failed, error.message ?: context.getString(R.string.msg_unknown_error)),
                     )
                 }
             }
@@ -256,18 +252,17 @@ fun ScheduleApp(
     val dateRangeEntriesCache = remember(entries) {
         DateRangeEntriesCache(entries)
     }
-    val visibleEntriesByDate = remember(dateRangeEntriesCache, isWeekMode, selectedLocalDate, selectedWeekStart, selectedWeekEnd) {
-        if (isWeekMode) {
-            dateRangeEntriesCache.resolve(selectedWeekStart, selectedWeekEnd)
-        } else {
-            dateRangeEntriesCache.resolve(selectedLocalDate, selectedLocalDate)
+    val dayEntriesByDate = remember(dateRangeEntriesCache, selectedLocalDate) {
+        dateRangeEntriesCache.resolve(selectedLocalDate, selectedLocalDate)
+    }
+    val selectedDayEntries = remember(dayEntriesByDate, selectedLocalDate) {
+        dayEntriesByDate[selectedLocalDate].orEmpty()
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.importPreview.collect { preview ->
+            importPreviewState = preview
         }
-    }
-    val selectedDayEntries = remember(visibleEntriesByDate, selectedLocalDate) {
-        visibleEntriesByDate[selectedLocalDate].orEmpty()
-    }
-    val filteredEntries = remember(selectedDayEntries) {
-        selectedDayEntries
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -327,123 +322,39 @@ fun ScheduleApp(
         ) { padding ->
             when (currentDestination) {
                 AppDestination.WEEK -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    WeekCalendarStrip(
-                        selectedDate = selectedLocalDate,
-                        onDateSelected = { date ->
-                            if (date in minDate..maxDate) {
-                                selectedDate = date.toString()
-                            }
-                        },
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                    ) {
-                        OutlinedButton(onClick = { editingFixedWeekSchedule = true }) {
-                            Text(stringResource(R.string.action_fixed_time))
-                        }
-                        if (selectedLocalDate != today) {
-                            OutlinedButton(onClick = { selectedDate = today.toString() }) {
-                                Text(stringResource(R.string.action_back_to_today))
-                            }
-                        }
-                    }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .pointerInput(selectedDate, isWeekMode) {
-                                var totalHorizontalDrag = 0f
-                                detectHorizontalDragGestures(
-                                    onHorizontalDrag = { _, dragAmount -> totalHorizontalDrag += dragAmount },
-                                    onDragEnd = {
-                                        val swipeThresholdPx = density * 48f
-                                        when {
-                                            totalHorizontalDrag > swipeThresholdPx -> {
-                                                val previousDate = selectedLocalDate.minusDays(7)
-                                                if (previousDate >= minDate) selectedDate = previousDate.toString()
-                                            }
-                                            totalHorizontalDrag < -swipeThresholdPx -> {
-                                                val nextDate = selectedLocalDate.plusDays(7)
-                                                if (nextDate <= maxDate) selectedDate = nextDate.toString()
-                                            }
-                                        }
-                                        totalHorizontalDrag = 0f
-                                    },
-                                )
-                            }
-                            .verticalScroll(rememberScrollState()),
-                    ) {
-                        WeekScheduleBoard(
-                            selectedDate = selectedLocalDate,
-                            weekStart = selectedWeekStart,
-                            weekEnd = selectedWeekEnd,
-                            entriesByDay = visibleEntriesByDate,
-                            slots = weekTimeSlots,
-                            cardAlpha = weekCardAlpha,
-                            cardHue = weekCardHue,
-                            onAddSlot = {
-                                val nextSlot = defaultNewWeekSlot(weekTimeSlots)
-                                if (nextSlot == null) {
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar("当天已没有可新增的完整节次")
-                                    }
-                                } else {
-                                    addingWeekSlotInitial = nextSlot
-                                }
-                            },
-                            onCustomizeSlotCount = { editingWeekSlotCount = true },
-                            onEntryClick = { editingEntry = it },
-                            onSlotClick = { editingWeekSlotIndex = it },
-                        )
-                    }
-                }
-                }
-                AppDestination.DAY -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .pointerInput(selectedDate, isWeekMode) {
-                            var totalHorizontalDrag = 0f
-                            detectHorizontalDragGestures(
-                                onHorizontalDrag = { _, dragAmount -> totalHorizontalDrag += dragAmount },
-                                onDragEnd = {
-                                    val swipeThresholdPx = density * 48f
-                                    when {
-                                        totalHorizontalDrag > swipeThresholdPx -> {
-                                            val previousDate = selectedLocalDate.minusDays(1)
-                                            if (previousDate >= minDate) selectedDate = previousDate.toString()
-                                        }
-                                        totalHorizontalDrag < -swipeThresholdPx -> {
-                                            val nextDate = selectedLocalDate.plusDays(1)
-                                            if (nextDate <= maxDate) selectedDate = nextDate.toString()
-                                        }
-                                    }
-                                    totalHorizontalDrag = 0f
-                                },
-                            )
-                        }
-                        .padding(padding),
-                ) {
-                    DayScheduleList(
-                        context = context,
-                        scope = scope,
-                        listState = listState,
-                        snackbarHostState = snackbarHostState,
-                        entries = entries,
+                    WeekViewContent(
                         selectedDate = selectedDate,
                         selectedLocalDate = selectedLocalDate,
-                        filteredEntries = filteredEntries,
+                        selectedWeekStart = selectedWeekStart,
+                        selectedWeekEnd = selectedWeekEnd,
+                        minDate = minDate,
+                        maxDate = maxDate,
+                        entries = entries,
+                        dateRangeEntriesCache = dateRangeEntriesCache,
+                        weekTimeSlots = weekTimeSlots,
+                        weekCardAlpha = weekCardAlpha,
+                        weekCardHue = weekCardHue,
+                        snackbarHostState = snackbarHostState,
+                        onDateChanged = { selectedDate = it },
+                        onEditEntry = { editingEntry = it },
+                        onEditWeekSlot = { editingWeekSlotIndex = it },
+                        onAddWeekSlot = { addingWeekSlotInitial = it },
+                        onEditFixedWeekSchedule = { editingFixedWeekSchedule = true },
+                        contentPadding = padding,
+                    )
+                }
+                AppDestination.DAY -> {
+                    DayViewContent(
+                        padding = padding,
+                        selectedDate = selectedDate,
+                        selectedLocalDate = selectedLocalDate,
+                        minDate = minDate,
+                        maxDate = maxDate,
+                        entries = entries,
                         selectedDayEntries = selectedDayEntries,
                         dateRangeEntriesCache = dateRangeEntriesCache,
                         nextCourseSnapshot = nextCourseSnapshot,
+                        snackbarHostState = snackbarHostState,
                         importLauncher = importLauncher,
                         exportLauncher = exportLauncher,
                         notificationPermissionLauncher = notificationPermissionLauncher,
@@ -474,15 +385,14 @@ fun ScheduleApp(
                         onDuplicateEntry = { entry ->
                             editingEntry = duplicateEntryTemplate(entry)
                             scope.launch {
-                                snackbarHostState.showSnackbar("已复制课程，确认后保存")
+                                snackbarHostState.showSnackbar(context.getString(R.string.msg_entry_duplicated))
                             }
                         },
                         onDeleteEntry = { deletingEntry = it },
                         onCreateEntry = { date, existing ->
                             editingEntry = createQuickEntryTemplate(date, existing)
-                        }
+                        },
                     )
-                }
                 }
                 AppDestination.SETTINGS -> {
                     SettingsScreen(
@@ -496,16 +406,16 @@ fun ScheduleApp(
                                         AppCacheManager.clearAppCaches(context)
                                     }
                                     val message = if (result.bytesCleared > 0L) {
-                                        "已清除 ${AppCacheManager.formatBytes(result.bytesCleared)} 缓存"
+                                        context.getString(R.string.msg_cache_cleared, AppCacheManager.formatBytes(result.bytesCleared))
                                     } else {
-                                        "没有可清理的缓存"
+                                        context.getString(R.string.msg_cache_empty)
                                     }
                                     snackbarHostState.showSnackbar(message)
                                 } catch (cancelled: CancellationException) {
                                     throw cancelled
                                 } catch (error: Exception) {
                                     snackbarHostState.showSnackbar(
-                                        "清除缓存失败：${error.message ?: "未知错误"}",
+                                        context.getString(R.string.msg_cache_clear_failed, error.message ?: context.getString(R.string.msg_unknown_error)),
                                     )
                                 } finally {
                                     clearingCache = false
@@ -519,244 +429,181 @@ fun ScheduleApp(
         }
     }
 
-    var importPreviewState by remember { mutableStateOf<ImportPreview?>(null) }
+    ScheduleDialogOverlays(
+        viewModel = viewModel,
+        entries = entries,
+        weekTimeSlots = weekTimeSlots,
+        snackbarHostState = snackbarHostState,
+        editingEntry = editingEntry,
+        pendingConflict = pendingConflict,
+        editingWeekSlotIndex = editingWeekSlotIndex,
+        addingWeekSlotInitial = addingWeekSlotInitial,
+        editingWeekSlotCount = editingWeekSlotCount,
+        editingFixedWeekSchedule = editingFixedWeekSchedule,
+        showBackgroundAdjustDialog = showBackgroundAdjustDialog,
+        deletingEntry = deletingEntry,
+        importPreviewState = importPreviewState,
+        backgroundAppearance = backgroundAppearance,
+        onEditingEntryChange = { editingEntry = it },
+        onPendingConflictChange = { pendingConflict = it },
+        onEditingWeekSlotIndexChange = { editingWeekSlotIndex = it },
+        onAddingWeekSlotInitialChange = { addingWeekSlotInitial = it },
+        onEditingWeekSlotCountChange = { editingWeekSlotCount = it },
+        onEditingFixedWeekScheduleChange = { editingFixedWeekSchedule = it },
+        onShowBackgroundAdjustDialogChange = { showBackgroundAdjustDialog = it },
+        onDeletingEntryChange = { deletingEntry = it },
+        onImportPreviewStateChange = { importPreviewState = it },
+        onBackgroundAppearanceChange = { backgroundAppearance = it },
+        onWeekTimeSlotsChange = { weekTimeSlots = it },
+    )
+}
 
-    LaunchedEffect(Unit) {
-        viewModel.importPreview.collect { preview ->
-            importPreviewState = preview
-        }
-    }
-
-    deletingEntry?.let { toDelete ->
-        AlertDialog(
-            onDismissRequest = { deletingEntry = null },
-            title = { Text("确认删除") },
-            text = {
-                Text(
-                    "确定要删除课程「${toDelete.title.ifBlank { "未命名" }}」吗？\n此操作无法撤销。",
+/**
+ * 日视图内容。
+ *
+ * 显示单日课程表，包含课程列表、下一节课信息、导入/导出功能等。
+ *
+ * @param padding 内边距
+ * @param selectedDate 选中的日期
+ * @param selectedLocalDate 选中的本地日期
+ * @param minDate 最小日期
+ * @param maxDate 最大日期
+ * @param entries 所有课程条目
+ * @param selectedDayEntries 选中日期的课程条目
+ * @param dateRangeEntriesCache 日期范围课程缓存
+ * @param nextCourseSnapshot 下一节课快照
+ * @param snackbarHostState  Snackbar 主机状态
+ * @param importLauncher 导入启动器
+ * @param exportLauncher 导出启动器
+ * @param notificationPermissionLauncher 通知权限启动器
+ * @param exactAlarmSettingsLauncher 精确闹钟设置启动器
+ * @param exactAlarmEnabled 精确闹钟是否启用
+ * @param reminderMinutes 提醒分钟数
+ * @param reminderOptions 提醒选项
+ * @param onReminderMinutesChange 提醒分钟数变更回调
+ * @param backgroundAppearance 背景外观
+ * @param onBackgroundAppearanceChange 背景外观变更回调
+ * @param onSelectBackgroundImage 选择背景图片回调
+ * @param onAdjustCustomBackground 调整自定义背景回调
+ * @param weekCardAlpha 周卡片透明度
+ * @param onWeekCardAlphaChange 周卡片透明度变更回调
+ * @param weekCardHue 周卡片色调
+ * @param onWeekCardHueChange 周卡片色调变更回调
+ * @param onDateChanged 日期变更回调
+ * @param onEditEntry 编辑课程条目回调
+ * @param onDuplicateEntry 复制课程条目回调
+ * @param onDeleteEntry 删除课程条目回调
+ * @param onCreateEntry 创建课程条目回调
+ */
+@Composable
+private fun DayViewContent(
+    padding: androidx.compose.foundation.layout.PaddingValues,
+    selectedDate: String,
+    selectedLocalDate: LocalDate,
+    minDate: LocalDate,
+    maxDate: LocalDate,
+    entries: List<TimetableEntry>,
+    selectedDayEntries: List<TimetableEntry>,
+    dateRangeEntriesCache: DateRangeEntriesCache,
+    nextCourseSnapshot: NextCourseSnapshot?,
+    snackbarHostState: SnackbarHostState,
+    importLauncher: androidx.activity.result.ActivityResultLauncher<Array<String>>,
+    exportLauncher: androidx.activity.result.ActivityResultLauncher<String>,
+    notificationPermissionLauncher: androidx.activity.result.ActivityResultLauncher<String>,
+    exactAlarmSettingsLauncher: androidx.activity.result.ActivityResultLauncher<android.content.Intent>,
+    exactAlarmEnabled: Boolean,
+    reminderMinutes: List<Int>,
+    reminderOptions: List<Int>,
+    onReminderMinutesChange: (List<Int>) -> Unit,
+    backgroundAppearance: com.example.timetable.data.BackgroundAppearance,
+    onBackgroundAppearanceChange: (com.example.timetable.data.BackgroundAppearance) -> Unit,
+    onSelectBackgroundImage: () -> Unit,
+    onAdjustCustomBackground: () -> Unit,
+    weekCardAlpha: Float,
+    onWeekCardAlphaChange: (Float) -> Unit,
+    weekCardHue: Float,
+    onWeekCardHueChange: (Float) -> Unit,
+    onDateChanged: (String) -> Unit,
+    onEditEntry: (TimetableEntry) -> Unit,
+    onDuplicateEntry: (TimetableEntry) -> Unit,
+    onDeleteEntry: (TimetableEntry) -> Unit,
+    onCreateEntry: (LocalDate, List<TimetableEntry>) -> Unit,
+) {
+    val isWeekMode = false
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(selectedDate, isWeekMode) {
+                var totalHorizontalDrag = 0f
+                detectHorizontalDragGestures(
+                    onHorizontalDrag = { _, dragAmount -> totalHorizontalDrag += dragAmount },
+                    onDragEnd = {
+                        val swipeThresholdPx = density * 48f
+                        when {
+                            totalHorizontalDrag > swipeThresholdPx -> {
+                                val previousDate = selectedLocalDate.minusDays(1)
+                                if (previousDate >= minDate) onDateChanged(previousDate.toString())
+                            }
+                            totalHorizontalDrag < -swipeThresholdPx -> {
+                                val nextDate = selectedLocalDate.plusDays(1)
+                                if (nextDate <= maxDate) onDateChanged(nextDate.toString())
+                            }
+                        }
+                        totalHorizontalDrag = 0f
+                    },
                 )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.deleteEntry(toDelete.id)
-                        deletingEntry = null
-                    },
-                ) { Text("删除") }
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { deletingEntry = null }) { Text("取消") }
-            },
-        )
-    }
-
-    importPreviewState?.let { preview ->
-        AlertDialog(
-            onDismissRequest = {
-                viewModel.cancelImport()
-                importPreviewState = null
-            },
-            title = { Text("导入冲突确认") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("解析到 ${preview.totalParsed} 条课程，其中有效 ${preview.validEntries.size} 条。")
-                    if (preview.invalidCount > 0) {
-                        Text("跳过无效课程 ${preview.invalidCount} 条。")
-                    }
-                    Text(
-                        "检测到 ${preview.conflictCount} 组时间冲突，继续导入将替换当前课表。",
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.confirmImport(preview)
-                        importPreviewState = null
-                    },
-                ) { Text("确认导入") }
-            },
-            dismissButton = {
-                OutlinedButton(
-                    onClick = {
-                        viewModel.cancelImport()
-                        importPreviewState = null
-                    },
-                ) { Text("取消") }
-            },
-        )
-    }
-
-    if (showBackgroundAdjustDialog) {
-        BackgroundImageAdjustDialog(
-            backgroundAppearance = backgroundAppearance,
-            onDismiss = { showBackgroundAdjustDialog = false },
-            onSave = { transform ->
-                AppearanceStore.setBackgroundImageTransform(context, transform)
-                backgroundAppearance = AppearanceStore.getBackgroundAppearance(context)
-                showBackgroundAdjustDialog = false
-                scope.launch { snackbarHostState.showSnackbar("已更新背景展示范围") }
-            },
-        )
-    }
-
-    if (editingFixedWeekSchedule) {
-        FixedWeekScheduleDialog(
-            initialConfig = inferFixedWeekScheduleConfig(weekTimeSlots),
-            initialSlots = weekTimeSlots,
-            onDismiss = { editingFixedWeekSchedule = false },
-            onSave = { updatedSlots ->
-                weekTimeSlots = AppearanceStore.setWeekTimeSlots(context, updatedSlots)
-                editingFixedWeekSchedule = false
-                scope.launch { snackbarHostState.showSnackbar("已更新周视图节次时间") }
-            },
-        )
-    }
-
-    editingEntry?.let { entry ->
-        val existingEntry = entries.any { it.id == entry.id }
-        val applyEntrySave: (TimetableEntry, Boolean) -> Unit = { updatedEntry, allowConflict ->
-            viewModel.upsertEntry(updatedEntry, allowConflict = allowConflict)
-            val syncedWeekTimeSlots = syncWeekTimeSlotsWithEntryChange(
-                currentSlots = weekTimeSlots,
-                originalEntry = entry.takeIf { existingEntry },
-                updatedEntry = updatedEntry,
-            )
-            if (syncedWeekTimeSlots != weekTimeSlots) {
-                weekTimeSlots = AppearanceStore.setWeekTimeSlots(context, syncedWeekTimeSlots)
             }
-            pendingConflict = null
-            editingEntry = null
-        }
-        EntryEditorDialog(
-            initial = entry,
-            onDismiss = {
-                pendingConflict = null
-                editingEntry = null
-            },
-            onSave = { updatedEntry ->
-                val conflict = viewModel.previewConflict(updatedEntry)
-                if (conflict != null) {
-                    pendingConflict = PendingEntryConflict(
-                        updatedEntry = updatedEntry,
-                        conflictEntry = conflict,
-                    )
-                } else {
-                    applyEntrySave(updatedEntry, false)
-                }
-            },
-        )
+            .padding(padding),
+    ) {
+        val context = LocalContext.current
+        val scope = rememberCoroutineScope()
+        val listState = remember { androidx.compose.foundation.lazy.LazyListState() }
 
-        pendingConflict?.let { state ->
-            AlertDialog(
-                onDismissRequest = { pendingConflict = null },
-                title = { Text("检测到时间冲突") },
-                text = {
-                    Text(
-                        "与 ${state.conflictEntry.title}（${formatMinutes(state.conflictEntry.startMinutes)}-" +
-                            "${formatMinutes(state.conflictEntry.endMinutes)}）重叠。你可以返回修改，或继续保存。",
-                    )
-                },
-                confirmButton = {
-                    Button(onClick = { applyEntrySave(state.updatedEntry, true) }) {
-                        Text("仍然保存")
-                    }
-                },
-                dismissButton = {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
-                            onClick = {
-                                val adjusted = viewModel.suggestResolvedEntry(state.updatedEntry)
-                                if (adjusted == null) {
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar("当天没有可顺延的完整时间段")
-                                    }
-                                } else {
-                                    applyEntrySave(adjusted, false)
-                                }
-                            },
-                        ) {
-                            Text("顺延并保存")
-                        }
-                        OutlinedButton(onClick = { pendingConflict = null }) {
-                            Text("返回修改")
-                        }
-                    }
-                },
-            )
-        }
-    }
-
-    editingWeekSlotIndex?.let { index ->
-        val currentSlot = weekTimeSlots.getOrNull(index) ?: return@let
-        WeekSlotEditorDialog(
-            title = "编辑第 ${index + 1} 节时间",
-            initial = currentSlot,
-            onDismiss = { editingWeekSlotIndex = null },
-            onSave = { updatedSlot ->
-                val updatedSlots = weekTimeSlots.toMutableList().apply {
-                    this[index] = updatedSlot
-                }.sortedBy { it.startMinutes }
-                if (!areWeekTimeSlotsNonOverlapping(updatedSlots)) {
-                    scope.launch { snackbarHostState.showSnackbar("节次时间不能重叠") }
-                    return@WeekSlotEditorDialog
-                }
-                weekTimeSlots = AppearanceStore.setWeekTimeSlots(context, updatedSlots)
-                editingWeekSlotIndex = null
-            },
-            onDelete = if (weekTimeSlots.size > 1) {
-                {
-                    val updatedSlots = weekTimeSlots.toMutableList().apply { removeAt(index) }
-                    weekTimeSlots = AppearanceStore.setWeekTimeSlots(context, updatedSlots)
-                    editingWeekSlotIndex = null
-                    scope.launch { snackbarHostState.showSnackbar("已删除第 ${index + 1} 节") }
-                }
-            } else {
-                null
-            },
-        )
-    }
-
-    addingWeekSlotInitial?.let { initialSlot ->
-        WeekSlotEditorDialog(
-            title = "新增节次",
-            initial = initialSlot,
-            onDismiss = { addingWeekSlotInitial = null },
-            onSave = { newSlot ->
-                val updatedSlots = (weekTimeSlots + newSlot).sortedBy { it.startMinutes }
-                if (!areWeekTimeSlotsNonOverlapping(updatedSlots)) {
-                    scope.launch { snackbarHostState.showSnackbar("节次时间不能重叠") }
-                    return@WeekSlotEditorDialog
-                }
-                weekTimeSlots = AppearanceStore.setWeekTimeSlots(context, updatedSlots)
-                addingWeekSlotInitial = null
-                scope.launch { snackbarHostState.showSnackbar("已新增第 ${updatedSlots.indexOf(newSlot) + 1} 节") }
-            },
-        )
-    }
-
-    if (editingWeekSlotCount) {
-        WeekSlotCountDialog(
-            initialCount = weekTimeSlots.size,
-            onDismiss = { editingWeekSlotCount = false },
-            onSave = { count ->
-                val updatedSlots = resizeWeekTimeSlots(weekTimeSlots, count)
-                weekTimeSlots = AppearanceStore.setWeekTimeSlots(context, updatedSlots)
-                editingWeekSlotCount = false
-                scope.launch {
-                    val message = if (updatedSlots.size == count) {
-                        "已调整为 $count 节"
-                    } else {
-                        "只能扩展到 ${updatedSlots.size} 节，后续时间不足"
-                    }
-                    snackbarHostState.showSnackbar(message)
-                }
-            },
+        DayScheduleList(
+            context = context,
+            scope = scope,
+            listState = listState,
+            snackbarHostState = snackbarHostState,
+            entries = entries,
+            selectedDate = selectedDate,
+            selectedLocalDate = selectedLocalDate,
+            filteredEntries = selectedDayEntries,
+            selectedDayEntries = selectedDayEntries,
+            dateRangeEntriesCache = dateRangeEntriesCache,
+            nextCourseSnapshot = nextCourseSnapshot,
+            importLauncher = importLauncher,
+            exportLauncher = exportLauncher,
+            notificationPermissionLauncher = notificationPermissionLauncher,
+            exactAlarmSettingsLauncher = exactAlarmSettingsLauncher,
+            exactAlarmEnabled = exactAlarmEnabled,
+            reminderMinutes = reminderMinutes,
+            reminderOptions = reminderOptions,
+            onReminderMinutesChange = onReminderMinutesChange,
+            backgroundAppearance = backgroundAppearance,
+            onBackgroundAppearanceChange = onBackgroundAppearanceChange,
+            onSelectBackgroundImage = onSelectBackgroundImage,
+            onAdjustCustomBackground = onAdjustCustomBackground,
+            weekCardAlpha = weekCardAlpha,
+            onWeekCardAlphaChange = onWeekCardAlphaChange,
+            weekCardHue = weekCardHue,
+            onWeekCardHueChange = onWeekCardHueChange,
+            onDateChanged = onDateChanged,
+            onEditEntry = onEditEntry,
+            onDuplicateEntry = onDuplicateEntry,
+            onDeleteEntry = onDeleteEntry,
+            onCreateEntry = onCreateEntry,
         )
     }
 }
 
+/**
+ * 创建默认的新周时段。
+ *
+ * 根据现有时段列表创建一个默认的新周时段。
+ *
+ * @param slots 现有周时段列表
+ * @return 新的周时段，或 null 如果无法创建
+ */
 internal fun defaultNewWeekSlot(slots: List<WeekTimeSlot>): WeekTimeSlot? {
     val lastSlot = slots.maxByOrNull { it.endMinutes }
     if (lastSlot == null) {
@@ -768,6 +615,15 @@ internal fun defaultNewWeekSlot(slots: List<WeekTimeSlot>): WeekTimeSlot? {
     return nextWeekTimeSlot(lastSlot)
 }
 
+/**
+ * 调整周时段列表大小。
+ *
+ * 根据目标数量调整周时段列表，添加或删除时段。
+ *
+ * @param slots 现有周时段列表
+ * @param targetCount 目标数量
+ * @return 调整后的周时段列表
+ */
 internal fun resizeWeekTimeSlots(slots: List<WeekTimeSlot>, targetCount: Int): List<WeekTimeSlot> {
     if (targetCount <= 0) return slots
     if (slots.size == targetCount) return slots.sortedBy { it.startMinutes }
@@ -790,6 +646,14 @@ internal fun resizeWeekTimeSlots(slots: List<WeekTimeSlot>, targetCount: Int): L
     return expanded
 }
 
+/**
+ * 创建下一个周时段。
+ *
+ * 根据前一个周时段创建下一个周时段。
+ *
+ * @param previous 前一个周时段
+ * @return 下一个周时段，或 null 如果无法创建
+ */
 internal fun nextWeekTimeSlot(previous: WeekTimeSlot): WeekTimeSlot? {
     val start = previous.endMinutes + DEFAULT_WEEK_SLOT_GAP_MINUTES
     val end = start + DEFAULT_WEEK_SLOT_DURATION_MINUTES
@@ -797,19 +661,37 @@ internal fun nextWeekTimeSlot(previous: WeekTimeSlot): WeekTimeSlot? {
     return WeekTimeSlot(startMinutes = start, endMinutes = end)
 }
 
-private data class PendingEntryConflict(
+/**
+ * 待处理的课程冲突。
+ *
+ * 表示课程条目更新时遇到的冲突。
+ *
+ * @param updatedEntry 更新后的课程条目
+ * @param conflictEntry 冲突的课程条目
+ */
+data class PendingEntryConflict(
     val updatedEntry: TimetableEntry,
     val conflictEntry: TimetableEntry,
 )
-internal fun NextCourseSnapshot.toCardState(): NextCourseCardState {
+
+internal fun NextCourseSnapshot.toCardState(unnamedLabel: String = ""): NextCourseCardState {
     return NextCourseCardState(
-        title = entry.title.ifBlank { "未命名课程" },
+        title = entry.title.ifBlank { unnamedLabel },
         timeRange = "${formatMinutes(entry.startMinutes)} - ${formatMinutes(entry.endMinutes)}",
         location = entry.location,
         statusText = statusText,
     )
 }
 
+/**
+ * 创建快速课程条目模板。
+ *
+ * 根据现有课程条目创建一个快速课程条目模板。
+ *
+ * @param date 日期
+ * @param existingEntries 现有课程条目
+ * @return 课程条目模板
+ */
 internal fun createQuickEntryTemplate(
     date: LocalDate,
     existingEntries: List<TimetableEntry>,
@@ -835,7 +717,7 @@ internal fun createQuickEntryTemplate(
         fallbackStart to fallbackEnd
     }
 
-    return TimetableEntry(
+    return TimetableEntry.create(
         title = "",
         date = date.toString(),
         dayOfWeek = date.dayOfWeek.value,
@@ -844,8 +726,16 @@ internal fun createQuickEntryTemplate(
     )
 }
 
+/**
+ * 复制课程条目模板。
+ *
+ * 创建一个现有课程条目的副本。
+ *
+ * @param source 源课程条目
+ * @return 复制的课程条目
+ */
 internal fun duplicateEntryTemplate(source: TimetableEntry): TimetableEntry {
-    return TimetableEntry(
+    return TimetableEntry.create(
         title = source.title,
         date = source.date,
         dayOfWeek = source.dayOfWeek,

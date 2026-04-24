@@ -1,5 +1,6 @@
 package com.example.timetable.ui
 
+import android.content.Context
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -33,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -42,6 +44,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.example.timetable.R
+import androidx.compose.ui.res.stringResource
 import com.example.timetable.data.TimetableEntry
 import com.example.timetable.data.WeekTimeSlot
 import com.example.timetable.data.formatMinutes
@@ -193,15 +197,15 @@ private fun WeekOverviewHeader(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "第 $weekNumber 周  ${formatWeekRange(weekStart, weekEnd)}",
+                    text = stringResource(R.string.label_week_number, weekNumber) + "  " + formatWeekRange(weekStart, weekEnd),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     text = if (weekEntries.isEmpty()) {
-                        "本周暂无课程"
+                        stringResource(R.string.label_week_no_courses)
                     } else {
-                        "本周 ${weekEntries.size} 节，今天 ${selectedDayEntries.size} 节"
+                        stringResource(R.string.label_week_course_count, weekEntries.size, selectedDayEntries.size)
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
@@ -213,7 +217,7 @@ private fun WeekOverviewHeader(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 GlassActionChip(
-                    label = "节数 $slotCount",
+                    label = stringResource(R.string.label_slot_count, slotCount),
                     onClick = onCustomizeSlotCount,
                 )
                 WeekMiniStats(
@@ -231,8 +235,8 @@ private fun WeekMiniStats(
     weekCount: Int,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        SummaryPill(label = "今日", value = selectedCount.toString())
-        SummaryPill(label = "本周", value = weekCount.toString())
+        SummaryPill(label = stringResource(R.string.label_today), value = selectedCount.toString())
+        SummaryPill(label = stringResource(R.string.label_this_week), value = weekCount.toString())
     }
 }
 
@@ -287,7 +291,7 @@ private fun TimeColumnHeader(
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     imageVector = Icons.Default.Add,
-                    contentDescription = "新增节次",
+                    contentDescription = stringResource(R.string.title_add_slot),
                     modifier = Modifier.size(20.dp),
                 )
             }
@@ -339,7 +343,7 @@ private fun DayHeaderCell(
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = chineseWeekday(day.dayOfWeek),
+            text = chineseWeekday(day.dayOfWeek, LocalContext.current),
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
             color = MaterialTheme.colorScheme.onSurface,
         )
@@ -427,6 +431,7 @@ private fun TimeSlotCell(
     height: Dp,
     onClick: () -> Unit,
 ) {
+    val slotContext = LocalContext.current
     Box(
         modifier = Modifier
             .width(width)
@@ -435,7 +440,7 @@ private fun TimeSlotCell(
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
             .semantics {
                 role = Role.Button
-                contentDescription = buildTimeSlotContentDescription(index, slot)
+                contentDescription = buildTimeSlotContentDescription(slotContext, index, slot)
             }
             .clickable(onClick = onClick)
             .padding(horizontal = 4.dp, vertical = 8.dp),
@@ -491,6 +496,7 @@ private fun WeekEntryBlock(
     color: Color,
     onClick: () -> Unit,
 ) {
+    val entryContext = LocalContext.current
     BoxWithConstraints(
         modifier = modifier
             .clip(RoundedCornerShape(18.dp))
@@ -502,7 +508,7 @@ private fun WeekEntryBlock(
             .background(color)
             .semantics {
                 role = Role.Button
-                contentDescription = buildWeekEntryContentDescription(entry)
+                contentDescription = buildWeekEntryContentDescription(entryContext, entry)
             }
             .clickable(onClick = onClick),
     ) {
@@ -584,14 +590,14 @@ private data class TimeAnchor(
     val positionPx: Float,
 )
 
-internal fun chineseWeekday(dayOfWeek: DayOfWeek): String = when (dayOfWeek) {
-    DayOfWeek.MONDAY -> "一"
-    DayOfWeek.TUESDAY -> "二"
-    DayOfWeek.WEDNESDAY -> "三"
-    DayOfWeek.THURSDAY -> "四"
-    DayOfWeek.FRIDAY -> "五"
-    DayOfWeek.SATURDAY -> "六"
-    DayOfWeek.SUNDAY -> "日"
+internal fun chineseWeekday(dayOfWeek: DayOfWeek, context: Context): String = when (dayOfWeek) {
+    DayOfWeek.MONDAY -> context.getString(R.string.weekday_mon)
+    DayOfWeek.TUESDAY -> context.getString(R.string.weekday_tue)
+    DayOfWeek.WEDNESDAY -> context.getString(R.string.weekday_wed)
+    DayOfWeek.THURSDAY -> context.getString(R.string.weekday_thu)
+    DayOfWeek.FRIDAY -> context.getString(R.string.weekday_fri)
+    DayOfWeek.SATURDAY -> context.getString(R.string.weekday_sat)
+    DayOfWeek.SUNDAY -> context.getString(R.string.weekday_sun)
 }
 
 private fun formatWeekRange(start: LocalDate, end: LocalDate): String {

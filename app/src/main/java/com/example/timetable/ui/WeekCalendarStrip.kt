@@ -33,7 +33,10 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.example.timetable.R
 import com.kizitonwose.calendar.compose.WeekCalendar
 import com.kizitonwose.calendar.compose.weekcalendar.rememberWeekCalendarState
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -94,7 +97,7 @@ fun WeekCalendarStrip(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                text = "周选择",
+                text = stringResource(R.string.label_week_selector),
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                 color = MaterialTheme.colorScheme.onSurface,
             )
@@ -121,6 +124,7 @@ private fun WeekCalendarDayCell(
     today: Boolean,
     onClick: () -> Unit,
 ) {
+    val cellContext = LocalContext.current
     val containerColor = when {
         selected -> MaterialTheme.colorScheme.primary
         today -> MaterialTheme.colorScheme.primaryContainer
@@ -142,6 +146,7 @@ private fun WeekCalendarDayCell(
                 role = Role.Button
                 this.selected = selected
                 contentDescription = buildWeekCalendarDayContentDescription(
+                    context = cellContext,
                     date = date,
                     selected = selected,
                     today = today,
@@ -155,7 +160,7 @@ private fun WeekCalendarDayCell(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
-                text = chineseWeekday(date.dayOfWeek),
+                text = chineseWeekday(date.dayOfWeek, LocalContext.current),
                 style = MaterialTheme.typography.labelMedium,
                 color = contentColor.copy(alpha = 0.82f),
                 textAlign = TextAlign.Center,
@@ -175,7 +180,7 @@ private fun WeekCalendarDayCell(
                     .padding(horizontal = 3.dp, vertical = 1.dp),
             ) {
                 Text(
-                    text = if (today) "今" else "",
+                    text = if (today) stringResource(R.string.label_today_short) else "",
                     style = MaterialTheme.typography.labelSmall,
                     color = containerColor,
                 )

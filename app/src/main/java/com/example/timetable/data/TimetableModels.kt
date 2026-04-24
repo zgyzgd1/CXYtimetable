@@ -7,22 +7,28 @@ import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 import java.util.UUID
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * 课程表条目数据类
- * 表示单个课程或事件的基本信息
+ * 表示单个课程表条目（课程或事件）。
  *
- * @property id 唯一标识符，自动生成 UUID
+ * @property id 唯一标识符，自动生成的 UUID
  * @property title 课程标题
- * @property date 课程日期（yyyy-MM-dd）
- * @property dayOfWeek 星期几（1-7，分别代表周一到周日）
- * @property startMinutes 开始时间（从当天0点起的分钟数）
- * @property endMinutes 结束时间（从当天0点起的分钟数）
- * @property location 上课地点
- * @property note 备注信息
+ * @property date 课程日期 (yyyy-MM-dd 格式)
+ * @property dayOfWeek 星期几 (1-7，周一到周日)
+ * @property startMinutes 开始时间，从午夜开始的分钟数
+ * @property endMinutes 结束时间，从午夜开始的分钟数
+ * @property location 课程地点
+ * @property note 附加备注
  */
-@Entity(tableName = "timetable_entries")
+@Entity(
+    tableName = "timetable_entries",
+    indices = [
+        Index(value = ["date", "startMinutes"]),
+        Index(value = ["dayOfWeek"]),
+    ],
+)
 data class TimetableEntry(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
     val title: String,
@@ -38,42 +44,88 @@ data class TimetableEntry(
     val customWeekList: String = "",
     val skipWeekList: String = "",
 ) {
-    init {
-        require(parseEntryDate(date) != null)
-        // 验证数据的合法性
-        require(dayOfWeek in 1..7)
-        require(startMinutes in 0 until 24 * 60)
-        require(endMinutes in 1..24 * 60)
-        require(startMinutes < endMinutes)
-        require(resolveRecurrenceType(recurrenceType) != null)
-        require(resolveWeekRule(weekRule) != null)
-        if (semesterStartDate.isNotBlank()) {
-            require(parseEntryDate(semesterStartDate) != null)
+    companion object {
+        /**
+         * 创建一个带有完整数据验证的 [TimetableEntry]。
+         * 用于 UI 层确保构造新条目时的数据有效性。
+         * Room 反序列化通过主构造函数绕过验证以提高性能。
+         */
+        fun create(
+            id: String = UUID.randomUUID().toString(),
+            title: String,
+            date: String,
+            dayOfWeek: Int,
+            startMinutes: Int,
+            endMinutes: Int,
+            location: String = "",
+            note: String = "",
+            recurrenceType: String = RecurrenceType.NONE.name,
+            semesterStartDate: String = "",
+            weekRule: String = WeekRule.ALL.name,
+            customWeekList: String = "",
+            skipWeekList: String = "",
+        ): TimetableEntry {
+            require(parseEntryDate(date) != null) { "课程日期无效: $date" }
+            require(dayOfWeek in 1..7) { "dayOfWeek 必须在 1..7 范围内: $dayOfWeek" }
+            require(startMinutes in 0 until 24 * 60) { "开始时间不合法: $startMinutes" }
+            require(endMinutes in 1..24 * 60) { "结束时间不合法: $endMinutes" }
+            require(startMinutes < endMinutes) { "结束时间需要晚于开始时间" }
+            require(resolveRecurrenceType(recurrenceType) != null) { "重复规则无效: $recurrenceType" }
+            require(resolveWeekRule(weekRule) != null) { "周次规则无效: $weekRule" }
+            if (semesterStartDate.isNotBlank()) {
+                require(parseEntryDate(semesterStartDate) != null) { "学期开学日期无效: $semesterStartDate" }
+            }
+            require(parseWeekList(customWeekList) != null) { "自定义周次格式错误: $customWeekList" }
+            require(parseWeekList(skipWeekList) != null) { "跳过周次格式错误: $skipWeekList" }
+            return TimetableEntry(
+                id = id,
+                title = title,
+                date = date,
+                dayOfWeek = dayOfWeek,
+                startMinutes = startMinutes,
+                endMinutes = endMinutes,
+                location = location,
+                note = note,
+                recurrenceType = recurrenceType,
+                semesterStartDate = semesterStartDate,
+                weekRule = weekRule,
+                customWeekList = customWeekList,
+                skipWeekList = skipWeekList,
+            )
         }
-        require(parseWeekList(customWeekList) != null)
-        require(parseWeekList(skipWeekList) != null)
     }
 }
 
+/**
+ * 重复类型枚举
+ */
 enum class RecurrenceType {
+    /** 不重复 */
     NONE,
+    /** 按周重复 */
     WEEKLY,
 }
 
+/**
+ * 周次规则枚举
+ */
 enum class WeekRule {
+    /** 每周 */
     ALL,
+    /** 单周 */
     ODD,
+    /** 双周 */
     EVEN,
+    /** 自定义周次 */
     CUSTOM,
 }
 
 /**
- * 星期选项数据类
- * 用于 UI 显示星期的完整标签和缩写
+ * 星期选项数据类，用于 UI 显示完整和缩写的星期标签。
  *
- * @property value 星期数值（1-7）
- * @property label 完整标签（如"周一"）
- * @property shortLabel 缩写标签（如"一"）
+ * @property value 星期数字 (1-7)
+ * @property label 完整标签 (例如 "Monday")
+ * @property shortLabel 缩写标签 (例如 "Mon")
  */
 data class DayOption(
     val value: Int,
@@ -81,22 +133,22 @@ data class DayOption(
     val shortLabel: String,
 )
 
-// 定义一周七天的选项列表
+// 整周的星期选项
 val WeekdayOptions = listOf(
-    DayOption(1, "周一", "一"),
-    DayOption(2, "周二", "二"),
-    DayOption(3, "周三", "三"),
-    DayOption(4, "周四", "四"),
-    DayOption(5, "周五", "五"),
-    DayOption(6, "周六", "六"),
-    DayOption(7, "周日", "日"),
+    DayOption(1, "Monday", "Mon"),
+    DayOption(2, "Tuesday", "Tue"),
+    DayOption(3, "Wednesday", "Wed"),
+    DayOption(4, "Thursday", "Thu"),
+    DayOption(5, "Friday", "Fri"),
+    DayOption(6, "Saturday", "Sat"),
+    DayOption(7, "Sunday", "Sun"),
 )
 
 /**
- * 将分钟数格式化为时间字符串（HH:mm 格式）
+ * 将从午夜开始的分钟数格式化为时间字符串（HH:mm 格式）。
  *
- * @param minutes 从0点开始的分钟数
- * @return 格式化后的时间字符串，如 "08:30"
+ * @param minutes 从午夜开始的分钟数
+ * @return 格式化的时间字符串，例如 "08:30"
  */
 fun formatMinutes(minutes: Int): String {
     val safeMinutes = minutes.coerceIn(0, 24 * 60)
@@ -105,10 +157,10 @@ fun formatMinutes(minutes: Int): String {
 }
 
 /**
- * 解析时间字符串为分钟数
+ * 解析时间字符串为从午夜开始的分钟数。
  *
- * @param text 时间字符串，格式为 "HH:mm"
- * @return 解析成功返回分钟数，失败返回 null
+ * @param text "HH:mm" 格式的时间字符串
+ * @return 成功时返回从午夜开始的分钟数，失败时返回 null
  */
 fun parseMinutes(text: String): Int? {
     val trimmed = text.trim().replace('：', ':')
@@ -136,20 +188,20 @@ fun parseMinutes(text: String): Int? {
 }
 
 /**
- * 根据星期数值获取完整的中文标签
+ * 返回给定星期数字的完整星期标签。
  *
- * @param dayOfWeek 星期数值（1-7）
- * @return 中文标签，如"周一"，未找到返回空字符串
+ * @param dayOfWeek 星期数字 (1-7)
+ * @return 完整标签，例如 "Monday"，如果未找到则返回空字符串
  */
 fun dayLabel(dayOfWeek: Int): String {
     return WeekdayOptions.firstOrNull { it.value == dayOfWeek }?.label ?: ""
 }
 
 /**
- * 根据星期数值获取缩写的中文标签
+ * 返回给定星期数字的缩写星期标签。
  *
- * @param dayOfWeek 星期数值（1-7）
- * @return 缩写标签，如"一"，未找到返回空字符串
+ * @param dayOfWeek 星期数字 (1-7)
+ * @return 缩写标签，例如 "Mon"，如果未找到则返回空字符串
  */
 fun dayShortLabel(dayOfWeek: Int): String {
     return WeekdayOptions.firstOrNull { it.value == dayOfWeek }?.shortLabel ?: ""
@@ -159,30 +211,80 @@ private val entryDateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 private val minSupportedDate = LocalDate.of(1970, 1, 1)
 private val maxSupportedDate = LocalDate.of(2100, 12, 31)
 
+/** 安全上限：跳过周次时的最大迭代次数，防止由于大的 skipWeekList 导致长循环。 */
+private const val MAX_SKIP_WEEK_ITERATIONS = 200
+
+/**
+ * 解析条目日期字符串为 LocalDate 对象。
+ *
+ * @param text 日期字符串
+ * @return 解析成功时返回 LocalDate，失败时返回 null
+ */
 fun parseEntryDate(text: String): LocalDate? {
     val parsed = runCatching { LocalDate.parse(text.trim(), entryDateFormatter) }.getOrNull() ?: return null
     return parsed.takeIf { it in minSupportedDate..maxSupportedDate }
 }
 
+/**
+ * 格式化日期标签。
+ *
+ * @param date 日期字符串
+ * @return 格式化的日期标签，例如 "2026-09-01 Monday"
+ */
 fun formatDateLabel(date: String): String {
     val parsed = parseEntryDate(date) ?: return date
     return "%d-%02d-%02d %s".format(parsed.year, parsed.monthValue, parsed.dayOfMonth, dayLabel(parsed.dayOfWeek.value))
 }
 
+/**
+ * 获取指定星期几的默认日期。
+ *
+ * @param dayOfWeek 星期数字 (1-7)
+ * @return 默认日期字符串
+ */
 fun defaultDateForWeekday(dayOfWeek: Int): String {
     val safeDay = dayOfWeek.coerceIn(1, 7)
     val monday = LocalDate.now().with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
     return monday.plusDays((safeDay - 1).toLong()).toString()
 }
 
+/**
+ * 解析重复类型字符串为 RecurrenceType 枚举。
+ *
+ * @param value 重复类型字符串
+ * @return 解析成功时返回 RecurrenceType，失败时返回 null
+ */
 fun resolveRecurrenceType(value: String): RecurrenceType? {
     return runCatching { RecurrenceType.valueOf(value.trim().uppercase()) }.getOrNull()
 }
 
+/**
+ * 解析周次规则字符串为 WeekRule 枚举。
+ *
+ * @param value 周次规则字符串
+ * @return 解析成功时返回 WeekRule，失败时返回 null
+ */
 fun resolveWeekRule(value: String): WeekRule? {
     return runCatching { WeekRule.valueOf(value.trim().uppercase()) }.getOrNull()
 }
 
+/**
+ * 标准化周次列表文本。
+ */
+internal fun normalizeWeekListText(raw: String): String {
+    return raw.trim()
+        .replace('，', ',')
+        .replace('—', '-')
+        .replace('–', '-')
+        .replace(" ", "")
+}
+
+/**
+ * 解析周次列表字符串为整数集合。
+ *
+ * @param raw 周次列表字符串，例如 "1,3,5" 或 "1-16"
+ * @return 解析成功时返回周次集合，失败时返回 null
+ */
 fun parseWeekList(raw: String): Set<Int>? {
     if (raw.isBlank()) return emptySet()
     val result = linkedSetOf<Int>()
@@ -208,6 +310,13 @@ fun parseWeekList(raw: String): Set<Int>? {
     return result
 }
 
+/**
+ * 计算从学期开始到目标日期的周数。
+ *
+ * @param semesterStartDate 学期开始日期
+ * @param targetDate 目标日期
+ * @return 周数，如果目标日期在学期开始之前则返回 null
+ */
 fun weekIndexFromSemesterStart(
     semesterStartDate: LocalDate,
     targetDate: LocalDate,
@@ -219,6 +328,13 @@ fun weekIndexFromSemesterStart(
     return (dayDiff / 7L).toInt() + 1
 }
 
+/**
+ * 获取当前周数。
+ *
+ * @param semesterStartDateText 学期开始日期字符串
+ * @param today 今天的日期，默认为当前日期
+ * @return 当前周数，如果学期开始日期无效则返回 null
+ */
 fun currentWeekIndex(
     semesterStartDateText: String,
     today: LocalDate = LocalDate.now(),
@@ -227,6 +343,13 @@ fun currentWeekIndex(
     return weekIndexFromSemesterStart(semesterStartDate, today)
 }
 
+/**
+ * 计算下一次课程出现的日期。
+ *
+ * @param entry 课程条目
+ * @param onOrAfter 从该日期开始查找
+ * @return 下一次出现的日期，如果没有则返回 null
+ */
 fun nextOccurrenceDate(
     entry: TimetableEntry,
     onOrAfter: LocalDate,
@@ -274,8 +397,10 @@ fun nextOccurrenceDate(
     }
 
     val weekStep = if (weekRule == WeekRule.ALL) 1 else 2
+    var skipIterations = 0
     while (candidateWeek in skippedWeeks) {
         candidateWeek += weekStep
+        if (++skipIterations > MAX_SKIP_WEEK_ITERATIONS) return null
     }
 
     val nextDate = semesterWeekStart
@@ -284,6 +409,13 @@ fun nextOccurrenceDate(
     return nextDate.takeIf { !it.isBefore(searchStart) && occursOnDate(entry, it) }
 }
 
+/**
+ * 检查课程是否在指定日期出现。
+ *
+ * @param entry 课程条目
+ * @param targetDate 目标日期
+ * @return 如果课程在该日期出现则返回 true，否则返回 false
+ */
 fun occursOnDate(
     entry: TimetableEntry,
     targetDate: LocalDate,
@@ -316,36 +448,35 @@ fun occursOnDate(
 }
 
 /**
- * 生成示例课程数据
- * 用于应用首次启动时展示示例内容
+ * 生成首次启动演示内容的示例课程条目。
  *
- * @return 包含三个示例课程的列表
+ * @return 三个示例课程条目的列表
  */
 fun sampleEntries(): List<TimetableEntry> = listOf(
-    TimetableEntry(
-        title = "高等数学",
+    TimetableEntry.create(
+        title = "Advanced Mathematics",
         date = "2026-09-07",
         dayOfWeek = 1,
         startMinutes = 8 * 60,
         endMinutes = 9 * 60 + 35,
         location = "A-201",
-        note = "第一周开始",
+        note = "Starts from week 1",
     ),
-    TimetableEntry(
-        title = "英语阅读",
+    TimetableEntry.create(
+        title = "English Reading",
         date = "2027-03-10",
         dayOfWeek = 3,
         startMinutes = 10 * 60,
         endMinutes = 11 * 60 + 30,
         location = "B-108",
     ),
-    TimetableEntry(
-        title = "计算机基础",
+    TimetableEntry.create(
+        title = "Computer Fundamentals",
         date = "2028-11-24",
         dayOfWeek = 5,
         startMinutes = 13 * 60 + 30,
         endMinutes = 15 * 60,
-        location = "机房 2",
-        note = "带笔记本",
+        location = "Lab 2",
+        note = "Bring laptop",
     ),
 )

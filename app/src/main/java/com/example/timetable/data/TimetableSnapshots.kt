@@ -1,5 +1,7 @@
 package com.example.timetable.data
 
+import android.content.Context
+import com.example.timetable.R
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.temporal.ChronoUnit
@@ -14,16 +16,25 @@ internal fun findNextCourseSnapshot(
     entries: List<TimetableEntry>,
     nowDate: LocalDate = LocalDate.now(),
     nowMinutes: Int = LocalTime.now().let { it.hour * 60 + it.minute },
+    context: Context? = null,
 ): NextCourseSnapshot? {
     val todayEntries = entriesForDate(entries, nowDate)
 
     val ongoingEntry = todayEntries.firstOrNull { nowMinutes in it.startMinutes until it.endMinutes }
     if (ongoingEntry != null) {
         val remainingMinutes = (ongoingEntry.endMinutes - nowMinutes).coerceAtLeast(0)
-        val status = if (remainingMinutes > 0) {
-            "正在进行，距离下课 $remainingMinutes 分钟"
+        val status = if (context != null) {
+            if (remainingMinutes > 0) {
+                context.getString(R.string.status_ongoing_remaining, remainingMinutes)
+            } else {
+                context.getString(R.string.status_ongoing)
+            }
         } else {
-            "正在进行"
+            if (remainingMinutes > 0) {
+                "In progress, $remainingMinutes min until end"
+            } else {
+                "In progress"
+            }
         }
         return NextCourseSnapshot(
             entry = ongoingEntry,
@@ -35,10 +46,18 @@ internal fun findNextCourseSnapshot(
     val nextTodayEntry = todayEntries.firstOrNull { it.startMinutes >= nowMinutes }
     if (nextTodayEntry != null) {
         val waitMinutes = (nextTodayEntry.startMinutes - nowMinutes).coerceAtLeast(0)
-        val status = if (waitMinutes == 0) {
-            "即将开始"
+        val status = if (context != null) {
+            if (waitMinutes == 0) {
+                context.getString(R.string.status_starting_soon)
+            } else {
+                context.getString(R.string.status_minutes_later, waitMinutes)
+            }
         } else {
-            "$waitMinutes 分钟后开始"
+            if (waitMinutes == 0) {
+                "Starting soon"
+            } else {
+                "Starts in $waitMinutes min"
+            }
         }
         return NextCourseSnapshot(
             entry = nextTodayEntry,
@@ -66,16 +85,30 @@ internal fun findNextCourseSnapshot(
     val resolvedEntry = futureOccurrence.first
     val resolvedDate = futureOccurrence.second
     val dayOffset = ChronoUnit.DAYS.between(nowDate, resolvedDate).toInt().coerceAtLeast(0)
-    val dayLabel = when (dayOffset) {
-        0 -> "今天"
-        1 -> "明天"
-        2 -> "后天"
-        else -> "$dayOffset 天后"
+    val dayLabel = if (context != null) {
+        when (dayOffset) {
+            0 -> context.getString(R.string.widget_today)
+            1 -> context.getString(R.string.widget_tomorrow)
+            2 -> context.getString(R.string.widget_day_after_tomorrow)
+            else -> context.getString(R.string.status_days_later, dayOffset)
+        }
+    } else {
+        when (dayOffset) {
+            0 -> "Today"
+            1 -> "Tomorrow"
+            2 -> "Day after tomorrow"
+            else -> "In $dayOffset days"
+        }
     }
+    val startLabel = formatMinutes(resolvedEntry.startMinutes)
     return NextCourseSnapshot(
         entry = resolvedEntry,
         occurrenceDate = resolvedDate,
-        statusText = "$dayLabel ${formatMinutes(resolvedEntry.startMinutes)} 开始",
+        statusText = if (context != null) {
+            context.getString(R.string.status_day_start, dayLabel, startLabel)
+        } else {
+            "$dayLabel at $startLabel"
+        },
     )
 }
 
@@ -131,23 +164,29 @@ internal class DateRangeEntriesCache(
         val endDate: LocalDate,
     )
 
-    private val rangeCache = object : LinkedHashMap<RangeKey, Map<LocalDate, List<TimetableEntry>>>(16, 0.75f, true) {
-        override fun removeEldestEntry(
-            eldest: MutableMap.MutableEntry<RangeKey, Map<LocalDate, List<TimetableEntry>>>?,
-        ): Boolean {
-            return size > maxRanges
+    private val rangeCache = java.util.Collections.synchronizedMap(
+        object : LinkedHashMap<RangeKey, Map<LocalDate, List<TimetableEntry>>>(16, 0.75f, true) {
+            override fun removeEldestEntry(
+                eldest: MutableMap.MutableEntry<RangeKey, Map<LocalDate, List<TimetableEntry>>>?,
+            ): Boolean {
+                return size > maxRanges
+            }
         }
-    }
+    )
 
     fun resolve(startDate: LocalDate, endDate: LocalDate): Map<LocalDate, List<TimetableEntry>> {
         if (endDate.isBefore(startDate)) return emptyMap()
 
         val key = RangeKey(startDate, endDate)
-        val cached = rangeCache[key]
-        if (cached != null) return cached
+        synchronized(rangeCache) {
+            val cached = rangeCache[key]
+            if (cached != null) return cached
+        }
 
         val computed = entriesByDateInRange(entries, startDate, endDate)
-        rangeCache[key] = computed
+        synchronized(rangeCache) {
+            rangeCache[key] = computed
+        }
         return computed
     }
 }

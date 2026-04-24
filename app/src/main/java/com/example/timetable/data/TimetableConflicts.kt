@@ -24,7 +24,7 @@ fun suggestAdjustedEntryAfterConflicts(
 
     val conflictingEntries = entriesList
         .asSequence()
-        .filter { it.id != target.id && entriesShareAnyOccurrenceDate(it, target) }
+        .filter { it.id != target.id && it.dayOfWeek == target.dayOfWeek && entriesShareAnyOccurrenceDate(it, target) }
         .sortedBy { it.startMinutes }
         .toList()
 
@@ -92,11 +92,22 @@ internal fun entriesShareAnyOccurrenceDate(
         firstCustomDates != null -> firstCustomDates.any { occursOnDate(second, it) }
         secondCustomDates != null -> secondCustomDates.any { occursOnDate(first, it) }
         else -> {
-            val searchStart = maxOf(firstDate, secondDate)
-            val candidateCount = maxOf(relevantSearchWeeks(first), relevantSearchWeeks(second)) + 2
-            generateSequence(searchStart) { it.plusWeeks(1) }
-                .take(candidateCount.coerceAtLeast(2))
-                .any { date -> occursOnDate(first, date) && occursOnDate(second, date) }
+            val firstRule = resolveWeekRule(first.weekRule) ?: WeekRule.ALL
+            val secondRule = resolveWeekRule(second.weekRule) ?: WeekRule.ALL
+            val firstSkips = parseWeekList(first.skipWeekList).orEmpty()
+            val secondSkips = parseWeekList(second.skipWeekList).orEmpty()
+
+            if (firstRule == WeekRule.ODD && secondRule == WeekRule.EVEN && firstSkips.isEmpty() && secondSkips.isEmpty()) {
+                false
+            } else if (firstRule == WeekRule.EVEN && secondRule == WeekRule.ODD && firstSkips.isEmpty() && secondSkips.isEmpty()) {
+                false
+            } else {
+                val searchStart = maxOf(firstDate, secondDate)
+                val candidateCount = maxOf(relevantSearchWeeks(first), relevantSearchWeeks(second)) + 6
+                generateSequence(searchStart) { it.plusWeeks(1) }
+                    .take(candidateCount.coerceIn(2, 30))
+                    .any { date -> occursOnDate(first, date) && occursOnDate(second, date) }
+            }
         }
     }
 }

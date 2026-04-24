@@ -21,8 +21,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.example.timetable.R
 import com.example.timetable.data.FixedWeekScheduleConfig
 import com.example.timetable.data.RecurrenceType
 import com.example.timetable.data.TimetableEntry
@@ -31,14 +34,23 @@ import com.example.timetable.data.WeekRule
 import com.example.timetable.data.areWeekTimeSlotsNonOverlapping
 import com.example.timetable.data.buildWeekTimeSlotsFromFixedSchedule
 import com.example.timetable.data.formatMinutes
+import com.example.timetable.data.normalizeWeekListText
 import com.example.timetable.data.parseWeekList
 import com.example.timetable.data.parseEntryDate
 import com.example.timetable.data.parseMinutes
 import com.example.timetable.data.resolveRecurrenceType
 import com.example.timetable.data.resolveWeekRule
 import com.example.timetable.data.SemesterStore
-import androidx.compose.ui.platform.LocalContext
 
+/**
+ * 课程条目编辑器对话框。
+ *
+ * 用于创建或编辑课程表条目，包含标题、日期、时间、地点、备注等信息。
+ *
+ * @param initial 初始课程表条目
+ * @param onDismiss 关闭对话框的回调
+ * @param onSave 保存课程表条目的回调
+ */
 @Composable
 fun EntryEditorDialog(
     initial: TimetableEntry,
@@ -61,6 +73,19 @@ fun EntryEditorDialog(
     var errorText by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
 
+    // Pre-load string resources for use in validation logic
+    val strEmptyName = stringResource(R.string.error_empty_course_name)
+    val strTitleTooLong = stringResource(R.string.error_title_too_long)
+    val strInvalidDate = stringResource(R.string.error_invalid_date)
+    val strInvalidTime = stringResource(R.string.error_invalid_time)
+    val strInvalidTimeRange = stringResource(R.string.error_invalid_time_range)
+    val strLocationTooLong = stringResource(R.string.error_location_too_long)
+    val strNoteTooLong = stringResource(R.string.error_note_too_long)
+    val strInvalidSemesterDate = stringResource(R.string.error_invalid_semester_date)
+    val strInvalidCustomWeeks = stringResource(R.string.error_invalid_custom_weeks)
+    val strInvalidSkipWeeks = stringResource(R.string.error_invalid_skip_weeks)
+    val strEmptyCustomWeeks = stringResource(R.string.error_empty_custom_weeks)
+
     // Auto-fill semester start date from global config if empty
     val globalSemesterDate = remember { SemesterStore.getSemesterStartDate(context) }
     if (semesterStartDateText.isBlank() && globalSemesterDate != null && recurrenceType == RecurrenceType.WEEKLY) {
@@ -69,7 +94,7 @@ fun EntryEditorDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (initial.title.isBlank()) "新增课程" else "编辑课程") },
+        title = { Text(if (initial.title.isBlank()) stringResource(R.string.title_new_course) else stringResource(R.string.title_edit_course)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 AppTextField(
@@ -78,7 +103,7 @@ fun EntryEditorDialog(
                         title = it
                         errorText = null
                     },
-                    label = "课程名称",
+                    label = stringResource(R.string.label_course_name),
                     singleLine = true,
                 )
                 AppTextField(
@@ -87,7 +112,7 @@ fun EntryEditorDialog(
                         dateText = it
                         errorText = null
                     },
-                    label = "日期",
+                    label = stringResource(R.string.label_date),
                     placeholder = "2026-09-01",
                     singleLine = true,
                 )
@@ -106,7 +131,7 @@ fun EntryEditorDialog(
                 AppTextField(
                     value = location,
                     onValueChange = { location = it },
-                    label = "地点",
+                    label = stringResource(R.string.label_location),
                     singleLine = true,
                 )
                 AppTextField(
@@ -115,7 +140,7 @@ fun EntryEditorDialog(
                         note = it
                         errorText = null
                     },
-                    label = "备注",
+                    label = stringResource(R.string.label_note),
                     minLines = 2,
                 )
                 RecurrenceSelector(
@@ -132,7 +157,7 @@ fun EntryEditorDialog(
                             semesterStartDateText = it
                             errorText = null
                         },
-                        label = "学期开学日期",
+                        label = stringResource(R.string.label_semester_start_date),
                         placeholder = "2026-09-01",
                         singleLine = true,
                     )
@@ -150,8 +175,8 @@ fun EntryEditorDialog(
                                 customWeekListText = it
                                 errorText = null
                             },
-                            label = "自定义周次",
-                            placeholder = "1,3,5 或 1-16",
+                            label = stringResource(R.string.label_custom_weeks),
+                            placeholder = "1,3,5 or 1-16",
                             singleLine = true,
                         )
                     }
@@ -161,8 +186,8 @@ fun EntryEditorDialog(
                             skipWeekListText = it
                             errorText = null
                         },
-                        label = "跳过周次(可选)",
-                        placeholder = "如 8,12",
+                        label = stringResource(R.string.label_skip_weeks),
+                        placeholder = stringResource(R.string.hint_skip_weeks_format),
                         singleLine = true,
                     )
                 }
@@ -187,18 +212,18 @@ fun EntryEditorDialog(
                     val customWeeks = parseWeekList(normalizedCustomWeekList)
                     val skipWeeks = parseWeekList(normalizedSkipWeekList)
                     when {
-                        title.trim().isBlank() -> errorText = "请输入课程名称"
-                        title.trim().length > 64 -> errorText = "课程名称不能超过 64 个字符"
-                        parsedDate == null -> errorText = "请输入合法日期，范围 1970-01-01 到 2100-12-31"
-                        parsedStart == null || parsedEnd == null -> errorText = "请输入合法时间，例如 08:00"
-                        parsedStart >= parsedEnd -> errorText = "结束时间需要晚于开始时间"
-                        location.trim().length > 64 -> errorText = "地点不能超过 64 个字符"
-                        note.trim().length > 256 -> errorText = "备注不能超过 256 个字符"
-                        recurrenceType == RecurrenceType.WEEKLY && parsedSemesterStart == null -> errorText = "请输入合法的学期开学日期"
-                        recurrenceType == RecurrenceType.WEEKLY && customWeeks == null -> errorText = "自定义周次格式错误，请使用 1,3,5 或 1-16"
-                        recurrenceType == RecurrenceType.WEEKLY && skipWeeks == null -> errorText = "跳过周次格式错误，请使用 8,12 或 1-3"
+                        title.trim().isBlank() -> errorText = strEmptyName
+                        title.trim().length > 64 -> errorText = strTitleTooLong
+                        parsedDate == null -> errorText = strInvalidDate
+                        parsedStart == null || parsedEnd == null -> errorText = strInvalidTime
+                        parsedStart >= parsedEnd -> errorText = strInvalidTimeRange
+                        location.trim().length > 64 -> errorText = strLocationTooLong
+                        note.trim().length > 256 -> errorText = strNoteTooLong
+                        recurrenceType == RecurrenceType.WEEKLY && parsedSemesterStart == null -> errorText = strInvalidSemesterDate
+                        recurrenceType == RecurrenceType.WEEKLY && customWeeks == null -> errorText = strInvalidCustomWeeks
+                        recurrenceType == RecurrenceType.WEEKLY && skipWeeks == null -> errorText = strInvalidSkipWeeks
                         recurrenceType == RecurrenceType.WEEKLY && weekRule == WeekRule.CUSTOM && customWeeks.isNullOrEmpty() -> {
-                            errorText = "自定义周次不能为空"
+                            errorText = strEmptyCustomWeeks
                         }
                         else -> {
                             // Persist the semester start date to global config
@@ -206,7 +231,8 @@ fun EntryEditorDialog(
                                 SemesterStore.setSemesterStartDate(context, parsedSemesterStart)
                             }
                             onSave(
-                                initial.copy(
+                                TimetableEntry.create(
+                                    id = initial.id,
                                     title = title.trim(),
                                     date = parsedDate.toString(),
                                     dayOfWeek = parsedDate.dayOfWeek.value,
@@ -214,7 +240,7 @@ fun EntryEditorDialog(
                                     endMinutes = parsedEnd,
                                     location = location.trim(),
                                     note = note.trim(),
-                                    recurrenceType = recurrenceType.name,
+                                    recurrenceType = if (recurrenceType == RecurrenceType.WEEKLY) recurrenceType.name else RecurrenceType.NONE.name,
                                     semesterStartDate = if (recurrenceType == RecurrenceType.WEEKLY) {
                                         parsedSemesterStart.toString()
                                     } else {
@@ -241,24 +267,34 @@ fun EntryEditorDialog(
                     }
                 },
             ) {
-                Text("保存")
+                Text(stringResource(R.string.action_save))
             }
         },
         dismissButton = {
             OutlinedButton(onClick = onDismiss) {
-                Text("取消")
+                Text(stringResource(R.string.action_cancel))
             }
         },
     )
 }
 
+/**
+ * 重复规则选择器。
+ *
+ * 用于选择课程的重复规则，如无重复或每周重复。
+ *
+ * @param selected 当前选择的重复规则
+ * @param onSelected 选择重复规则的回调
+ */
 @Composable
 private fun RecurrenceSelector(
     selected: RecurrenceType,
     onSelected: (RecurrenceType) -> Unit,
 ) {
+    val labelNone = stringResource(R.string.recurrence_none)
+    val labelWeekly = stringResource(R.string.recurrence_weekly)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("重复规则", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.label_recurrence_rule), style = MaterialTheme.typography.titleSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             RecurrenceType.entries.forEach { option ->
                 OutlinedButton(
@@ -267,8 +303,8 @@ private fun RecurrenceSelector(
                 ) {
                     Text(
                         when (option) {
-                            RecurrenceType.NONE -> "仅当天"
-                            RecurrenceType.WEEKLY -> "按周循环"
+                            RecurrenceType.NONE -> labelNone
+                            RecurrenceType.WEEKLY -> labelWeekly
                         } + if (option == selected) " ✓" else "",
                     )
                 }
@@ -277,13 +313,31 @@ private fun RecurrenceSelector(
     }
 }
 
+/**
+ * 周规则选择器。
+ *
+ * 用于选择课程的周规则，如全部周、奇数周、偶数周或自定义周。
+ *
+ * @param selected 当前选择的周规则
+ * @param onSelected 选择周规则的回调
+ */
 @Composable
 private fun WeekRuleSelector(
     selected: WeekRule,
     onSelected: (WeekRule) -> Unit,
 ) {
+    val labelAll = stringResource(R.string.week_rule_all)
+    val labelOdd = stringResource(R.string.week_rule_odd)
+    val labelEven = stringResource(R.string.week_rule_even)
+    val labelCustom = stringResource(R.string.week_rule_custom)
+    val weekRuleLabels = mapOf(
+        WeekRule.ALL to labelAll,
+        WeekRule.ODD to labelOdd,
+        WeekRule.EVEN to labelEven,
+        WeekRule.CUSTOM to labelCustom,
+    )
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("周次规则", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.label_week_rule), style = MaterialTheme.typography.titleSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             val leftOptions = listOf(WeekRule.ALL, WeekRule.ODD)
             leftOptions.forEach { option ->
@@ -291,7 +345,7 @@ private fun WeekRuleSelector(
                     modifier = Modifier.weight(1f),
                     onClick = { onSelected(option) },
                 ) {
-                    Text(weekRuleLabel(option) + if (option == selected) " ✓" else "")
+                    Text(weekRuleLabels[option] + if (option == selected) " ✓" else "")
                 }
             }
         }
@@ -302,29 +356,23 @@ private fun WeekRuleSelector(
                     modifier = Modifier.weight(1f),
                     onClick = { onSelected(option) },
                 ) {
-                    Text(weekRuleLabel(option) + if (option == selected) " ✓" else "")
+                    Text(weekRuleLabels[option] + if (option == selected) " ✓" else "")
                 }
             }
         }
     }
 }
 
-private fun weekRuleLabel(rule: WeekRule): String {
-    return when (rule) {
-        WeekRule.ALL -> "每周"
-        WeekRule.ODD -> "单周"
-        WeekRule.EVEN -> "双周"
-        WeekRule.CUSTOM -> "自定义"
-    }
-}
-
-private fun normalizeWeekListText(raw: String): String {
-    return raw
-        .trim()
-        .replace('，', ',')
-        .replace(" ", "")
-}
-
+/**
+ * 时间范围输入字段。
+ *
+ * 用于输入开始时间和结束时间的字段。
+ *
+ * @param startTime 开始时间
+ * @param endTime 结束时间
+ * @param onStartChanged 开始时间变更的回调
+ * @param onEndChanged 结束时间变更的回调
+ */
 @Composable
 fun TimeRangeFields(
     startTime: String,
@@ -336,7 +384,7 @@ fun TimeRangeFields(
         AppTextField(
             value = startTime,
             onValueChange = onStartChanged,
-            label = "开始时间",
+            label = stringResource(R.string.label_start_time),
             placeholder = "08:00",
             keyboardType = KeyboardType.Text,
             singleLine = true,
@@ -345,7 +393,7 @@ fun TimeRangeFields(
         AppTextField(
             value = endTime,
             onValueChange = onEndChanged,
-            label = "结束时间",
+            label = stringResource(R.string.label_end_time),
             placeholder = "09:30",
             keyboardType = KeyboardType.Text,
             singleLine = true,
@@ -354,6 +402,20 @@ fun TimeRangeFields(
     }
 }
 
+/**
+ * 应用文本字段。
+ *
+ * 通用的文本输入字段，用于各种表单输入。
+ *
+ * @param value 输入值
+ * @param onValueChange 值变更的回调
+ * @param label 字段标签
+ * @param modifier 修饰符
+ * @param singleLine 是否单行
+ * @param minLines 最小行数
+ * @param placeholder 占位符
+ * @param keyboardType 键盘类型
+ */
 @Composable
 fun AppTextField(
     value: String,
@@ -377,6 +439,17 @@ fun AppTextField(
     )
 }
 
+/**
+ * 周时段编辑器对话框。
+ *
+ * 用于编辑周时段的开始和结束时间。
+ *
+ * @param title 对话框标题
+ * @param initial 初始周时段
+ * @param onDismiss 关闭对话框的回调
+ * @param onSave 保存周时段的回调
+ * @param onDelete 删除周时段的回调
+ */
 @Composable
 fun WeekSlotEditorDialog(
     title: String,
@@ -388,6 +461,9 @@ fun WeekSlotEditorDialog(
     var startTime by rememberSaveable(title) { mutableStateOf(formatMinutes(initial.startMinutes)) }
     var endTime by rememberSaveable(title) { mutableStateOf(formatMinutes(initial.endMinutes)) }
     var errorText by remember { mutableStateOf<String?>(null) }
+
+    val strInvalidTime = stringResource(R.string.error_invalid_time)
+    val strInvalidTimeRange = stringResource(R.string.error_invalid_time_range)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -417,30 +493,39 @@ fun WeekSlotEditorDialog(
                     val parsedStart = parseMinutes(startTime)
                     val parsedEnd = parseMinutes(endTime)
                     when {
-                        parsedStart == null || parsedEnd == null -> errorText = "请输入合法时间，例如 08:00"
-                        parsedStart >= parsedEnd -> errorText = "结束时间需要晚于开始时间"
+                        parsedStart == null || parsedEnd == null -> errorText = strInvalidTime
+                        parsedStart >= parsedEnd -> errorText = strInvalidTimeRange
                         else -> onSave(WeekTimeSlot(parsedStart, parsedEnd))
                     }
                 },
             ) {
-                Text("保存")
+                Text(stringResource(R.string.action_save))
             }
         },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 onDelete?.let {
                     OutlinedButton(onClick = it) {
-                        Text("删除")
+                        Text(stringResource(R.string.action_delete))
                     }
                 }
                 OutlinedButton(onClick = onDismiss) {
-                    Text("取消")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         },
     )
 }
 
+/**
+ * 周时段数量对话框。
+ *
+ * 用于设置自定义周时段数量。
+ *
+ * @param initialCount 初始时段数量
+ * @param onDismiss 关闭对话框的回调
+ * @param onSave 保存时段数量的回调
+ */
 @Composable
 fun WeekSlotCountDialog(
     initialCount: Int,
@@ -450,9 +535,12 @@ fun WeekSlotCountDialog(
     var countText by rememberSaveable(initialCount) { mutableStateOf(initialCount.toString()) }
     var errorText by remember { mutableStateOf<String?>(null) }
 
+    val strInvalidNumber = stringResource(R.string.error_invalid_number)
+    val strSlotRange = stringResource(R.string.error_slot_range)
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("自定义节数") },
+        title = { Text(stringResource(R.string.title_custom_slot_count)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 AppTextField(
@@ -461,13 +549,13 @@ fun WeekSlotCountDialog(
                         countText = it
                         errorText = null
                     },
-                    label = "总节数",
+                    label = stringResource(R.string.label_total_slots),
                     placeholder = "20",
                     keyboardType = KeyboardType.Number,
                     singleLine = true,
                 )
                 Text(
-                    text = "会保留前面的节次时间，多出来的节次自动补在后面，减少时从末尾裁剪。",
+                    text = stringResource(R.string.hint_slot_resize),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -481,23 +569,33 @@ fun WeekSlotCountDialog(
                 onClick = {
                     val parsed = countText.toIntOrNull()
                     when {
-                        parsed == null -> errorText = "请输入数字"
-                        parsed !in 1..20 -> errorText = "节数范围为 1 到 20"
+                        parsed == null -> errorText = strInvalidNumber
+                        parsed !in 1..20 -> errorText = strSlotRange
                         else -> onSave(parsed)
                     }
                 },
             ) {
-                Text("保存")
+                Text(stringResource(R.string.action_save))
             }
         },
         dismissButton = {
             OutlinedButton(onClick = onDismiss) {
-                Text("取消")
+                Text(stringResource(R.string.action_cancel))
             }
         },
     )
 }
 
+/**
+ * 固定周时间表对话框。
+ *
+ * 用于设置固定的周时间表，包括第一节课开始时间、课程时长、课间休息时长等。
+ *
+ * @param initialConfig 初始配置
+ * @param initialSlots 初始时段列表
+ * @param onDismiss 关闭对话框的回调
+ * @param onSave 保存时段列表的回调
+ */
 @Composable
 fun FixedWeekScheduleDialog(
     initialConfig: FixedWeekScheduleConfig,
@@ -527,9 +625,14 @@ fun FixedWeekScheduleDialog(
     }
     var errorText by remember { mutableStateOf<String?>(null) }
 
+    val strInvalidFixedParams = stringResource(R.string.error_invalid_fixed_params)
+    val strIncompleteSlots = stringResource(R.string.error_incomplete_slots)
+    val strSlotEndBeforeStart = stringResource(R.string.error_slot_end_before_start)
+    val strSlotsCrossing = stringResource(R.string.error_slots_crossing)
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("固定上课时间") },
+        title = { Text(stringResource(R.string.title_fixed_schedule)) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -541,7 +644,7 @@ fun FixedWeekScheduleDialog(
                         firstStartTime = it
                         errorText = null
                     },
-                    label = "首节开始时间",
+                    label = stringResource(R.string.label_first_start),
                     placeholder = "08:00",
                     singleLine = true,
                 )
@@ -552,7 +655,7 @@ fun FixedWeekScheduleDialog(
                             lessonDurationText = it
                             errorText = null
                         },
-                        label = "单节时长(分钟)",
+                        label = stringResource(R.string.label_lesson_duration),
                         keyboardType = KeyboardType.Number,
                         singleLine = true,
                         modifier = Modifier.weight(1f),
@@ -563,7 +666,7 @@ fun FixedWeekScheduleDialog(
                             breakDurationText = it
                             errorText = null
                         },
-                        label = "节间休息(分钟)",
+                        label = stringResource(R.string.label_break_duration),
                         keyboardType = KeyboardType.Number,
                         singleLine = true,
                         modifier = Modifier.weight(1f),
@@ -575,12 +678,12 @@ fun FixedWeekScheduleDialog(
                         slotCountText = it
                         errorText = null
                     },
-                    label = "生成节数",
+                    label = stringResource(R.string.label_generate_slots),
                     keyboardType = KeyboardType.Number,
                     singleLine = true,
                 )
                 Text(
-                    text = "先用固定规则快速生成节次，再在下面逐节微调。每一节之间可以留空档，不要求连续。",
+                    text = stringResource(R.string.hint_fixed_schedule),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -594,17 +697,17 @@ fun FixedWeekScheduleDialog(
                                 slotCountText = slotCountText,
                             )
                             if (generatedSlots == null) {
-                                errorText = "请先输入合法的固定时间参数"
+                                errorText = strInvalidFixedParams
                             } else {
                                 slotDrafts = generatedSlots.map { EditableWeekSlotDraft.fromSlot(it) }
                                 errorText = null
                             }
                         },
                     ) {
-                        Text("按固定规则生成")
+                        Text(stringResource(R.string.action_generate_by_rule))
                     }
                     Text(
-                        text = "当前 ${slotDrafts.size} 节",
+                        text = stringResource(R.string.label_current_slot_count, slotDrafts.size),
                         modifier = Modifier.padding(top = 10.dp),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -640,24 +743,34 @@ fun FixedWeekScheduleDialog(
                 onClick = {
                     val parsedSlots = slotDrafts.toWeekTimeSlots()
                     when {
-                        parsedSlots == null -> errorText = "请先把每一节的开始和结束时间填写完整，例如 08:00"
-                        parsedSlots.any { it.startMinutes >= it.endMinutes } -> errorText = "每一节都需要满足结束时间晚于开始时间"
-                        !areWeekTimeSlotsNonOverlapping(parsedSlots) -> errorText = "节次时间不能交叉，后面的节次可以留空档，但不能早于上一节结束"
+                        parsedSlots == null -> errorText = strIncompleteSlots
+                        parsedSlots.any { it.startMinutes >= it.endMinutes } -> errorText = strSlotEndBeforeStart
+                        !areWeekTimeSlotsNonOverlapping(parsedSlots) -> errorText = strSlotsCrossing
                         else -> onSave(parsedSlots)
                     }
                 },
             ) {
-                Text("应用")
+                Text(stringResource(R.string.action_apply))
             }
         },
         dismissButton = {
             OutlinedButton(onClick = onDismiss) {
-                Text("取消")
+                Text(stringResource(R.string.action_cancel))
             }
         },
     )
 }
 
+/**
+ * 周时段草稿编辑器。
+ *
+ * 用于编辑周时段草稿的开始和结束时间。
+ *
+ * @param index 时段索引
+ * @param draft 时段草稿
+ * @param onStartChanged 开始时间变更的回调
+ * @param onEndChanged 结束时间变更的回调
+ */
 @Composable
 private fun WeekSlotDraftEditor(
     index: Int,
@@ -667,7 +780,7 @@ private fun WeekSlotDraftEditor(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            text = "第${index + 1}节",
+            text = stringResource(R.string.label_slot_N, index + 1),
             style = MaterialTheme.typography.titleSmall,
         )
         TimeRangeFields(
@@ -679,11 +792,25 @@ private fun WeekSlotDraftEditor(
     }
 }
 
+/**
+ * 可编辑的周时段草稿。
+ *
+ * 用于在对话框中编辑周时段的开始和结束时间。
+ *
+ * @property startTime 开始时间
+ * @property endTime 结束时间
+ */
 private data class EditableWeekSlotDraft(
     val startTime: String,
     val endTime: String,
 ) {
     companion object {
+        /**
+         * 从周时段创建草稿。
+         *
+         * @param slot 周时段
+         * @return 可编辑的周时段草稿
+         */
         fun fromSlot(slot: WeekTimeSlot): EditableWeekSlotDraft {
             return EditableWeekSlotDraft(
                 startTime = formatMinutes(slot.startMinutes),
@@ -693,6 +820,11 @@ private data class EditableWeekSlotDraft(
     }
 }
 
+/**
+ * 将可编辑周时段草稿列表转换为周时段列表。
+ *
+ * @return 周时段列表，或 null 如果转换失败
+ */
 private fun List<EditableWeekSlotDraft>.toWeekTimeSlots(): List<WeekTimeSlot>? {
     val parsed = mutableListOf<WeekTimeSlot>()
     forEach { draft ->
@@ -706,6 +838,17 @@ private fun List<EditableWeekSlotDraft>.toWeekTimeSlots(): List<WeekTimeSlot>? {
     return parsed
 }
 
+/**
+ * 生成周时段列表。
+ *
+ * 根据给定的参数生成周时段列表。
+ *
+ * @param firstStartTime 第一节课开始时间
+ * @param lessonDurationText 课程时长（分钟）
+ * @param breakDurationText 课间休息时长（分钟）
+ * @param slotCountText 时段数量
+ * @return 周时段列表，或 null 如果参数无效
+ */
 private fun buildGeneratedWeekSlots(
     firstStartTime: String,
     lessonDurationText: String,

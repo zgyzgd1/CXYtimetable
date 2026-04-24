@@ -42,9 +42,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.timetable.R
 import com.example.timetable.data.TimetableEntry
 import com.example.timetable.data.dayLabel
 import com.example.timetable.data.formatMinutes
@@ -81,6 +83,7 @@ fun EntryCard(
     modifier: Modifier = Modifier,
 ) {
     val accent = remember(entry.title) { accentColorFor(entry.title) }
+    val unnamedCourse = stringResource(R.string.label_unnamed_course)
 
     Card(
         modifier = modifier
@@ -122,7 +125,7 @@ fun EntryCard(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Text(
-                        text = entry.title.ifBlank { "未命名课程" },
+                        text = entry.title.ifBlank { unnamedCourse },
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -225,7 +228,7 @@ fun EntryCard(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Edit,
-                            contentDescription = "编辑",
+                            contentDescription = stringResource(R.string.card_edit),
                             modifier = Modifier.size(18.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -239,7 +242,7 @@ fun EntryCard(
                     ) {
                         Icon(
                             imageVector = Icons.Default.ContentCopy,
-                            contentDescription = "复制",
+                            contentDescription = stringResource(R.string.card_copy),
                             modifier = Modifier.size(18.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -253,7 +256,7 @@ fun EntryCard(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Delete,
-                            contentDescription = "删除",
+                            contentDescription = stringResource(R.string.card_delete_content_desc),
                             modifier = Modifier.size(18.dp),
                             tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
                         )
@@ -289,7 +292,7 @@ fun NextCourseCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "下一节课",
+                    text = stringResource(R.string.card_next_course),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -356,7 +359,7 @@ fun NextCourseCard(
                 onClick = onViewDay,
                 shape = RoundedCornerShape(12.dp),
             ) {
-                Text("查看当天课表")
+                Text(stringResource(R.string.card_view_day_schedule))
             }
         }
     }
@@ -386,12 +389,12 @@ fun EmptyStateCard(onAdd: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    text = "今天暂无课程",
+                    text = stringResource(R.string.card_empty_title),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "切换日期查看，或点击下方按钮添加课程",
+                    text = stringResource(R.string.card_empty_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -406,7 +409,7 @@ fun EmptyStateCard(onAdd: () -> Unit) {
                     modifier = Modifier.size(16.dp),
                 )
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("添加课程")
+                Text(stringResource(R.string.card_add_course))
             }
         }
     }

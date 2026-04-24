@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import com.example.timetable.R
 import androidx.activity.result.ActivityResultLauncher
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -88,12 +89,12 @@ internal fun DayScheduleList(
                         ),
                     )
                 },
-                onExport = { exportLauncher.launch("课表导出.ics") },
+                onExport = { exportLauncher.launch(context.getString(R.string.export_filename)) },
                 onEnableNotifications = {
                     when {
                         Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU -> {
                             scope.launch {
-                                snackbarHostState.showSnackbar(context.getString(com.example.timetable.R.string.msg_notifications_enabled).replace("已开启通知提醒", "当前系统版本无需额外通知授权"))
+                                snackbarHostState.showSnackbar(context.getString(R.string.msg_notifications_not_required))
                             }
                         }
                         CourseReminderScheduler.notificationsEnabled(context) ||
@@ -114,7 +115,7 @@ internal fun DayScheduleList(
                     val intent = CourseReminderScheduler.buildExactAlarmSettingsIntent(context)
                     if (intent == null) {
                         scope.launch {
-                            snackbarHostState.showSnackbar("当前系统版本无需额外精确提醒授权")
+                            snackbarHostState.showSnackbar(context.getString(R.string.msg_exact_alarm_not_required))
                         }
                     } else {
                         exactAlarmSettingsLauncher.launch(intent)
@@ -129,21 +130,23 @@ internal fun DayScheduleList(
                 onUseBundledBackground = {
                     AppearanceStore.setBackgroundMode(context, AppBackgroundMode.BUNDLED_IMAGE)
                     onBackgroundAppearanceChange(AppearanceStore.getBackgroundAppearance(context))
-                    scope.launch { snackbarHostState.showSnackbar("已切换到默认背景") }
+                    scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.msg_switched_default_background)) }
                 },
                 onUseGradientBackground = {
                     AppearanceStore.setBackgroundMode(context, AppBackgroundMode.GRADIENT)
                     onBackgroundAppearanceChange(AppearanceStore.getBackgroundAppearance(context))
-                    scope.launch { snackbarHostState.showSnackbar("已关闭图片背景") }
+                    scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.msg_disabled_image_background)) }
                 },
                 onAdjustCustomBackground = onAdjustCustomBackground,
                 onClearCustomBackground = {
-                    BackgroundImageManager.clearCustomBackground(context)
-                    if (backgroundAppearance.mode == AppBackgroundMode.CUSTOM_IMAGE) {
-                        AppearanceStore.setBackgroundMode(context, AppBackgroundMode.BUNDLED_IMAGE)
+                    scope.launch {
+                        BackgroundImageManager.clearCustomBackground(context)
+                        if (backgroundAppearance.mode == AppBackgroundMode.CUSTOM_IMAGE) {
+                            AppearanceStore.setBackgroundMode(context, AppBackgroundMode.BUNDLED_IMAGE)
+                        }
+                        onBackgroundAppearanceChange(AppearanceStore.getBackgroundAppearance(context))
+                        snackbarHostState.showSnackbar(context.getString(R.string.msg_cleared_custom_background))
                     }
-                    onBackgroundAppearanceChange(AppearanceStore.getBackgroundAppearance(context))
-                    scope.launch { snackbarHostState.showSnackbar("已清除自定义背景") }
                 },
                 weekCardAlpha = weekCardAlpha,
                 onWeekCardAlphaChange = onWeekCardAlphaChange,
@@ -154,7 +157,7 @@ internal fun DayScheduleList(
         nextCourseSnapshot?.let { upcoming ->
             item {
                 NextCourseCard(
-                    state = upcoming.toCardState(),
+                    state = upcoming.toCardState(unnamedLabel = context.getString(R.string.label_unnamed_course)),
                     onViewDay = { onDateChanged(upcoming.occurrenceDate.toString()) },
                 )
             }

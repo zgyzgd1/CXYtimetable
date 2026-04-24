@@ -10,6 +10,8 @@ import java.io.FileOutputStream
 import java.io.IOException
 import kotlin.math.max
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 object BackgroundImageManager {
     private const val DIRECTORY_NAME = "appearance"
@@ -24,11 +26,11 @@ object BackgroundImageManager {
     fun hasCustomBackground(context: Context): Boolean = customBackgroundFile(context).isFile
 
     @Throws(IOException::class)
-    fun saveCustomBackground(
+    suspend fun saveCustomBackground(
         context: Context,
         contentResolver: ContentResolver,
         uri: Uri,
-    ) {
+    ) = withContext(Dispatchers.IO) {
         val bitmap = decodeScaledBitmap(contentResolver, uri)
             ?: throw IOException("Unable to decode selected image.")
         val targetFile = customBackgroundFile(context)
@@ -47,7 +49,7 @@ object BackgroundImageManager {
         AppearanceStore.setCustomBackground(context)
     }
 
-    fun clearCustomBackground(context: Context) {
+    suspend fun clearCustomBackground(context: Context) = withContext(Dispatchers.IO) {
         customBackgroundFile(context).delete()
     }
 

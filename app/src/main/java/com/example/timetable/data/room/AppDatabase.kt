@@ -9,22 +9,22 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.timetable.data.TimetableEntry
 
 /**
- * Room 数据库定义。
+ * Room database definition.
  *
- * ## 版本演进策略
+ * ## Version Evolution Strategy
  *
- * 1. **每次新增或修改字段时**，必须递增 [version]，并在 [Companion] 中
- *    添加对应的 `MIGRATION_N_M` 对象。
+ * 1. **When adding or modifying columns**, always increment [version] and add a
+ *    corresponding `MIGRATION_N_M` object in [Companion].
  *
- * 2. **禁止使用 `fallbackToDestructiveMigration()`**，
- *    否则版本升级会静默清空用户数据。
+ * 2. **Never use `fallbackToDestructiveMigration()`**,
+ *    otherwise version upgrades will silently wipe user data.
  *
- * 3. **已开启 `exportSchema = true`**，每次编译时 Room 会将当前
- *    schema 导出到 `app/schemas/` 目录，便于：
- *    - 版本对比和 code review
- *    - 后续可接入 `MigrationTestHelper` 做自动化迁移测试
+ * 3. **Schema export is enabled** (`exportSchema = true`); Room exports the current
+ *    schema to `app/schemas/` on each compile, enabling:
+ *    - Version comparison and code review
+ *    - Future integration with `MigrationTestHelper` for automated migration testing
  *
- * 4. **新增 Migration 模板**：
+ * 4. **New Migration template**:
  *    ```kotlin
  *    private val MIGRATION_2_3 = object : Migration(2, 3) {
  *        override fun migrate(db: SupportSQLiteDatabase) {
@@ -32,9 +32,9 @@ import com.example.timetable.data.TimetableEntry
  *        }
  *    }
  *    ```
- *    然后在 `getDatabase()` 中添加 `.addMigrations(MIGRATION_1_2, MIGRATION_2_3)`。
+ *    Then add `.addMigrations(MIGRATION_1_2, MIGRATION_2_3)` in `getDatabase()`.
  */
-@Database(entities = [TimetableEntry::class], version = 2, exportSchema = true)
+@Database(entities = [TimetableEntry::class], version = 3, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun timetableDao(): TimetableDao
 
@@ -49,7 +49,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "timetable_database"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                 INSTANCE = instance
                 instance
@@ -57,8 +57,8 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
-         * v1 → v2: 新增周循环课程字段。
-         * 添加于 2026-04，随 Room 迁移引入。
+         * v1 -> v2: Added weekly recurrence fields.
+         * Introduced April 2026 with Room migration.
          */
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -67,6 +67,18 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE timetable_entries ADD COLUMN weekRule TEXT NOT NULL DEFAULT 'ALL'")
                 db.execSQL("ALTER TABLE timetable_entries ADD COLUMN customWeekList TEXT NOT NULL DEFAULT ''")
                 db.execSQL("ALTER TABLE timetable_entries ADD COLUMN skipWeekList TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        /**
+         * v2 -> v3: Added query indexes.
+         * Adds composite index on date+startMinutes and single-field index on dayOfWeek
+         * to optimize high-frequency queries such as `ORDER BY date ASC, startMinutes ASC`.
+         */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_timetable_entries_date_startMinutes ON timetable_entries(date, startMinutes)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_timetable_entries_dayOfWeek ON timetable_entries(dayOfWeek)")
             }
         }
     }
