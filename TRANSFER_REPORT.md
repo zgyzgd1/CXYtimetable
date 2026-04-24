@@ -3,17 +3,16 @@
 ## 1. 当前发布状态
 - 主仓库：`https://github.com/zgyzgd1/CXYtimetable`
 - 归档仓库：`https://github.com/zgyzgd1/apk-`
-- 当前最新发布：`v1.24`
+- 当前最新发布：`v1.25`
 - 当前版本号：
-  - `APP_VERSION_NAME=1.24`
-  - `APP_VERSION_CODE=25`
-- 本轮 APK 名称：`Timetable-v1.24.apk`
-- 本轮 Release 地址：`https://github.com/zgyzgd1/CXYtimetable/releases/tag/v1.24`
-- 本轮归档路径：`apk-archive-repo/releases/Timetable-v1.24.apk`
-- 本轮 APK SHA256：`4E749BAA4D94A9A0FD06896B4A08F158254381B789269897B025176E8656C2B8`
-- 当前主仓库最新已推送提交：`82a4044` `Finalize transfer report after v1.24 release`
-- 当前主仓库本地待推送提交：`4c06ef0` `Update handoff task list`；`Centralize timetable conflict checks`
-- 当前归档仓库最新提交：`cc0d0e3` `Archive timetable v1.24 APK`
+  - `APP_VERSION_NAME=1.25`
+  - `APP_VERSION_CODE=26`
+- 本轮 APK 名称：`Timetable-v1.25.apk`
+- 本轮 Release 地址：`https://github.com/zgyzgd1/CXYtimetable/releases/tag/v1.25`
+- 本轮归档路径：`apk-archive-repo/releases/Timetable-v1.25.apk`
+- 本轮 APK SHA256：`C01356D6D857B5B3410CBAAFFDAA845E6F817F94124CF236FBCAE745BA02DF35`
+- 当前主仓库最新发布提交：`78c2fa1` `Release v1.25`
+- 当前归档仓库最新提交：`782af90` `Archive timetable v1.25 APK`
 
 说明：本文件依据 `OPTIMIZATION_PLAN.md` 的阶段计划重写；`UI_OPTIMIZATION_PLAN.md` 不纳入本轮交接范围。
 
@@ -72,9 +71,9 @@
 
 本轮已交付：
 - 主仓库 `main` 已推送到 GitHub。
-- `v1.24` tag 已创建并推送。
-- `Timetable-v1.24.apk` 已上传到 GitHub Release。
-- `Timetable-v1.24.apk` 已复制到归档仓库并推送归档仓库。
+- `v1.25` tag 已创建并推送。
+- `Timetable-v1.25.apk` 已上传到 GitHub Release。
+- `Timetable-v1.25.apk` 已复制到归档仓库并推送归档仓库。
 
 ## 4. 本轮提交范围
 主仓库本轮相对 `v1.23` 的主要提交：
@@ -85,11 +84,13 @@
 - `67b45e0` `Release v1.24`
 - `82a4044` `Finalize transfer report after v1.24 release`
 - `4c06ef0` `Update handoff task list`
-- 本轮继续提交 `Centralize timetable conflict checks`：冲突检测规则下沉到 data 层，`ScheduleViewModel` 改为复用统一入口
+- `a1c75f7` `Centralize timetable conflict checks`
+- `78c2fa1` `Release v1.25`
 
 归档仓库本轮提交：
 - `f908efb` `Archive timetable v1.20-v1.23 APKs`
 - `cc0d0e3` `Archive timetable v1.24 APK`
+- `782af90` `Archive timetable v1.25 APK`
 
 ## 5. 关键验证
 已完成的验证和发布操作：
@@ -99,9 +100,9 @@
 - `.\gradlew.bat --offline --no-daemon testDebugUnitTest`
 - `.\gradlew.bat --offline --no-daemon assembleRelease`
 - `git diff --check`
-- `scripts/push-github.ps1 -Version 1.24` 发布流：提交、推送、打 tag、上传 Release APK、同步归档仓库
-- GitHub API 核对：`v1.24` Release 存在，资产 `Timetable-v1.24.apk` 大小为 `18052792` bytes
-- 本地 release-assets 与归档仓库 APK 的 SHA256 一致：`4E749BAA4D94A9A0FD06896B4A08F158254381B789269897B025176E8656C2B8`
+- `scripts/publish-release.ps1 -Version 1.25` 发布流：测试、构建、提交、推送、打 tag、上传 Release APK
+- GitHub API 核对：`v1.25` Release 存在，资产 `Timetable-v1.25.apk` 大小为 `18052792` bytes
+- 本地 release-assets 与归档仓库 APK 的 SHA256 一致：`C01356D6D857B5B3410CBAAFFDAA845E6F817F94124CF236FBCAE745BA02DF35`
 - `.\gradlew.bat --offline --no-daemon testDebugUnitTest --tests com.example.timetable.data.TimetableConflictsTest --rerun-tasks`
 - `.\gradlew.bat --offline --no-daemon :app:compileDebugKotlin --rerun-tasks`
 - `.\gradlew.bat --offline --no-daemon testDebugUnitTest`
@@ -149,5 +150,5 @@ P2 / 可维护性：
 
 ## 8. 交接结论
 - 本轮不是 UI 计划执行轮，未处理 `UI_OPTIMIZATION_PLAN.md`。
-- `v1.24` 的重点是 v1.23 后的提醒稳定性补审、结构化签名、启动同步顺序修复和发布归档链路闭环，当前已完成推送、Release 上传和归档。
+- `v1.25` 的重点是 v1.24 后的交接任务清单补齐、冲突检测统一入口下沉到 data 层，以及发布归档链路闭环，当前已完成推送、Release 上传和归档。
 - 下一位接手者优先看第 6 节任务清单：先做提醒兜底和数据库迁移策略，再推进导入冲突确认、最近提醒候选扫描和学期配置入口。
