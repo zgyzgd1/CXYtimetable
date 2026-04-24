@@ -4,4 +4,23 @@
     <string name="widget_next_course_label">下一节课</string>
     <string name="widget_today_schedule_title">今日课表</string>
     <string name="widget_next_course_title">下一节课</string>
+    <string name="action_save">保存</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_delete">删除</string>
+    <string name="action_confirm_delete">确认删除</string>
+    <string name="action_add_course">新增课程</string>
+    <string name="action_fixed_time">固定时间</string>
+    <string name="action_back_to_today">回到今天</string>
+    <string name="title_my_schedule">我的课表</string>
+    <string name="title_settings">设置</string>
+    <string name="error_empty_course_name">请输入课程名称</string>
+    <string name="error_invalid_time_range">结束时间需要晚于开始时间</string>
+    <string name="msg_notifications_enabled">已开启通知提醒</string>
+    <string name="msg_notifications_disabled_warning">未授予通知权限，可能无法收到提醒</string>
+    <string name="msg_exact_alarm_enabled">已开启精确提醒</string>
+    <string name="msg_exact_alarm_disabled_warning">未开启精确提醒，系统可能延后提醒</string>
+    <string name="msg_export_success">已导出日历文件</string>
+    <string name="msg_export_failed">导出失败：%s</string>
+    <string name="msg_background_updated">已更新背景图片</string>
+    <string name="msg_background_failed">背景图片设置失败：%s</string>
 </resources>

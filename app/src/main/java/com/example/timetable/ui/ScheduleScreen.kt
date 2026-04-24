@@ -57,7 +57,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import com.example.timetable.R
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -179,7 +181,7 @@ fun ScheduleApp(
     ) { granted ->
         scope.launch {
             snackbarHostState.showSnackbar(
-                if (granted) "已开启通知提醒" else "未授予通知权限，可能无法收到提醒",
+                if (granted) context.getString(R.string.msg_notifications_enabled) else context.getString(R.string.msg_notifications_disabled_warning),
             )
         }
     }
@@ -191,9 +193,9 @@ fun ScheduleApp(
         scope.launch {
             if (enabled) {
                 viewModel.resyncReminderSchedule()
-                snackbarHostState.showSnackbar("已开启精确提醒")
+                snackbarHostState.showSnackbar(context.getString(R.string.msg_exact_alarm_enabled))
             } else if (result.resultCode == Activity.RESULT_CANCELED) {
-                snackbarHostState.showSnackbar("未开启精确提醒，系统可能延后提醒")
+                snackbarHostState.showSnackbar(context.getString(R.string.msg_exact_alarm_disabled_warning))
             } else {
                 snackbarHostState.showSnackbar("精确提醒仍未开启，系统可能延后提醒")
             }
@@ -222,9 +224,9 @@ fun ScheduleApp(
                     context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { writer ->
                         writer.write(text)
                     }
-                    snackbarHostState.showSnackbar("已导出日历文件")
+                    snackbarHostState.showSnackbar(context.getString(R.string.msg_export_success))
                 } catch (error: Exception) {
-                    snackbarHostState.showSnackbar("导出失败：${error.message ?: "未知错误"}")
+                    snackbarHostState.showSnackbar(context.getString(R.string.msg_export_failed, error.message ?: "未知错误"))
                 }
             }
         }
@@ -241,10 +243,10 @@ fun ScheduleApp(
                     }
                     backgroundAppearance = AppearanceStore.getBackgroundAppearance(context)
                     showBackgroundAdjustDialog = true
-                    snackbarHostState.showSnackbar("已更新背景图片")
+                    snackbarHostState.showSnackbar(context.getString(R.string.msg_background_updated))
                 } catch (error: Exception) {
                     snackbarHostState.showSnackbar(
-                        "背景图片设置失败：${error.message ?: "未知错误"}",
+                        context.getString(R.string.msg_background_failed, error.message ?: "未知错误"),
                     )
                 }
             }
@@ -282,7 +284,7 @@ fun ScheduleApp(
                         LargeTopAppBar(
                             title = {
                                 Text(
-                                    text = if (currentDestination == AppDestination.DAY) "我的课表" else "设置",
+                                    text = if (currentDestination == AppDestination.DAY) stringResource(R.string.title_my_schedule) else stringResource(R.string.title_settings),
                                     style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                                 )
                             },
@@ -312,7 +314,7 @@ fun ScheduleApp(
                             )
                         },
                     ) {
-                        Icon(imageVector = Icons.Default.Add, contentDescription = "新增课程")
+                        Icon(imageVector = Icons.Default.Add, contentDescription = stringResource(R.string.action_add_course))
                     }
                 }
             },
@@ -345,11 +347,11 @@ fun ScheduleApp(
                         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                     ) {
                         OutlinedButton(onClick = { editingFixedWeekSchedule = true }) {
-                            Text("固定时间")
+                            Text(stringResource(R.string.action_fixed_time))
                         }
                         if (selectedLocalDate != today) {
                             OutlinedButton(onClick = { selectedDate = today.toString() }) {
-                                Text("回到今天")
+                                Text(stringResource(R.string.action_back_to_today))
                             }
                         }
                     }
@@ -430,151 +432,56 @@ fun ScheduleApp(
                         }
                         .padding(padding),
                 ) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
-                        state = listState,
-                    ) {
-                        item {
-                            HeroSection(
-                                courseCount = entries.size,
-                                onImport = {
-                                    importLauncher.launch(
-                                        arrayOf(
-                                            "text/calendar",
-                                            "text/plain",
-                                            "application/ics",
-                                            "application/x-ical",
-                                            "application/octet-stream",
-                                            "*/*",
-                                        ),
-                                    )
-                                },
-                                onExport = { exportLauncher.launch("课表导出.ics") },
-                                onEnableNotifications = {
-                                    when {
-                                        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU -> {
-                                            scope.launch {
-                                                snackbarHostState.showSnackbar("当前系统版本无需额外通知授权")
-                                            }
-                                        }
-                                        CourseReminderScheduler.notificationsEnabled(context) ||
-                                            ContextCompat.checkSelfPermission(
-                                                context,
-                                                Manifest.permission.POST_NOTIFICATIONS,
-                                            ) == PackageManager.PERMISSION_GRANTED -> {
-                                            scope.launch {
-                                                snackbarHostState.showSnackbar("通知权限已开启")
-                                            }
-                                        }
-                                        else -> notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                    }
-                                },
-                                exactAlarmPermissionRequired = CourseReminderScheduler.exactAlarmPermissionRequired(),
-                                exactAlarmEnabled = exactAlarmEnabled,
-                                onOpenExactAlarmSettings = {
-                                    val intent = CourseReminderScheduler.buildExactAlarmSettingsIntent(context)
-                                    if (intent == null) {
-                                        scope.launch {
-                                            snackbarHostState.showSnackbar("当前系统版本无需额外精确提醒授权")
-                                        }
-                                    } else {
-                                        exactAlarmSettingsLauncher.launch(intent)
-                                    }
-                                },
-                                reminderMinutes = reminderMinutes,
-                                reminderOptions = reminderOptions,
-                                onReminderMinutesChange = { minutes ->
-                                    reminderMinutes = minutes
-                                    viewModel.updateReminderMinutes(minutes)
-                                },
-                                backgroundMode = backgroundAppearance.mode,
-                                hasCustomBackground = BackgroundImageManager.hasCustomBackground(context),
-                                onSelectBackgroundImage = {
-                                    backgroundImageLauncher.launch("image/*")
-                                },
-                                onUseBundledBackground = {
-                                    AppearanceStore.setBackgroundMode(context, AppBackgroundMode.BUNDLED_IMAGE)
-                                    backgroundAppearance = AppearanceStore.getBackgroundAppearance(context)
-                                    scope.launch { snackbarHostState.showSnackbar("已切换到默认背景") }
-                                },
-                                onUseGradientBackground = {
-                                    AppearanceStore.setBackgroundMode(context, AppBackgroundMode.GRADIENT)
-                                    backgroundAppearance = AppearanceStore.getBackgroundAppearance(context)
-                                    scope.launch { snackbarHostState.showSnackbar("已关闭图片背景") }
-                                },
-                                onAdjustCustomBackground = {
-                                    showBackgroundAdjustDialog = true
-                                },
-                                onClearCustomBackground = {
-                                    BackgroundImageManager.clearCustomBackground(context)
-                                    if (backgroundAppearance.mode == AppBackgroundMode.CUSTOM_IMAGE) {
-                                        AppearanceStore.setBackgroundMode(context, AppBackgroundMode.BUNDLED_IMAGE)
-                                    }
-                                    backgroundAppearance = AppearanceStore.getBackgroundAppearance(context)
-                                    scope.launch { snackbarHostState.showSnackbar("已清除自定义背景") }
-                                },
-                                weekCardAlpha = weekCardAlpha,
-                                onWeekCardAlphaChange = { alpha ->
-                                    weekCardAlpha = alpha
-                                    AppearanceStore.setWeekCardAlpha(context, alpha)
-                                },
-                                weekCardHue = weekCardHue,
-                                onWeekCardHueChange = { hue ->
-                                    weekCardHue = hue
-                                    AppearanceStore.setWeekCardHue(context, hue)
-                                },
-                            )
-                        }
-                        nextCourseSnapshot?.let { upcoming ->
-                            item {
-                                NextCourseCard(
-                                    state = upcoming.toCardState(),
-                                    onViewDay = { selectedDate = upcoming.occurrenceDate.toString() },
-                                )
+                    DayScheduleList(
+                        context = context,
+                        scope = scope,
+                        listState = listState,
+                        snackbarHostState = snackbarHostState,
+                        entries = entries,
+                        selectedDate = selectedDate,
+                        selectedLocalDate = selectedLocalDate,
+                        filteredEntries = filteredEntries,
+                        selectedDayEntries = selectedDayEntries,
+                        dateRangeEntriesCache = dateRangeEntriesCache,
+                        nextCourseSnapshot = nextCourseSnapshot,
+                        importLauncher = importLauncher,
+                        exportLauncher = exportLauncher,
+                        notificationPermissionLauncher = notificationPermissionLauncher,
+                        exactAlarmSettingsLauncher = exactAlarmSettingsLauncher,
+                        exactAlarmEnabled = exactAlarmEnabled,
+                        reminderMinutes = reminderMinutes,
+                        reminderOptions = reminderOptions,
+                        onReminderMinutesChange = { minutes ->
+                            reminderMinutes = minutes
+                            viewModel.updateReminderMinutes(minutes)
+                        },
+                        backgroundAppearance = backgroundAppearance,
+                        onBackgroundAppearanceChange = { backgroundAppearance = it },
+                        onSelectBackgroundImage = { backgroundImageLauncher.launch("image/*") },
+                        onAdjustCustomBackground = { showBackgroundAdjustDialog = true },
+                        weekCardAlpha = weekCardAlpha,
+                        onWeekCardAlphaChange = { alpha ->
+                            weekCardAlpha = alpha
+                            AppearanceStore.setWeekCardAlpha(context, alpha)
+                        },
+                        weekCardHue = weekCardHue,
+                        onWeekCardHueChange = { hue ->
+                            weekCardHue = hue
+                            AppearanceStore.setWeekCardHue(context, hue)
+                        },
+                        onDateChanged = { selectedDate = it },
+                        onEditEntry = { editingEntry = it },
+                        onDuplicateEntry = { entry ->
+                            editingEntry = duplicateEntryTemplate(entry)
+                            scope.launch {
+                                snackbarHostState.showSnackbar("已复制课程，确认后保存")
                             }
+                        },
+                        onDeleteEntry = { deletingEntry = it },
+                        onCreateEntry = { date, existing ->
+                            editingEntry = createQuickEntryTemplate(date, existing)
                         }
-                        item {
-                            PerpetualCalendar(
-                                selectedDate = selectedDate,
-                                entries = entries,
-                                entriesByDateResolver = dateRangeEntriesCache::resolve,
-                                onDateChanged = { selectedDate = it },
-                            )
-                        }
-                        item {
-                            SectionHeader(title = formatDateLabel(selectedDate))
-                        }
-                        if (filteredEntries.isEmpty()) {
-                            item {
-                                EmptyStateCard(
-                                    onAdd = {
-                                        editingEntry = createQuickEntryTemplate(
-                                            date = selectedLocalDate,
-                                            existingEntries = selectedDayEntries,
-                                        )
-                                    },
-                                )
-                            }
-                        } else {
-                            items(filteredEntries, key = { it.id }) { entry ->
-                                EntryCard(
-                                    entry = entry,
-                                    onEdit = { editingEntry = entry },
-                                    onDuplicate = {
-                                        editingEntry = duplicateEntryTemplate(entry)
-                                        scope.launch {
-                                            snackbarHostState.showSnackbar("已复制课程，确认后保存")
-                                        }
-                                    },
-                                    onDelete = { deletingEntry = entry },
-                                    modifier = Modifier.animateItem(),
-                                )
-                            }
-                        }
-                        item { Spacer(modifier = Modifier.height(56.dp)) }
-                    }
+                    )
                 }
                 }
                 AppDestination.SETTINGS -> {
@@ -612,6 +519,14 @@ fun ScheduleApp(
         }
     }
 
+    var importPreviewState by remember { mutableStateOf<ImportPreview?>(null) }
+
+    LaunchedEffect(Unit) {
+        viewModel.importPreview.collect { preview ->
+            importPreviewState = preview
+        }
+    }
+
     deletingEntry?.let { toDelete ->
         AlertDialog(
             onDismissRequest = { deletingEntry = null },
@@ -631,6 +546,44 @@ fun ScheduleApp(
             },
             dismissButton = {
                 OutlinedButton(onClick = { deletingEntry = null }) { Text("取消") }
+            },
+        )
+    }
+
+    importPreviewState?.let { preview ->
+        AlertDialog(
+            onDismissRequest = {
+                viewModel.cancelImport()
+                importPreviewState = null
+            },
+            title = { Text("导入冲突确认") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("解析到 ${preview.totalParsed} 条课程，其中有效 ${preview.validEntries.size} 条。")
+                    if (preview.invalidCount > 0) {
+                        Text("跳过无效课程 ${preview.invalidCount} 条。")
+                    }
+                    Text(
+                        "检测到 ${preview.conflictCount} 组时间冲突，继续导入将替换当前课表。",
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.confirmImport(preview)
+                        importPreviewState = null
+                    },
+                ) { Text("确认导入") }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = {
+                        viewModel.cancelImport()
+                        importPreviewState = null
+                    },
+                ) { Text("取消") }
             },
         )
     }
@@ -848,7 +801,7 @@ private data class PendingEntryConflict(
     val updatedEntry: TimetableEntry,
     val conflictEntry: TimetableEntry,
 )
-private fun NextCourseSnapshot.toCardState(): NextCourseCardState {
+internal fun NextCourseSnapshot.toCardState(): NextCourseCardState {
     return NextCourseCardState(
         title = entry.title.ifBlank { "未命名课程" },
         timeRange = "${formatMinutes(entry.startMinutes)} - ${formatMinutes(entry.endMinutes)}",

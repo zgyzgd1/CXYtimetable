@@ -36,6 +36,8 @@ import com.example.timetable.data.parseEntryDate
 import com.example.timetable.data.parseMinutes
 import com.example.timetable.data.resolveRecurrenceType
 import com.example.timetable.data.resolveWeekRule
+import com.example.timetable.data.SemesterStore
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun EntryEditorDialog(
@@ -57,6 +59,13 @@ fun EntryEditorDialog(
     var customWeekListText by rememberSaveable(initial.id) { mutableStateOf(initial.customWeekList) }
     var skipWeekListText by rememberSaveable(initial.id) { mutableStateOf(initial.skipWeekList) }
     var errorText by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+
+    // Auto-fill semester start date from global config if empty
+    val globalSemesterDate = remember { SemesterStore.getSemesterStartDate(context) }
+    if (semesterStartDateText.isBlank() && globalSemesterDate != null && recurrenceType == RecurrenceType.WEEKLY) {
+        semesterStartDateText = globalSemesterDate.toString()
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -191,38 +200,44 @@ fun EntryEditorDialog(
                         recurrenceType == RecurrenceType.WEEKLY && weekRule == WeekRule.CUSTOM && customWeeks.isNullOrEmpty() -> {
                             errorText = "自定义周次不能为空"
                         }
-                        else -> onSave(
-                            initial.copy(
-                                title = title.trim(),
-                                date = parsedDate.toString(),
-                                dayOfWeek = parsedDate.dayOfWeek.value,
-                                startMinutes = parsedStart,
-                                endMinutes = parsedEnd,
-                                location = location.trim(),
-                                note = note.trim(),
-                                recurrenceType = recurrenceType.name,
-                                semesterStartDate = if (recurrenceType == RecurrenceType.WEEKLY) {
-                                    parsedSemesterStart.toString()
-                                } else {
-                                    ""
-                                },
-                                weekRule = if (recurrenceType == RecurrenceType.WEEKLY) {
-                                    weekRule.name
-                                } else {
-                                    WeekRule.ALL.name
-                                },
-                                customWeekList = if (recurrenceType == RecurrenceType.WEEKLY) {
-                                    normalizedCustomWeekList
-                                } else {
-                                    ""
-                                },
-                                skipWeekList = if (recurrenceType == RecurrenceType.WEEKLY) {
-                                    normalizedSkipWeekList
-                                } else {
-                                    ""
-                                },
-                            ),
-                        )
+                        else -> {
+                            // Persist the semester start date to global config
+                            if (recurrenceType == RecurrenceType.WEEKLY && parsedSemesterStart != null) {
+                                SemesterStore.setSemesterStartDate(context, parsedSemesterStart)
+                            }
+                            onSave(
+                                initial.copy(
+                                    title = title.trim(),
+                                    date = parsedDate.toString(),
+                                    dayOfWeek = parsedDate.dayOfWeek.value,
+                                    startMinutes = parsedStart,
+                                    endMinutes = parsedEnd,
+                                    location = location.trim(),
+                                    note = note.trim(),
+                                    recurrenceType = recurrenceType.name,
+                                    semesterStartDate = if (recurrenceType == RecurrenceType.WEEKLY) {
+                                        parsedSemesterStart.toString()
+                                    } else {
+                                        ""
+                                    },
+                                    weekRule = if (recurrenceType == RecurrenceType.WEEKLY) {
+                                        weekRule.name
+                                    } else {
+                                        WeekRule.ALL.name
+                                    },
+                                    customWeekList = if (recurrenceType == RecurrenceType.WEEKLY) {
+                                        normalizedCustomWeekList
+                                    } else {
+                                        ""
+                                    },
+                                    skipWeekList = if (recurrenceType == RecurrenceType.WEEKLY) {
+                                        normalizedSkipWeekList
+                                    } else {
+                                        ""
+                                    },
+                                ),
+                            )
+                        }
                     }
                 },
             ) {

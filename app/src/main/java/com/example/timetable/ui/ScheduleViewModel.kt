@@ -21,6 +21,7 @@ import com.example.timetable.data.resolveRecurrenceType
 import com.example.timetable.data.resolveWeekRule
 import com.example.timetable.data.suggestAdjustedEntryAfterConflicts
 import com.example.timetable.notify.CourseReminderScheduler
+import com.example.timetable.notify.ReminderFallbackWorker
 import com.example.timetable.widget.TimetableWidgetUpdater
 import java.io.ByteArrayOutputStream
 import java.io.IOException
@@ -63,6 +64,7 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
     private var lastWidgetRefreshToken: String? = null
 
     init {
+        ReminderFallbackWorker.ensureScheduled(application)
         viewModelScope.launch {
             TimetableRepository.ensureMigrated(getApplication())
             TimetableRepository.getEntriesStream(getApplication()).collect { currentEntries ->
@@ -124,6 +126,9 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         IcsCalendar.write(entries.value)
     }
 
+    private val _importPreview = MutableSharedFlow<ImportPreview>(extraBufferCapacity = 1)
+    val importPreview = _importPreview.asSharedFlow()
+
     fun importFromIcs(contentResolver: ContentResolver, uri: Uri) {
         viewModelScope.launch {
             val text = readText(contentResolver, uri)
@@ -145,8 +150,64 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
                 return@launch
             }
 
-            applyImportedEntries(imported)
+            val preview = buildImportPreview(imported)
+            if (preview.validEntries.isEmpty()) {
+                postMessage("导入失败：未发现有效课程")
+                return@launch
+            }
+
+            if (preview.conflictCount == 0) {
+                // No conflicts — apply directly
+                commitImport(preview)
+            } else {
+                // Has conflicts — let the UI present confirmation
+                _importPreview.tryEmit(preview)
+            }
         }
+    }
+
+    fun confirmImport(preview: ImportPreview) {
+        viewModelScope.launch {
+            commitImport(preview)
+        }
+    }
+
+    fun cancelImport() {
+        // no-op; UI just dismisses the dialog
+    }
+
+    private suspend fun commitImport(preview: ImportPreview) {
+        TimetableRepository.replaceAllEntries(getApplication(), preview.validEntries)
+        if (preview.invalidCount == 0 && preview.conflictCount == 0) {
+            postMessage("已导入 ${preview.validEntries.size} 条课程，并保存为当前课表")
+        } else {
+            postMessage(
+                "已导入 ${preview.validEntries.size} 条课程，跳过无效 ${preview.invalidCount} 条，" +
+                    "冲突 ${preview.conflictCount} 组",
+            )
+        }
+    }
+
+    private fun buildImportPreview(imported: List<TimetableEntry>): ImportPreview {
+        val validEntries = mutableListOf<TimetableEntry>()
+        var invalidCount = 0
+
+        imported.map(::normalizeEntry)
+            .forEach { entry ->
+                if (validateEntry(entry) != null) {
+                    invalidCount++
+                    return@forEach
+                }
+                validEntries += entry
+            }
+
+        val conflictCount = if (validEntries.isNotEmpty()) countConflictPairs(validEntries) else 0
+        return ImportPreview(
+            validEntries = validEntries,
+            invalidCount = invalidCount,
+            conflictCount = conflictCount,
+            totalParsed = imported.size,
+        )
     }
 
     fun updateReminderMinutes(minutes: Iterable<Int>) {
@@ -190,37 +251,6 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
                 }
             }
         }.getOrNull()
-    }
-
-    private suspend fun applyImportedEntries(imported: List<TimetableEntry>) {
-        val validEntries = mutableListOf<TimetableEntry>()
-        var invalidCount = 0
-
-        imported.map(::normalizeEntry)
-            .forEach { entry ->
-                if (validateEntry(entry) != null) {
-                    invalidCount++
-                    return@forEach
-                }
-                validEntries += entry
-            }
-
-        if (validEntries.isEmpty()) {
-            postMessage("导入失败：未发现有效课程")
-            return
-        }
-
-        val conflictCount = countConflictPairs(validEntries)
-
-        TimetableRepository.replaceAllEntries(getApplication(), validEntries)
-
-        if (invalidCount == 0 && conflictCount == 0) {
-            postMessage("已导入 ${validEntries.size} 条课程，并保存为当前课表")
-        } else {
-            postMessage(
-                "已导入 ${validEntries.size} 条课程，跳过无效 $invalidCount 条，检测到冲突 $conflictCount 组",
-            )
-        }
     }
 
     private fun normalizeEntry(entry: TimetableEntry): TimetableEntry {
@@ -385,3 +415,16 @@ private fun entryTokenJson(entry: TimetableEntry): JSONObject {
         .put("customWeekList", entry.customWeekList)
         .put("skipWeekList", entry.skipWeekList)
 }
+
+/**
+ * 导入预览：解析完成但尚未写入数据库的导入结果。
+ *
+ * 当检测到冲突时，由 ViewModel 通过 [ScheduleViewModel.importPreview] 发送给 UI，
+ * 等用户确认后再调用 [ScheduleViewModel.confirmImport] 写入。
+ */
+data class ImportPreview(
+    val validEntries: List<TimetableEntry>,
+    val invalidCount: Int,
+    val conflictCount: Int,
+    val totalParsed: Int,
+)

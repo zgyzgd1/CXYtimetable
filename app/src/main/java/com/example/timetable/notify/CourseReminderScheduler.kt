@@ -13,8 +13,11 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.ContextCompat
+import com.example.timetable.data.RecurrenceType
 import com.example.timetable.data.TimetableEntry
 import com.example.timetable.data.nextOccurrenceDate
+import com.example.timetable.data.parseEntryDate
+import com.example.timetable.data.resolveRecurrenceType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -147,7 +150,40 @@ object CourseReminderScheduler {
         val nextEntries = mutableListOf<ScheduledReminder>()
         val nowDate = Instant.ofEpochMilli(nowMillis).atZone(systemZone).toLocalDate()
 
-        entries.forEach { entry ->
+        // Optimization: pre-sort entries so we scan near-future entries first.
+        // For non-recurring entries we use their date; for recurring ones we use
+        // today (they repeat and might fire today/tomorrow).
+        val maxLeadMinutes = normalizedReminderMinutes.maxOrNull() ?: 0
+        val sortedEntries = entries.sortedBy { entry ->
+            val recurrence = resolveRecurrenceType(entry.recurrenceType)
+            if (recurrence == null || recurrence == RecurrenceType.NONE) {
+                parseEntryDate(entry.date)?.toEpochDay() ?: Long.MAX_VALUE
+            } else {
+                // Recurring entries might fire as early as today
+                nowDate.toEpochDay()
+            }
+        }
+
+        sortedEntries.forEach { entry ->
+            // Early exit: for non-recurring entries, if entry date is beyond the
+            // current best trigger + maxLead buffer, skip it entirely.
+            val currentBest = nextTriggerAtMillis
+            if (currentBest != null) {
+                val recurrence = resolveRecurrenceType(entry.recurrenceType)
+                if (recurrence == null || recurrence == RecurrenceType.NONE) {
+                    val entryDate = parseEntryDate(entry.date)
+                    if (entryDate != null) {
+                        val earliestPossibleTrigger = entryDate.atStartOfDay(systemZone)
+                            .minusMinutes(maxLeadMinutes.toLong())
+                            .toInstant()
+                            .toEpochMilli()
+                        if (earliestPossibleTrigger > currentBest) {
+                            return@forEach  // This and subsequent non-recurring entries are too far out
+                        }
+                    }
+                }
+            }
+
             normalizedReminderMinutes.forEach { reminderMinutes ->
                 val scheduled = computeNextReminder(entry, reminderMinutes, nowMillis, nowDate) ?: return@forEach
                 val triggerAtMillis = scheduled.triggerAtMillis

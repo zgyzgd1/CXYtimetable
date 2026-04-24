@@ -11,6 +11,7 @@ import com.example.timetable.data.formatMinutes
 import com.example.timetable.ui.AppDestination
 
 class CourseReminderReceiver : BroadcastReceiver() {
+    @android.annotation.SuppressLint("MissingPermission")
     override fun onReceive(context: Context, intent: Intent) {
         val pendingResult = goAsync()
 
@@ -60,7 +61,9 @@ class CourseReminderReceiver : BroadcastReceiver() {
                     .build()
 
                 runCatching {
-                    NotificationManagerCompat.from(context).notify(requestCode, notification)
+                    @android.annotation.SuppressLint("MissingPermission")
+                    val nm = NotificationManagerCompat.from(context)
+                    nm.notify(requestCode, notification)
                 }
             }
 

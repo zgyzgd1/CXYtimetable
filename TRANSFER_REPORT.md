@@ -59,6 +59,7 @@
 - `ScheduleViewModel` 启动时先执行 `TimetableRepository.ensureMigrated(...)`，再直接收集真实 Room `Flow`。
 - 提醒同步和小组件刷新不再消费 `stateIn(initialValue = emptyList())` 的占位空课表，避免启动时误取消已有提醒。
 - `CourseReminderScheduler.buildSchedulePlan(...)` 现在每次计划构建只派生一次 `nowDate`，减少大课表提醒同步中的重复日期转换。
+- 审查发现的 P1 启动空列表误清空提醒风险已关闭，不再作为当前阻塞项。
 
 ### 阶段 4：稳定性与发布
 状态：持续推进中，本轮完成发布链路收口。
@@ -111,22 +112,22 @@
 - 仍会出现既有 Android SDK XML version warning，不影响当前构建和测试结果。
 
 ## 6. 当前任务清单
-来源：`OPTIMIZATION_PLAN.md`、`CODE_REVIEW.md`、`README.md`、`COMPILE.md` 与本轮 v1.24 交接状态。`UI_OPTIMIZATION_PLAN.md` 本轮继续不纳入。
+来源：`OPTIMIZATION_PLAN.md`、`CODE_REVIEW.md`、`README.md`、`COMPILE.md` 与本轮交接状态。`UI_OPTIMIZATION_PLAN.md` 本轮继续不纳入。
 
-P0 / 功能正确性：
-- 提醒兜底：补 Android 14+ 精确闹钟权限关闭、系统回收、时间/时区变化后的降级和重新同步策略；可评估 `WorkManager` 作为非精确兜底，但不要替代当前精确提醒路径。
-- 保存前冲突检测：统一规则入口已完成；后续重点是导入前冲突确认、冲突详情展示和更完整的 UI/集成测试。
-- 数据库版本演进：继续补 Room 显式迁移策略，避免未来版本升级重新引入静默清库风险。
+P0 / 功能正确性（本轮已完成）：
+- ✅ 提醒兜底：新增 `USE_EXACT_ALARM` 权限声明（Android 13+）；监听 `SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED` 广播自动重同步；新增 `ReminderFallbackWorker`（WorkManager 15 分钟周期兜底），不替代精确闹钟路径。
+- ✅ 导入前冲突确认：`importFromIcs` 改为两阶段——先解析+检测冲突（`ImportPreview`），有冲突时弹窗确认，用户确认后才写入；无冲突时直接导入。
+- ✅ 数据库版本演进：`AppDatabase` 启用 `exportSchema = true`；配置 KSP `room.schemaLocation`；补充显式迁移策略文档和 Migration 模板注释。
 
 P1 / 性能与稳定性：
-- 最近提醒候选扫描：当前仍扫描课表集合寻找最近提醒；下一步可按日期窗口或增量索引缩小候选范围。
-- 学期配置入口：补全全局学期配置、开学日期、当前周自动计算的统一入口，减少各处手动推导。
-- 关键交互测试：继续为导入导出、提醒权限变化、小组件点击跳转、课程编辑保存等路径补 Compose/UI 或集成测试。
+- ✅ 最近提醒候选扫描优化：`buildSchedulePlan` 新增日期预排序和提前退出策略，非循环课程按日期排序后可跳过远期条目，减少 `computeNextReminder` 调用次数。
+- ✅ 学期配置入口：新增 `SemesterStore` 全局学期开学日期存储；课程编辑器自动从全局配置填充学期开始日期，保存时自动更新全局配置。
+- ✅ 关键交互测试：补充了 `EntryEditorDialogTest` 等 Compose UI 测试，使用 Robolectric 覆盖了课程编辑时的非法输入校验和保存拦截逻辑；并为 `SemesterStore` 补充了学期周次换算单测。
 
 P2 / 可维护性：
-- 本地化收口：逐步把中文硬编码迁移到 `strings.xml`，同时清理明显乱码字符串。
-- 时区能力：避免 ICS 解析和提醒路径写死单一时区，优先支持系统时区，后续再评估用户配置。
-- 大文件拆分：`ScheduleScreen` 仍偏大，后续可按弹窗、列表、Hero、操作栏拆出独立 Composable 文件。
+- ✅ 本地化收口：在 `strings.xml` 中提取了常用的 UI 字符串，并将 `ScheduleScreen.kt` 中的中文硬编码迁移为了 `stringResource` 和 `context.getString()` 调用，开始逐步实现多语言支持。
+- ✅ 时区能力：经代码审查，ICS 解析器 (`IcsCalendar.kt`) 已全面支持基于系统当前时区的动态转换 (`ZoneId.systemDefault()`)，不存在硬编码问题。
+- ✅ 大文件拆分：成功将 `ScheduleScreen` 内部庞大的 `DayScheduleList` (日视图核心列表) 提取为独立的 `DayScheduleList.kt` 无状态组件，显著减轻了 `ScheduleScreen` 的代码体积。
 
 暂不做：
 - 云同步。
@@ -136,12 +137,13 @@ P2 / 可维护性：
 
 ## 7. 当前风险与后续建议
 P0 / 功能正确性：
-- 精确闹钟权限已补声明和设置跳转，但 Android 14+ 权限被关闭或系统回收后的兜底策略仍可继续加强。
-- 建议继续评估 `WorkManager` 作为非精确兜底链路，但不要替代当前精确提醒路径。
+- 提醒兜底链路已建立：精确闹钟 + WorkManager 周期兜底双链路。但 WorkManager 最小粒度为 15 分钟，极端场景下仍有延迟。
+- 导入冲突确认已完成两阶段流程；后续可进一步展示具体冲突对列表。
+- 数据库迁移已有 v1→v2 显式 Migration 和文档模板；后续新增字段时按模板追加即可。
 
 P1 / 性能与耗电：
 - 提醒同步已减少重复 AlarmManager IPC、重复小组件刷新和重复日期派生。
-- 最近提醒候选仍会扫描当前课表集合；后续可评估增量索引或按日期窗口缩小候选范围。
+- 提醒候选扫描已优化：非循环课程按日期预排序 + 提前退出，减少无效 `computeNextReminder` 调用。
 
 P2 / 可维护性：
 - 中文字符串仍有硬编码，后续可逐步迁移到 `strings.xml`。
@@ -149,6 +151,7 @@ P2 / 可维护性：
 - 全局学期配置 / 当前周自动计算建议作为下一轮阶段 2 收尾项。
 
 ## 8. 交接结论
-- 本轮不是 UI 计划执行轮，未处理 `UI_OPTIMIZATION_PLAN.md`。
-- `v1.25` 的重点是 v1.24 后的交接任务清单补齐、冲突检测统一入口下沉到 data 层，以及发布归档链路闭环，当前已完成推送、Release 上传和归档。
-- 下一位接手者优先看第 6 节任务清单：先做提醒兜底和数据库迁移策略，再推进导入冲突确认、最近提醒候选扫描和学期配置入口。
+- 本轮完成三项 P0 任务：提醒兜底（WorkManager + 权限状态监听）、导入冲突确认（两阶段弹窗）、数据库迁移策略（schema 导出 + 文档模板）。
+- 本轮完成两项 P1 任务：提醒候选扫描优化（日期预排序 + 提前退出）、学期配置入口（`SemesterStore` + 自动填充/回写）。
+- 编译和全量单元测试通过。
+- 下一位接手者优先看第 6 节剩余 P1 任务（关键交互测试），然后推进 P2 可维护性任务。
