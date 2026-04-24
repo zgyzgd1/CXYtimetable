@@ -77,3 +77,40 @@
 
 ## 许可证
 本项目采用 MIT 许可证。
+
+---
+
+## APK 归档仓库 (apk-archive-repo)
+
+### 归档概述
+APK 归档仓库 (`apk-archive-repo`) 是本项目的辅助仓库，用于存储所有历史版本的 APK 文件。归档仓库与主仓库并行维护，每次发布时会自动同步最新 APK。
+
+### 归档结构
+```
+apk-archive-repo/
+├── README.md      # 版本列表，记录每个版本对应的 APK 文件名
+└── releases/      # APK 文件存储目录
+    ├── Timetable-v0.8.apk
+    ├── Timetable-v1.0.apk
+    ├── Timetable-v1.1.apk
+    └── ...
+```
+
+### 版本签名状态 (v0.8 - v1.27)
+
+| 版本范围 | 签名类型 | 证书 DN | 证书 SHA-256 |
+|:---:|:---:|:---|:---|
+| **v0.8 ~ v1.17** | DEBUG → RELEASE 已重签 | `CN=Timetable Release, OU=Release, O=Timetable, L=Shanghai, ST=Shanghai, C=CN` | `e1df0d6e10c063395539077a532a02320886e9356a352b7f21793619de2314bc` |
+| **v1.18 ~ v1.27** | RELEASE 正式签名 | `CN=Timetable Release, OU=Release, O=Timetable, L=Shanghai, ST=Shanghai, C=CN` | `e1df0d6e10c063395539077a532a02320886e9356a352b7f21793619de2314bc` |
+
+> **说明**：2026-04-24 完成签名统一，所有历史 DEBUG 签名的 APK（v0.8 ~ v1.17）已使用正式 Release 证书重签。
+
+### 升级兼容性
+- `v0.8` ~ `v1.17`（原 DEBUG 签名）升级到 `v1.18`+（RELEASE 签名）：**需卸载旧包后全新安装**
+- `v1.18` ~ `v1.27` 之间：可正常覆盖升级（证书一致）
+
+### APK 命名规范
+归档中的 APK 文件遵循命名规范：`Timetable-v{X}.apk`，例如：
+- `Timetable-v1.27.apk`
+- `Timetable-v1.0.apk`
+- `Timetable-v0.8.apk`
