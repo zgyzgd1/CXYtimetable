@@ -63,6 +63,8 @@
 ### 3.5 本次补审（2026-04-24）
 - 修复 `ScheduleViewModel.kt` 启动阶段副作用同步顺序：先完成 `TimetableRepository.ensureMigrated(...)`，再直接收集仓库的 Room `Flow`
 - 提醒同步 / 小组件刷新不再消费 `stateIn(initialValue = emptyList())` 的占位空列表，避免启动时误取消已有提醒
+- `CourseReminderScheduler.kt` 的持久化提醒签名已改为 JSON array 结构化序列化，避免标题 / 地点包含 `|` 等分隔符时发生签名碰撞
+- `CourseReminderSchedulerTest.kt` 已补充分隔符碰撞回归测试，确认通知内容变化会触发重下发
 - 已重新验证 `:app:compileDebugKotlin`、提醒相关单测与完整 `testDebugUnitTest`
 
 ### 3.3 主要涉及文件
@@ -125,11 +127,11 @@
 根据 CODE_REVIEW.md 列举的 5 大风险，本轮审查确认：
 1. **闹铃机制失效**（Android 14+ 精准闹钟权限缺失）- 已部分修复：Manifest 权限、UI 状态提示、系统授权跳转与授权返回后的强制重同步已落地；仍缺更强的 fallback 策略
 2. **本地存储竞态条件**（多协程并行读写文件）- 已收口：主存储已是 Room，遗留 JSON 迁移与种子数据注入已补仓库级串行化与事务保护；遗留文件解码失败时不再误删原始数据或误注入样例
-3. **系统级耗电与 CPU 开销**（syncReminders 暴力全量校验）- 已部分修复：提醒调度改为签名增量下发，ViewModel 层新增提醒/小组件去重 token，且 token 已改为结构化序列化避免碰撞；补审已修复启动占位空课表误触发同步；仍保留“全量扫描课程求最近提醒”的计算路径，可作为下一阶段继续优化
+3. **系统级耗电与 CPU 开销**（syncReminders 暴力全量校验）- 已部分修复：提醒调度改为签名增量下发，ViewModel 层新增提醒/小组件去重 token，且 ViewModel token 与提醒持久化签名均已改为结构化序列化避免碰撞；补审已修复启动占位空课表误触发同步；仍保留“全量扫描课程求最近提醒”的计算路径，可作为下一阶段继续优化
 4. **硬编码与时区灾难**（中文硬编码、北京时区写死）- 未修复，标记为下阶段改进
 5. **Compose 巨型类问题**（ScheduleScreen ~1000 行）- 未修复，标记为下阶段改进
 
-**结论**：本轮新增审查发现的 4 个具体问题已完成修复：旧文件迁移失败误删数据、同步 token 分隔符碰撞、精确闹钟设置页伪 fallback、启动占位空课表误触发提醒同步。剩余高优先事项主要是“最近提醒候选仍需全量扫描”的计算路径以及更强的提醒 fallback；另有 P2 级提醒持久化签名结构化可继续补强。
+**结论**：本轮新增审查发现的 5 个具体问题已完成修复：旧文件迁移失败误删数据、同步 token 分隔符碰撞、精确闹钟设置页伪 fallback、启动占位空课表误触发提醒同步、提醒持久化签名分隔符碰撞。剩余高优先事项主要是“最近提醒候选仍需全量扫描”的计算路径以及更强的提醒 fallback。
 
 ## 5. 验证结果
 - 已执行：
@@ -146,6 +148,7 @@
   - `.\gradlew.bat --offline --no-daemon :app:compileDebugKotlin --rerun-tasks`
   - `.\gradlew.bat --offline --no-daemon testDebugUnitTest --tests com.example.timetable.ui.ScheduleViewModelSyncTokenTest --tests com.example.timetable.notify.CourseReminderSchedulerTest --rerun-tasks`
   - `.\gradlew.bat --offline --no-daemon testDebugUnitTest`
+  - `.\gradlew.bat --offline --no-daemon testDebugUnitTest --tests com.example.timetable.notify.CourseReminderSchedulerTest --rerun-tasks`
   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish-release.ps1`
   - VS Code 任务 `assembleDebug`
   - VS Code 任务 `envDoctor`
@@ -171,8 +174,9 @@
 ## 7. 当前工作区状态
 - 当前分支：`main`
 - 当前远端基线：`1eb22df` / `v1.23`
-- 当前主仓库本地提交范围：`TRANSFER_REPORT.md`、`app/src/main/java/com/example/timetable/ui/ScheduleViewModel.kt`
+- 当前主仓库本地提交范围：`TRANSFER_REPORT.md`、`app/src/main/java/com/example/timetable/ui/ScheduleViewModel.kt`、`app/src/main/java/com/example/timetable/notify/CourseReminderScheduler.kt`、`app/src/test/java/com/example/timetable/notify/CourseReminderSchedulerTest.kt`
 - 当前本地补审修复：`ScheduleViewModel.kt` 启动后先完成迁移，再收集真实 Room 数据流同步提醒和小组件
+- 当前本地提醒补强：`CourseReminderScheduler.kt` 持久化签名改为结构化 JSON array，避免分隔符碰撞
 - 当前归档仓库本地提交：`22b2ac9` `Archive timetable v1.20-v1.23 APKs`，待推送到归档仓库远端
 
 ## 8. 建议下一步

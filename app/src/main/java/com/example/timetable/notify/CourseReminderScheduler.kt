@@ -23,6 +23,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import org.json.JSONArray
 
 object CourseReminderScheduler {
     const val CHANNEL_ID = "course_reminder_channel"
@@ -348,17 +349,19 @@ object CourseReminderScheduler {
         return "${entry.id}|${entry.date}|${entry.startMinutes}|$reminderMinutes".hashCode()
     }
 
-    private fun scheduleSignature(scheduled: ScheduledReminder): String {
-        return listOf(
-            scheduled.triggerAtMillis.toString(),
-            scheduled.occurrenceDate.toString(),
-            scheduled.reminderMinutes.toString(),
-            scheduled.entry.id,
-            scheduled.entry.title,
-            scheduled.entry.location,
-            scheduled.entry.date,
-            scheduled.entry.startMinutes.toString(),
-        ).joinToString("|")
+    internal fun scheduleSignature(scheduled: ScheduledReminder): String {
+        return JSONArray(
+            listOf(
+                scheduled.triggerAtMillis,
+                scheduled.occurrenceDate.toString(),
+                scheduled.reminderMinutes,
+                scheduled.entry.id,
+                scheduled.entry.title,
+                scheduled.entry.location,
+                scheduled.entry.date,
+                scheduled.entry.startMinutes,
+            ),
+        ).toString()
     }
 
     private fun encodeScheduledSignatures(schedules: Map<Int, ScheduledReminder>): Set<String> {
