@@ -1,5 +1,7 @@
 package com.example.timetable.ui
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,6 +27,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -135,12 +138,18 @@ private fun WeekCalendarDayCell(
         today -> MaterialTheme.colorScheme.onPrimaryContainer
         else -> MaterialTheme.colorScheme.onSurface
     }
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1.05f else 1f,
+        animationSpec = tween(durationMillis = 150),
+        label = "dayCellScale",
+    )
 
     Box(
         modifier = Modifier
-            .padding(horizontal = 4.dp)
-            .aspectRatio(1f)
-            .clip(RoundedCornerShape(18.dp))
+            .padding(horizontal = 3.dp)
+            .aspectRatio(0.85f)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(RoundedCornerShape(16.dp))
             .background(containerColor)
             .semantics {
                 role = Role.Button
@@ -157,13 +166,14 @@ private fun WeekCalendarDayCell(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
                 text = chineseWeekday(date.dayOfWeek, LocalContext.current),
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelSmall,
                 color = contentColor.copy(alpha = 0.82f),
                 textAlign = TextAlign.Center,
+                maxLines = 1,
             )
             Text(
                 text = date.dayOfMonth.toString(),
@@ -172,18 +182,22 @@ private fun WeekCalendarDayCell(
                 ),
                 color = contentColor,
                 textAlign = TextAlign.Center,
+                maxLines = 1,
             )
-            Box(
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .background(if (today) contentColor else Color.Transparent)
-                    .padding(horizontal = 3.dp, vertical = 1.dp),
-            ) {
-                Text(
-                    text = if (today) stringResource(R.string.label_today_short) else "",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = containerColor,
-                )
+            if (today) {
+                Box(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(contentColor)
+                        .padding(horizontal = 3.dp, vertical = 1.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.label_today_short),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = containerColor,
+                        maxLines = 1,
+                    )
+                }
             }
         }
     }

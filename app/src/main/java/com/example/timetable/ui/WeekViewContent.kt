@@ -11,9 +11,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
@@ -21,13 +22,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.timetable.R
 import com.example.timetable.data.DateRangeEntriesCache
 import com.example.timetable.data.TimetableEntry
 import com.example.timetable.data.WeekTimeSlot
-import com.example.timetable.data.areWeekTimeSlotsNonOverlapping
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 
@@ -99,13 +100,31 @@ internal fun WeekViewContent(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
         ) {
-            OutlinedButton(onClick = onEditFixedWeekSchedule) {
-                Text(stringResource(R.string.action_fixed_time))
+            Surface(
+                onClick = onEditFixedWeekSchedule,
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ) {
+                Text(
+                    text = stringResource(R.string.action_fixed_time),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
+                )
             }
             val today = LocalDate.now()
             if (selectedLocalDate != today) {
-                OutlinedButton(onClick = { onDateChanged(today.toString()) }) {
-                    Text(stringResource(R.string.action_back_to_today))
+                Surface(
+                    onClick = { onDateChanged(today.toString()) },
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                    contentColor = MaterialTheme.colorScheme.primary,
+                ) {
+                    Text(
+                        text = stringResource(R.string.action_back_to_today),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
+                    )
                 }
             }
         }

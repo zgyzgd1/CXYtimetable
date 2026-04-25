@@ -84,85 +84,90 @@ fun WeekScheduleBoard(
     val horizontalScrollState = rememberScrollState()
 
     val timeColumnWidth = 60.dp
-    val dayColumnWidth = 116.dp
     val headerHeight = 80.dp
     val slotHeight = 120.dp
     val slotGap = 8.dp
-    val laneHeight = calculateLaneHeight(slots.size, slotHeight, slotGap)
 
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.25f))
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
-                shape = RoundedCornerShape(28.dp),
-            ),
-    ) {
-        WeekOverviewHeader(
-            selectedDate = selectedDate,
-            weekStart = weekStart,
-            weekEnd = weekEnd,
-            weekNumber = weekNumber,
-            weekEntries = weekEntries,
-            selectedDayEntries = selectedDayEntries,
-            slotCount = slots.size,
-            onCustomizeSlotCount = onCustomizeSlotCount,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-        )
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val availableWidth = maxWidth - 16.dp // subtract horizontal padding
+        val minDayColumnWidth = 100.dp
+        val dayColumnWidth = ((availableWidth - timeColumnWidth) / 7f).coerceAtLeast(minDayColumnWidth)
+        val laneHeight = calculateLaneHeight(slots.size, slotHeight, slotGap)
 
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(horizontalScrollState)
-                .padding(horizontal = 8.dp, vertical = 8.dp),
+                .clip(RoundedCornerShape(24.dp))
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.25f))
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
+                    shape = RoundedCornerShape(24.dp),
+                ),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TimeColumnHeader(
-                    width = timeColumnWidth,
-                    height = headerHeight,
-                    onAddSlot = onAddSlot,
-                )
-                days.forEach { day ->
-                    DayHeaderCell(
-                        day = day,
-                        width = dayColumnWidth,
-                        height = headerHeight,
-                        selected = day == selectedDate,
-                    )
-                }
-            }
+            WeekOverviewHeader(
+                selectedDate = selectedDate,
+                weekStart = weekStart,
+                weekEnd = weekEnd,
+                weekNumber = weekNumber,
+                weekEntries = weekEntries,
+                selectedDayEntries = selectedDayEntries,
+                slotCount = slots.size,
+                onCustomizeSlotCount = onCustomizeSlotCount,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top,
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(horizontalScrollState)
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
             ) {
-                TimeSlotColumn(
-                    width = timeColumnWidth,
-                    slots = slots,
-                    slotHeight = slotHeight,
-                    slotGap = slotGap,
-                    onSlotClick = onSlotClick,
-                )
-                days.forEach { day ->
-                    WeekDayLane(
-                        day = day,
-                        selected = day == selectedDate,
-                        entries = entriesByDay[day].orEmpty(),
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TimeColumnHeader(
+                        width = timeColumnWidth,
+                        height = headerHeight,
+                        onAddSlot = onAddSlot,
+                    )
+                    days.forEach { day ->
+                        DayHeaderCell(
+                            day = day,
+                            width = dayColumnWidth,
+                            height = headerHeight,
+                            selected = day == selectedDate,
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    TimeSlotColumn(
+                        width = timeColumnWidth,
                         slots = slots,
-                        width = dayColumnWidth,
-                        laneHeight = laneHeight,
                         slotHeight = slotHeight,
                         slotGap = slotGap,
-                        cardAlpha = cardAlpha,
-                        cardHue = cardHue,
-                        onEntryClick = onEntryClick,
+                        onSlotClick = onSlotClick,
                     )
+                    days.forEach { day ->
+                        WeekDayLane(
+                            day = day,
+                            selected = day == selectedDate,
+                            entries = entriesByDay[day].orEmpty(),
+                            slots = slots,
+                            width = dayColumnWidth,
+                            laneHeight = laneHeight,
+                            slotHeight = slotHeight,
+                            slotGap = slotGap,
+                            cardAlpha = cardAlpha,
+                            cardHue = cardHue,
+                            onEntryClick = onEntryClick,
+                        )
+                    }
                 }
             }
         }
@@ -185,21 +190,25 @@ private fun WeekOverviewHeader(
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
                     text = "${selectedDate.year}/${selectedDate.monthValue}/${selectedDate.dayOfMonth}",
-                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Normal),
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = stringResource(R.string.label_week_number, weekNumber) + "  " + formatWeekRange(weekStart, weekEnd),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = if (weekEntries.isEmpty()) {
@@ -207,14 +216,17 @@ private fun WeekOverviewHeader(
                     } else {
                         stringResource(R.string.label_week_course_count, weekEntries.size, selectedDayEntries.size)
                     },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
 
             Column(
                 horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(start = 12.dp),
             ) {
                 GlassActionChip(
                     label = stringResource(R.string.label_slot_count, slotCount),
@@ -248,12 +260,12 @@ private fun SummaryPill(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(12.dp),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+            verticalArrangement = Arrangement.spacedBy(1.dp),
         ) {
             Text(
                 text = label,
@@ -337,7 +349,7 @@ private fun DayHeaderCell(
             .width(width)
             .height(height)
             .padding(horizontal = 2.dp)
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else Color.Transparent),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -346,11 +358,15 @@ private fun DayHeaderCell(
             text = chineseWeekday(day.dayOfWeek, LocalContext.current),
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
             color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
         Text(
             text = "${day.monthValue}/${day.dayOfMonth}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -398,7 +414,7 @@ private fun WeekDayLane(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(slotHeight)
-                        .clip(RoundedCornerShape(18.dp))
+                        .clip(RoundedCornerShape(16.dp))
                         .background(if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.08f)),
                 )
             }
@@ -420,6 +436,19 @@ private fun WeekDayLane(
                 onClick = { onEntryClick(layout.entry) },
             )
         }
+
+        if (entries.isEmpty() && selected && slots.isNotEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = stringResource(R.string.card_empty_title),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                )
+            }
+        }
     }
 }
 
@@ -436,7 +465,7 @@ private fun TimeSlotCell(
         modifier = Modifier
             .width(width)
             .height(height)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
             .semantics {
                 role = Role.Button
@@ -454,16 +483,22 @@ private fun TimeSlotCell(
                 text = (index + 1).toString(),
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                 color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = formatMinutes(slot.startMinutes),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = formatMinutes(slot.endMinutes),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -478,12 +513,12 @@ private fun GlassActionChip(
         onClick = onClick,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(12.dp),
         shadowElevation = 0.dp,
     ) {
         Text(
             text = label,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
         )
     }
@@ -499,11 +534,11 @@ private fun WeekEntryBlock(
     val entryContext = LocalContext.current
     BoxWithConstraints(
         modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(16.dp))
             .border(
                 width = 1.dp,
                 color = Color.White.copy(alpha = 0.16f),
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(16.dp),
             )
             .background(color)
             .semantics {
@@ -520,12 +555,18 @@ private fun WeekEntryBlock(
             maxHeight >= 140.dp -> 6
             else -> 4
         }
+        val innerPadding = if (maxHeight >= 120.dp) 10.dp else 6.dp
+        val innerSpacing = if (maxHeight >= 120.dp) 4.dp else 2.dp
+        // Ensure readable text: use dark text when card color is too light
+        val luminance = 0.2126f * color.red + 0.7152f * color.green + 0.0722f * color.blue
+        val textColor = if (luminance > 0.5f) Color(0xDE1C1B1F) else Color.White
+        val subTextColor = if (luminance > 0.5f) Color(0x991C1B1F) else Color.White.copy(alpha = 0.92f)
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 10.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+                .padding(horizontal = innerPadding, vertical = innerPadding),
+            verticalArrangement = Arrangement.spacedBy(innerSpacing),
         ) {
             Text(
                 text = entry.title,
@@ -534,7 +575,7 @@ private fun WeekEntryBlock(
                 } else {
                     MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
                 },
-                color = Color.White,
+                color = textColor,
                 maxLines = titleLines,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -542,7 +583,7 @@ private fun WeekEntryBlock(
                 Text(
                     text = entry.location,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.95f),
+                    color = subTextColor,
                     maxLines = if (showNote) 4 else 3,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -551,7 +592,7 @@ private fun WeekEntryBlock(
                 Text(
                     text = entry.note,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.92f),
+                    color = subTextColor,
                     maxLines = 4,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -560,7 +601,7 @@ private fun WeekEntryBlock(
             Text(
                 text = "${formatMinutes(entry.startMinutes)}-${formatMinutes(entry.endMinutes)}",
                 style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.92f),
+                color = subTextColor,
             )
         }
     }
