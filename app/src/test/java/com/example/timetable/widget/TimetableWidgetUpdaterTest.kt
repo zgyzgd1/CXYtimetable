@@ -42,7 +42,7 @@ class TimetableWidgetUpdaterTest {
         val state = buildTodayScheduleWidgetState(emptyList(), today, nowMinutes = 12 * 60, context = context)
 
         assertTrue(state.courseItems.isEmpty())
-        assertNotNull(state.emptyText)
+        org.junit.Assert.assertNotNull(state.emptyText)
         assertEquals(today, state.targetDate)
     }
 
@@ -163,10 +163,6 @@ class TimetableWidgetUpdaterTest {
         val state = buildNextCourseWidgetState(entries, today = today, nowMinutes = 18 * 60, context = context)
 
         assertEquals(today, state.targetDate)
-    }
-
-    private fun assertNotNull(value: String?) {
-        org.junit.Assert.assertNotNull(value)
     }
 
     private fun entry(

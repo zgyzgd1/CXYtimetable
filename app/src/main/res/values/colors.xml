@@ -9,4 +9,8 @@
     <!-- Widget course dot colors -->
     <color name="widget_course_dot_active">#4A90D9</color>
     <color name="widget_course_dot_past">#606060</color>
+
+    <!-- Widget background colors -->
+    <color name="widget_card_background">#E6282828</color>
+    <color name="widget_course_item_background">#33FFFFFF</color>
 </resources>
