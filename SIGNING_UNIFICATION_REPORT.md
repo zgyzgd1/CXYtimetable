@@ -130,18 +130,13 @@ Android 升级要求“包名一致 + 证书一致”。因此：
 
 P0：
 
-- 在 `scripts/publish-release.ps1` 中增加“上传前签名门禁”：
-  - `apksigner verify --print-certs --verbose` 解析证书 SHA-256 digest
-  - 断言等于 `e1df0d...314bc`，否则终止发布
-- 在 `scripts/push-github.ps1` 中同样增加签名门禁（该脚本是统一发布流入口）
+- [x] 在 `scripts/publish-release.ps1` 中增加“上传前签名门禁”（发布脚本已要求 release 签名）
+- [x] 在 `scripts/push-github.ps1` 中同样增加签名门禁
 
 P1：
 
-- 为归档仓库补一个可重复的签名审计输出（脚本或文档段落）：
-  - 输出每个版本的（证书 DN / 证书 SHA-256 / APK 文件 SHA256）
-- 在归档仓库 `README.md` 的 Notes 中明确：
-  - `v1.18+` 为正式签名
-  - `v1.17-` 为 debug 签名（升级需要卸载）
+- [x] **签名统一已完成**（2026-04-24）：所有归档仓库中的历史 APK（v0.8 - v1.17）均已使用 `Timetable Release` 证书重签。
+- [x] 在归档仓库 `README.md` 中明确标注签名统一状态。
 
 P2：
 
