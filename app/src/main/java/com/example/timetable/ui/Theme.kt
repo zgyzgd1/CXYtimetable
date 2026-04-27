@@ -6,9 +6,57 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.dp
+
+/** 课程强调色板 CompositionLocal */
+val LocalCourseAccentColors = compositionLocalOf { LightCourseAccentColors }
+
+/** 亮色主题课程强调色 */
+val LightCourseAccentColors = listOf(
+    Color(0xFF7986CB),
+    Color(0xFF4DB6AC),
+    Color(0xFFFF8A65),
+    Color(0xFFA1887F),
+    Color(0xFF4FC3F7),
+    Color(0xFFAED581),
+    Color(0xFFBA68C8),
+    Color(0xFFFFB74D),
+    Color(0xFFF06292),
+    Color(0xFF4DD0E1),
+)
+
+/** 暗色主题课程强调色（更亮以适配深色背景） */
+val DarkCourseAccentColors = listOf(
+    Color(0xFF9FA8DA),
+    Color(0xFF80CBC4),
+    Color(0xFFFFAB91),
+    Color(0xFFBCAAA4),
+    Color(0xFF81D4FA),
+    Color(0xFFC5E1A5),
+    Color(0xFFCE93D8),
+    Color(0xFFFFCC80),
+    Color(0xFFF48FB1),
+    Color(0xFF80DEEA),
+)
+
+object AppShape {
+    val CardLarge = RoundedCornerShape(24.dp)
+    val CardMedium = RoundedCornerShape(20.dp)
+    val CardSmall = RoundedCornerShape(16.dp)
+    val CardExtraSmall = RoundedCornerShape(14.dp)
+    val Chip = RoundedCornerShape(12.dp)
+    val Badge = RoundedCornerShape(10.dp)
+    val Pill = RoundedCornerShape(999.dp)
+    val Dialog = RoundedCornerShape(28.dp)
+    val DialogContent = RoundedCornerShape(26.dp)
+    val CalendarDay = RoundedCornerShape(18.dp)
+}
 
 // Light theme color scheme
 private val LightColors = lightColorScheme(
@@ -65,9 +113,13 @@ fun TimetableTheme(content: @Composable () -> Unit) {
         else -> LightColors
     }
 
+    val courseAccentColors = if (isSystemInDarkTheme()) DarkCourseAccentColors else LightCourseAccentColors
+
     // Apply Material Design 3 theme
-    MaterialTheme(
-        colorScheme = colorScheme,
-        content = content,
-    )
+    CompositionLocalProvider(LocalCourseAccentColors provides courseAccentColors) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            content = content,
+        )
+    }
 }

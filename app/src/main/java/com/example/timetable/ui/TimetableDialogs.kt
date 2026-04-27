@@ -2,7 +2,9 @@ package com.example.timetable.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -23,9 +25,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.timetable.R
+import com.example.timetable.data.EntryConstants
+import com.example.timetable.data.EntryValidationError
+import com.example.timetable.data.EntryValidator
 import com.example.timetable.data.FixedWeekScheduleConfig
 import com.example.timetable.data.RecurrenceType
 import com.example.timetable.data.TimetableEntry
@@ -74,17 +80,11 @@ fun EntryEditorDialog(
     val context = LocalContext.current
 
     // Pre-load string resources for use in validation logic
-    val strEmptyName = stringResource(R.string.error_empty_course_name)
-    val strTitleTooLong = stringResource(R.string.error_title_too_long)
-    val strInvalidDate = stringResource(R.string.error_invalid_date)
-    val strInvalidTime = stringResource(R.string.error_invalid_time)
-    val strInvalidTimeRange = stringResource(R.string.error_invalid_time_range)
-    val strLocationTooLong = stringResource(R.string.error_location_too_long)
-    val strNoteTooLong = stringResource(R.string.error_note_too_long)
-    val strInvalidSemesterDate = stringResource(R.string.error_invalid_semester_date)
-    val strInvalidCustomWeeks = stringResource(R.string.error_invalid_custom_weeks)
-    val strInvalidSkipWeeks = stringResource(R.string.error_invalid_skip_weeks)
-    val strEmptyCustomWeeks = stringResource(R.string.error_empty_custom_weeks)
+    val validationErrorMessages = remember {
+        EntryValidationError.entries.associateWith { error ->
+            context.getString(error.messageResId)
+        }
+    }
 
     // Auto-fill semester start date from global config if empty
     val globalSemesterDate = remember { SemesterStore.getSemesterStartDate(context) }
@@ -209,22 +209,22 @@ fun EntryEditorDialog(
                     } else {
                         parseEntryDate(semesterStartDateText)
                     }
-                    val customWeeks = parseWeekList(normalizedCustomWeekList)
-                    val skipWeeks = parseWeekList(normalizedSkipWeekList)
+
+                    val error = EntryValidator.validateDraft(
+                        title = title,
+                        parsedDate = parsedDate,
+                        parsedStart = parsedStart,
+                        parsedEnd = parsedEnd,
+                        location = location,
+                        note = note,
+                        recurrenceType = recurrenceType,
+                        parsedSemesterStart = parsedSemesterStart,
+                        customWeekList = normalizedCustomWeekList,
+                        skipWeekList = normalizedSkipWeekList,
+                        weekRule = weekRule,
+                    )
                     when {
-                        title.trim().isBlank() -> errorText = strEmptyName
-                        title.trim().length > 64 -> errorText = strTitleTooLong
-                        parsedDate == null -> errorText = strInvalidDate
-                        parsedStart == null || parsedEnd == null -> errorText = strInvalidTime
-                        parsedStart >= parsedEnd -> errorText = strInvalidTimeRange
-                        location.trim().length > 64 -> errorText = strLocationTooLong
-                        note.trim().length > 256 -> errorText = strNoteTooLong
-                        recurrenceType == RecurrenceType.WEEKLY && parsedSemesterStart == null -> errorText = strInvalidSemesterDate
-                        recurrenceType == RecurrenceType.WEEKLY && customWeeks == null -> errorText = strInvalidCustomWeeks
-                        recurrenceType == RecurrenceType.WEEKLY && skipWeeks == null -> errorText = strInvalidSkipWeeks
-                        recurrenceType == RecurrenceType.WEEKLY && weekRule == WeekRule.CUSTOM && customWeeks.isNullOrEmpty() -> {
-                            errorText = strEmptyCustomWeeks
-                        }
+                        error != null -> errorText = validationErrorMessages[error]
                         else -> {
                             // Persist the semester start date to global config
                             if (recurrenceType == RecurrenceType.WEEKLY && parsedSemesterStart != null) {
@@ -380,25 +380,58 @@ fun TimeRangeFields(
     onStartChanged: (String) -> Unit,
     onEndChanged: (String) -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        AppTextField(
-            value = startTime,
-            onValueChange = onStartChanged,
-            label = stringResource(R.string.label_start_time),
-            placeholder = "08:00",
-            keyboardType = KeyboardType.Text,
-            singleLine = true,
-            modifier = Modifier.weight(1f),
+    val quickTimeOptions = remember {
+        listOf("08:00", "08:30", "10:00", "10:30", "14:00", "14:30", "16:00", "16:30")
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = stringResource(R.string.label_quick_times),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        AppTextField(
-            value = endTime,
-            onValueChange = onEndChanged,
-            label = stringResource(R.string.label_end_time),
-            placeholder = "09:30",
-            keyboardType = KeyboardType.Text,
-            singleLine = true,
-            modifier = Modifier.weight(1f),
-        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            quickTimeOptions.forEach { time ->
+                OutlinedButton(
+                    onClick = {
+                        if (startTime.isBlank() || startTime == time) {
+                            onStartChanged(time)
+                        } else {
+                            onEndChanged(time)
+                        }
+                    },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.defaultMinSize(minWidth = 1.dp, minHeight = 1.dp),
+                ) {
+                    Text(
+                        text = time,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            AppTextField(
+                value = startTime,
+                onValueChange = onStartChanged,
+                label = stringResource(R.string.label_start_time),
+                placeholder = "08:00",
+                keyboardType = KeyboardType.Text,
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+            AppTextField(
+                value = endTime,
+                onValueChange = onEndChanged,
+                label = stringResource(R.string.label_end_time),
+                placeholder = "09:30",
+                keyboardType = KeyboardType.Text,
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
 }
 
@@ -570,7 +603,7 @@ fun WeekSlotCountDialog(
                     val parsed = countText.toIntOrNull()
                     when {
                         parsed == null -> errorText = strInvalidNumber
-                        parsed !in 1..20 -> errorText = strSlotRange
+                        parsed !in EntryConstants.SLOT_COUNT_MIN..EntryConstants.SLOT_COUNT_MAX -> errorText = strSlotRange
                         else -> onSave(parsed)
                     }
                 },
@@ -861,13 +894,13 @@ private fun buildGeneratedWeekSlots(
     val parsedSlotCount = slotCountText.toIntOrNull()
     if (
         parsedStart == null ||
-        parsedStart >= 24 * 60 ||
+        parsedStart >= EntryConstants.MINUTES_PER_DAY ||
         parsedLessonDuration == null ||
         parsedBreakDuration == null ||
         parsedSlotCount == null ||
         parsedLessonDuration !in 1..240 ||
         parsedBreakDuration !in 0..120 ||
-        parsedSlotCount !in 1..20
+        parsedSlotCount !in EntryConstants.SLOT_COUNT_MIN..EntryConstants.SLOT_COUNT_MAX
     ) {
         return null
     }

@@ -109,6 +109,7 @@ fun ScheduleApp(
 
     val minDate = LocalDate.of(1970, 1, 1)
     val maxDate = LocalDate.of(2100, 12, 31)
+    @Suppress("MagicNumber") // Fallback date for initial state
     val initialDate = parseEntryDate(launchTarget.selectedDate.orEmpty())
         ?.takeIf { it in minDate..maxDate }
         ?: LocalDate.now().takeIf { it in minDate..maxDate }
@@ -323,23 +324,29 @@ fun ScheduleApp(
             when (currentDestination) {
                 AppDestination.WEEK -> {
                     WeekViewContent(
-                        selectedDate = selectedDate,
-                        selectedLocalDate = selectedLocalDate,
-                        selectedWeekStart = selectedWeekStart,
-                        selectedWeekEnd = selectedWeekEnd,
-                        minDate = minDate,
-                        maxDate = maxDate,
-                        entries = entries,
-                        dateRangeEntriesCache = dateRangeEntriesCache,
-                        weekTimeSlots = weekTimeSlots,
-                        weekCardAlpha = weekCardAlpha,
-                        weekCardHue = weekCardHue,
+                        config = WeekViewConfig(
+                            selectedDate = selectedDate,
+                            selectedLocalDate = selectedLocalDate,
+                            selectedWeekStart = selectedWeekStart,
+                            selectedWeekEnd = selectedWeekEnd,
+                            minDate = minDate,
+                            maxDate = maxDate,
+                        ),
+                        data = WeekViewData(
+                            entries = entries,
+                            dateRangeEntriesCache = dateRangeEntriesCache,
+                            weekTimeSlots = weekTimeSlots,
+                            weekCardAlpha = weekCardAlpha,
+                            weekCardHue = weekCardHue,
+                        ),
                         snackbarHostState = snackbarHostState,
-                        onDateChanged = { selectedDate = it },
-                        onEditEntry = { editingEntry = it },
-                        onEditWeekSlot = { editingWeekSlotIndex = it },
-                        onAddWeekSlot = { addingWeekSlotInitial = it },
-                        onEditFixedWeekSchedule = { editingFixedWeekSchedule = true },
+                        callbacks = WeekViewCallbacks(
+                            onDateChanged = { selectedDate = it },
+                            onEditEntry = { editingEntry = it },
+                            onEditWeekSlot = { editingWeekSlotIndex = it },
+                            onAddWeekSlot = { addingWeekSlotInitial = it },
+                            onEditFixedWeekSchedule = { editingFixedWeekSchedule = true },
+                        ),
                         contentPadding = padding,
                     )
                 }
@@ -357,29 +364,36 @@ fun ScheduleApp(
                         snackbarHostState = snackbarHostState,
                         importLauncher = importLauncher,
                         exportLauncher = exportLauncher,
-                        notificationPermissionLauncher = notificationPermissionLauncher,
-                        exactAlarmSettingsLauncher = exactAlarmSettingsLauncher,
-                        exactAlarmEnabled = exactAlarmEnabled,
-                        reminderMinutes = reminderMinutes,
-                        reminderOptions = reminderOptions,
-                        onReminderMinutesChange = { minutes ->
-                            reminderMinutes = minutes
-                            viewModel.updateReminderMinutes(minutes)
-                        },
-                        backgroundAppearance = backgroundAppearance,
-                        onBackgroundAppearanceChange = { backgroundAppearance = it },
-                        onSelectBackgroundImage = { backgroundImageLauncher.launch("image/*") },
-                        onAdjustCustomBackground = { showBackgroundAdjustDialog = true },
-                        weekCardAlpha = weekCardAlpha,
-                        onWeekCardAlphaChange = { alpha ->
-                            weekCardAlpha = alpha
-                            AppearanceStore.setWeekCardAlpha(context, alpha)
-                        },
-                        weekCardHue = weekCardHue,
-                        onWeekCardHueChange = { hue ->
-                            weekCardHue = hue
-                            AppearanceStore.setWeekCardHue(context, hue)
-                        },
+                        reminderConfig = ReminderConfig(
+                            minutes = reminderMinutes,
+                            options = reminderOptions,
+                            exactAlarmEnabled = exactAlarmEnabled,
+                            onMinutesChange = { minutes ->
+                                reminderMinutes = minutes
+                                viewModel.updateReminderMinutes(minutes)
+                            },
+                            onEnableNotifications = { notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
+                            onOpenExactAlarmSettings = {
+                                val intent = CourseReminderScheduler.buildExactAlarmSettingsIntent(context)
+                                if (intent != null) exactAlarmSettingsLauncher.launch(intent)
+                            },
+                        ),
+                        appearanceConfig = AppearanceConfig(
+                            backgroundAppearance = backgroundAppearance,
+                            onSelectBackgroundImage = { backgroundImageLauncher.launch("image/*") },
+                            onAdjustCustomBackground = { showBackgroundAdjustDialog = true },
+                            onBackgroundAppearanceChange = { backgroundAppearance = it },
+                            weekCardAlpha = weekCardAlpha,
+                            onWeekCardAlphaChange = { alpha ->
+                                weekCardAlpha = alpha
+                                AppearanceStore.setWeekCardAlpha(context, alpha)
+                            },
+                            weekCardHue = weekCardHue,
+                            onWeekCardHueChange = { hue ->
+                                weekCardHue = hue
+                                AppearanceStore.setWeekCardHue(context, hue)
+                            },
+                        ),
                         onDateChanged = { selectedDate = it },
                         onEditEntry = { editingEntry = it },
                         onDuplicateEntry = { entry ->
@@ -509,20 +523,8 @@ private fun DayViewContent(
     snackbarHostState: SnackbarHostState,
     importLauncher: androidx.activity.result.ActivityResultLauncher<Array<String>>,
     exportLauncher: androidx.activity.result.ActivityResultLauncher<String>,
-    notificationPermissionLauncher: androidx.activity.result.ActivityResultLauncher<String>,
-    exactAlarmSettingsLauncher: androidx.activity.result.ActivityResultLauncher<android.content.Intent>,
-    exactAlarmEnabled: Boolean,
-    reminderMinutes: List<Int>,
-    reminderOptions: List<Int>,
-    onReminderMinutesChange: (List<Int>) -> Unit,
-    backgroundAppearance: com.example.timetable.data.BackgroundAppearance,
-    onBackgroundAppearanceChange: (com.example.timetable.data.BackgroundAppearance) -> Unit,
-    onSelectBackgroundImage: () -> Unit,
-    onAdjustCustomBackground: () -> Unit,
-    weekCardAlpha: Float,
-    onWeekCardAlphaChange: (Float) -> Unit,
-    weekCardHue: Float,
-    onWeekCardHueChange: (Float) -> Unit,
+    reminderConfig: ReminderConfig,
+    appearanceConfig: AppearanceConfig,
     onDateChanged: (String) -> Unit,
     onEditEntry: (TimetableEntry) -> Unit,
     onDuplicateEntry: (TimetableEntry) -> Unit,
@@ -555,13 +557,9 @@ private fun DayViewContent(
             }
             .padding(padding),
     ) {
-        val context = LocalContext.current
-        val scope = rememberCoroutineScope()
         val listState = remember { androidx.compose.foundation.lazy.LazyListState() }
 
         DayScheduleList(
-            context = context,
-            scope = scope,
             listState = listState,
             snackbarHostState = snackbarHostState,
             entries = entries,
@@ -573,20 +571,8 @@ private fun DayViewContent(
             nextCourseSnapshot = nextCourseSnapshot,
             importLauncher = importLauncher,
             exportLauncher = exportLauncher,
-            notificationPermissionLauncher = notificationPermissionLauncher,
-            exactAlarmSettingsLauncher = exactAlarmSettingsLauncher,
-            exactAlarmEnabled = exactAlarmEnabled,
-            reminderMinutes = reminderMinutes,
-            reminderOptions = reminderOptions,
-            onReminderMinutesChange = onReminderMinutesChange,
-            backgroundAppearance = backgroundAppearance,
-            onBackgroundAppearanceChange = onBackgroundAppearanceChange,
-            onSelectBackgroundImage = onSelectBackgroundImage,
-            onAdjustCustomBackground = onAdjustCustomBackground,
-            weekCardAlpha = weekCardAlpha,
-            onWeekCardAlphaChange = onWeekCardAlphaChange,
-            weekCardHue = weekCardHue,
-            onWeekCardHueChange = onWeekCardHueChange,
+            reminderConfig = reminderConfig,
+            appearanceConfig = appearanceConfig,
             onDateChanged = onDateChanged,
             onEditEntry = onEditEntry,
             onDuplicateEntry = onDuplicateEntry,
@@ -672,6 +658,26 @@ internal fun nextWeekTimeSlot(previous: WeekTimeSlot): WeekTimeSlot? {
 data class PendingEntryConflict(
     val updatedEntry: TimetableEntry,
     val conflictEntry: TimetableEntry,
+)
+
+data class ReminderConfig(
+    val minutes: List<Int>,
+    val options: List<Int>,
+    val exactAlarmEnabled: Boolean,
+    val onMinutesChange: (List<Int>) -> Unit,
+    val onEnableNotifications: () -> Unit,
+    val onOpenExactAlarmSettings: () -> Unit,
+)
+
+data class AppearanceConfig(
+    val backgroundAppearance: com.example.timetable.data.BackgroundAppearance,
+    val onSelectBackgroundImage: () -> Unit,
+    val onAdjustCustomBackground: () -> Unit,
+    val onBackgroundAppearanceChange: (com.example.timetable.data.BackgroundAppearance) -> Unit,
+    val weekCardAlpha: Float,
+    val onWeekCardAlphaChange: (Float) -> Unit,
+    val weekCardHue: Float,
+    val onWeekCardHueChange: (Float) -> Unit,
 )
 
 internal fun NextCourseSnapshot.toCardState(unnamedLabel: String = ""): NextCourseCardState {

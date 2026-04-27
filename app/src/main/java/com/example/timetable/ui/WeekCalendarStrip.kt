@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -86,7 +85,7 @@ fun WeekCalendarStrip(
 
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = AppShape.CardLarge,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.80f),
         ),
@@ -149,7 +148,7 @@ private fun WeekCalendarDayCell(
             .padding(horizontal = 3.dp)
             .aspectRatio(0.85f)
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(RoundedCornerShape(16.dp))
+            .clip(AppShape.CardSmall)
             .background(containerColor)
             .semantics {
                 role = Role.Button
@@ -169,7 +168,7 @@ private fun WeekCalendarDayCell(
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
-                text = chineseWeekday(date.dayOfWeek, LocalContext.current),
+                text = weekdayLabel(date.dayOfWeek, LocalContext.current),
                 style = MaterialTheme.typography.labelSmall,
                 color = contentColor.copy(alpha = 0.82f),
                 textAlign = TextAlign.Center,

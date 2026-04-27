@@ -3,6 +3,8 @@ package com.example.timetable.ui
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.EaseInOutQuad
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,7 +21,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
@@ -104,7 +105,7 @@ fun PerpetualCalendar(
     }
 
     Card(
-        shape = RoundedCornerShape(24.dp),
+        shape = AppShape.CardLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f)),
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -154,24 +155,37 @@ fun PerpetualCalendar(
                     val hasCourse = datesWithEntries[date] == true
                     val dayContext = LocalContext.current
 
-                    val containerColor by animateColorAsState(
-                        targetValue = when {
-                            isSelected -> MaterialTheme.colorScheme.primary
-                            isToday -> MaterialTheme.colorScheme.primaryContainer
-                            else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
-                        },
-                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                        label = "calendarContainer",
-                    )
-                    val textColor by animateColorAsState(
-                        targetValue = when {
-                            isSelected -> MaterialTheme.colorScheme.onPrimary
-                            isToday -> MaterialTheme.colorScheme.onPrimaryContainer
-                            else -> MaterialTheme.colorScheme.onSurface
-                        },
-                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                        label = "calendarText",
-                    )
+                    // Only animate color for selected items; static items use direct colors
+                    val containerColor by if (isSelected || isToday) {
+                        animateColorAsState(
+                            targetValue = when {
+                                isSelected -> MaterialTheme.colorScheme.primary
+                                isToday -> MaterialTheme.colorScheme.primaryContainer
+                                else -> Color.Transparent
+                            },
+                            animationSpec = tween(durationMillis = 350, easing = EaseInOutQuad),
+                            label = "calendarContainerColor",
+                        )
+                    } else {
+                        remember {
+                            mutableStateOf(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f))
+                        }
+                    }
+                    val textColor by if (isSelected || isToday) {
+                        animateColorAsState(
+                            targetValue = when {
+                                isSelected -> MaterialTheme.colorScheme.onPrimary
+                                isToday -> MaterialTheme.colorScheme.onPrimaryContainer
+                                else -> MaterialTheme.colorScheme.onSurface
+                            },
+                            animationSpec = tween(durationMillis = 350, easing = EaseInOutQuad),
+                            label = "calendarTextColor",
+                        )
+                    } else {
+                        remember {
+                            mutableStateOf(MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
 
                     Card(
                         modifier = Modifier
@@ -188,7 +202,7 @@ fun PerpetualCalendar(
                                 )
                             }
                             .clickable { onDateChanged(date.toString()) },
-                        shape = RoundedCornerShape(18.dp),
+                        shape = AppShape.CalendarDay,
                         colors = CardDefaults.cardColors(containerColor = containerColor),
                         elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 2.dp else 0.dp),
                     ) {
@@ -200,7 +214,7 @@ fun PerpetualCalendar(
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             Text(
-                                text = chineseWeekday(date.dayOfWeek, LocalContext.current),
+                                text = weekdayLabel(date.dayOfWeek, LocalContext.current),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = textColor.copy(alpha = 0.8f),
                                 textAlign = TextAlign.Center,

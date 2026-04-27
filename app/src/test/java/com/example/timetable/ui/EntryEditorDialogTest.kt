@@ -49,7 +49,7 @@ class EntryEditorDialogTest {
             title = "Math",
             date = "2026-09-01",
             dayOfWeek = 2,
-            startMinutes = 8 * 60,
+            startMinutes = 10 * 60, // 直接设置开始时间晚于结束时间
             endMinutes = 9 * 60
         )
 
@@ -61,10 +61,6 @@ class EntryEditorDialogTest {
             )
         }
 
-        // Change start time to be after end time
-        composeTestRule.onNodeWithText("08:00").performTextClearance()
-        composeTestRule.onNodeWithText("开始时间").performTextInput("10:00")
-        
         composeTestRule.onNodeWithText("保存").performClick()
         composeTestRule.onNodeWithText("结束时间需要晚于开始时间").assertExists()
     }

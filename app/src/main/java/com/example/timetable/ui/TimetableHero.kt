@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.ColorLens
@@ -66,36 +65,40 @@ import androidx.compose.ui.unit.sp
 import com.example.timetable.data.AppBackgroundMode
 import com.example.timetable.notify.CourseReminderScheduler
 
+data class HeroSectionConfig(
+    val courseCount: Int,
+    val onImport: () -> Unit,
+    val onExport: () -> Unit,
+    val onEnableNotifications: () -> Unit,
+    val exactAlarmPermissionRequired: Boolean,
+    val exactAlarmEnabled: Boolean,
+    val onOpenExactAlarmSettings: () -> Unit,
+    val reminderMinutes: List<Int>,
+    val reminderOptions: List<Int>,
+    val onReminderMinutesChange: (List<Int>) -> Unit,
+    val backgroundMode: AppBackgroundMode,
+    val hasCustomBackground: Boolean,
+    val onSelectBackgroundImage: () -> Unit,
+    val onUseBundledBackground: () -> Unit,
+    val onUseGradientBackground: () -> Unit,
+    val onAdjustCustomBackground: () -> Unit,
+    val onClearCustomBackground: () -> Unit,
+    val weekCardAlpha: Float,
+    val onWeekCardAlphaChange: (Float) -> Unit,
+    val weekCardHue: Float,
+    val onWeekCardHueChange: (Float) -> Unit,
+)
+
 @Composable
 fun HeroSection(
-    courseCount: Int,
-    onImport: () -> Unit,
-    onExport: () -> Unit,
-    onEnableNotifications: () -> Unit,
-    exactAlarmPermissionRequired: Boolean,
-    exactAlarmEnabled: Boolean,
-    onOpenExactAlarmSettings: () -> Unit,
-    reminderMinutes: List<Int>,
-    reminderOptions: List<Int>,
-    onReminderMinutesChange: (List<Int>) -> Unit,
-    backgroundMode: AppBackgroundMode,
-    hasCustomBackground: Boolean,
-    onSelectBackgroundImage: () -> Unit,
-    onUseBundledBackground: () -> Unit,
-    onUseGradientBackground: () -> Unit,
-    onAdjustCustomBackground: () -> Unit,
-    onClearCustomBackground: () -> Unit,
-    weekCardAlpha: Float,
-    onWeekCardAlphaChange: (Float) -> Unit,
-    weekCardHue: Float,
-    onWeekCardHueChange: (Float) -> Unit,
+    config: HeroSectionConfig,
 ) {
     var showReminderSheet by remember { mutableStateOf(false) }
     var showAppearanceDialog by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = AppShape.CardLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.84f)),
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -121,7 +124,7 @@ fun HeroSection(
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
                 Text(
-                    text = stringResource(R.string.hero_subtitle, courseCount),
+                    text = stringResource(R.string.hero_subtitle, config.courseCount),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
                 )
@@ -134,18 +137,18 @@ fun HeroSection(
                 HeroActionChip(
                     icon = Icons.Default.Download,
                     label = stringResource(R.string.hero_import),
-                    onClick = onImport,
+                    onClick = config.onImport,
                     modifier = Modifier.weight(1f),
                 )
                 HeroActionChip(
                     icon = Icons.Default.Upload,
                     label = stringResource(R.string.hero_export),
-                    onClick = onExport,
+                    onClick = config.onExport,
                     modifier = Modifier.weight(1f),
                 )
                 HeroActionChip(
                     icon = Icons.Default.NotificationsActive,
-                    label = stringResource(R.string.hero_reminder, CourseReminderScheduler.formatReminderChipLabel(reminderMinutes)),
+                    label = stringResource(R.string.hero_reminder, CourseReminderScheduler.formatReminderChipLabel(config.reminderMinutes)),
                     onClick = { showReminderSheet = true },
                     modifier = Modifier.weight(1f),
                 )
@@ -161,21 +164,21 @@ fun HeroSection(
 
     if (showReminderSheet) {
         ReminderPickerDialog(
-            reminderMinutes = reminderMinutes,
-            reminderOptions = reminderOptions,
-            exactAlarmPermissionRequired = exactAlarmPermissionRequired,
-            exactAlarmEnabled = exactAlarmEnabled,
+            reminderMinutes = config.reminderMinutes,
+            reminderOptions = config.reminderOptions,
+            exactAlarmPermissionRequired = config.exactAlarmPermissionRequired,
+            exactAlarmEnabled = config.exactAlarmEnabled,
             onDismiss = { showReminderSheet = false },
             onSelect = {
-                onReminderMinutesChange(it)
+                config.onReminderMinutesChange(it)
                 showReminderSheet = false
             },
             onEnableNotifications = {
-                onEnableNotifications()
+                config.onEnableNotifications()
                 showReminderSheet = false
             },
             onOpenExactAlarmSettings = {
-                onOpenExactAlarmSettings()
+                config.onOpenExactAlarmSettings()
                 showReminderSheet = false
             },
         )
@@ -184,17 +187,17 @@ fun HeroSection(
     if (showAppearanceDialog) {
         AppearanceDialog(
             onDismiss = { showAppearanceDialog = false },
-            backgroundMode = backgroundMode,
-            hasCustomBackground = hasCustomBackground,
-            onSelectBackgroundImage = onSelectBackgroundImage,
-            onUseBundledBackground = onUseBundledBackground,
-            onUseGradientBackground = onUseGradientBackground,
-            onAdjustCustomBackground = onAdjustCustomBackground,
-            onClearCustomBackground = onClearCustomBackground,
-            weekCardAlpha = weekCardAlpha,
-            onWeekCardAlphaChange = onWeekCardAlphaChange,
-            weekCardHue = weekCardHue,
-            onWeekCardHueChange = onWeekCardHueChange,
+            backgroundMode = config.backgroundMode,
+            hasCustomBackground = config.hasCustomBackground,
+            onSelectBackgroundImage = config.onSelectBackgroundImage,
+            onUseBundledBackground = config.onUseBundledBackground,
+            onUseGradientBackground = config.onUseGradientBackground,
+            onAdjustCustomBackground = config.onAdjustCustomBackground,
+            onClearCustomBackground = config.onClearCustomBackground,
+            weekCardAlpha = config.weekCardAlpha,
+            onWeekCardAlphaChange = config.onWeekCardAlphaChange,
+            weekCardHue = config.weekCardHue,
+            onWeekCardHueChange = config.onWeekCardHueChange,
         )
     }
 }
@@ -209,14 +212,14 @@ private fun HeroActionChip(
     val context = LocalContext.current
     Surface(
         modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
+            .clip(AppShape.CardExtraSmall)
             .semantics {
                 role = Role.Button
                 contentDescription = buildHeroActionContentDescription(context, label)
             }
             .clickable(onClick = onClick),
         color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.18f),
-        shape = RoundedCornerShape(14.dp),
+        shape = AppShape.CardExtraSmall,
     ) {
         Column(
             modifier = Modifier
@@ -343,7 +346,7 @@ private fun AppearanceDialog(
                     ) {
                         Icon(
                             imageVector = Icons.Default.ColorLens,
-                            contentDescription = null,
+                            contentDescription = stringResource(R.string.content_desc_color_adjust),
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(18.dp),
                         )
@@ -361,7 +364,7 @@ private fun AppearanceDialog(
                     ) {
                         Surface(
                             color = previewColor,
-                            shape = RoundedCornerShape(12.dp),
+                            shape = AppShape.Chip,
                             modifier = Modifier.size(width = 56.dp, height = 32.dp),
                         ) {}
                         Text(
@@ -379,7 +382,7 @@ private fun AppearanceDialog(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Opacity,
-                            contentDescription = null,
+                            contentDescription = stringResource(R.string.content_desc_opacity_adjust),
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(18.dp),
                         )
@@ -401,7 +404,7 @@ private fun AppearanceDialog(
         confirmButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_done)) }
         },
-        shape = RoundedCornerShape(20.dp),
+        shape = AppShape.CardMedium,
     )
 }
 
@@ -521,7 +524,7 @@ private fun ReminderPickerDialog(
                     selectedReminderMinutes.forEach { minute ->
                         OutlinedButton(
                             onClick = { toggleReminder(minute) },
-                            shape = RoundedCornerShape(10.dp),
+                            shape = AppShape.Badge,
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                         ) {
                             Text("${minute}m")
@@ -540,13 +543,13 @@ private fun ReminderPickerDialog(
                         if (selected) {
                             Button(
                                 onClick = { toggleReminder(option) },
-                                shape = RoundedCornerShape(10.dp),
+                                shape = AppShape.Badge,
                                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                             ) { Text("${option}m") }
                         } else {
                             OutlinedButton(
                                 onClick = { toggleReminder(option) },
-                                shape = RoundedCornerShape(10.dp),
+                                shape = AppShape.Badge,
                                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                             ) { Text("${option}m") }
                         }
@@ -589,7 +592,7 @@ private fun ReminderPickerDialog(
                 TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
             }
         },
-        shape = RoundedCornerShape(20.dp),
+        shape = AppShape.CardMedium,
     )
 }
 
@@ -624,19 +627,19 @@ fun ViewModeSwitcher(
         NavigationBarItem(
             selected = currentDestination == AppDestination.DAY,
             onClick = { onDestinationChange(AppDestination.DAY) },
-            icon = { Icon(Icons.Default.CalendarToday, contentDescription = null) },
+            icon = { Icon(Icons.Default.CalendarToday, contentDescription = stringResource(R.string.nav_day_view)) },
             label = { Text(stringResource(R.string.nav_day_view)) },
         )
         NavigationBarItem(
             selected = currentDestination == AppDestination.WEEK,
             onClick = { onDestinationChange(AppDestination.WEEK) },
-            icon = { Icon(Icons.Default.DateRange, contentDescription = null) },
+            icon = { Icon(Icons.Default.DateRange, contentDescription = stringResource(R.string.nav_week_view)) },
             label = { Text(stringResource(R.string.nav_week_view)) },
         )
         NavigationBarItem(
             selected = currentDestination == AppDestination.SETTINGS,
             onClick = { onDestinationChange(AppDestination.SETTINGS) },
-            icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+            icon = { Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.nav_settings)) },
             label = { Text(stringResource(R.string.nav_settings)) },
         )
     }

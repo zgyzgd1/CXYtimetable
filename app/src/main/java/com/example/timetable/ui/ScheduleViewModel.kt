@@ -7,6 +7,9 @@ import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.timetable.R
+import com.example.timetable.data.EntryConstants
+import com.example.timetable.data.EntryValidationError
+import com.example.timetable.data.EntryValidator
 import com.example.timetable.data.IcsCalendar
 import com.example.timetable.data.MAX_EXPANDED_OCCURRENCES
 import com.example.timetable.data.RecurrenceType
@@ -338,38 +341,8 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
 
     private fun validateEntry(entry: TimetableEntry): String? {
         val app = getApplication<Application>()
-        val recurrence = resolveRecurrenceType(entry.recurrenceType) ?: return app.getString(R.string.val_invalid_recurrence)
-        val weekRule = resolveWeekRule(entry.weekRule) ?: return app.getString(R.string.val_invalid_week_rule)
-        val customWeeks = parseWeekList(entry.customWeekList) ?: return app.getString(R.string.val_invalid_custom_weeks)
-        val skipWeeks = parseWeekList(entry.skipWeekList) ?: return app.getString(R.string.val_invalid_skip_weeks)
-        val entryDate = parseEntryDate(entry.date) ?: return app.getString(R.string.val_invalid_date)
-        val semesterStartDate = entry.semesterStartDate.takeIf { it.isNotBlank() }?.let { parseEntryDate(it) }
-        return when {
-            entry.title.isBlank() -> app.getString(R.string.val_empty_title)
-            entry.title.length > 64 -> app.getString(R.string.val_title_too_long)
-            entry.location.length > 64 -> app.getString(R.string.val_location_too_long)
-            entry.note.length > 256 -> app.getString(R.string.val_note_too_long)
-            entry.startMinutes !in 0 until 24 * 60 -> app.getString(R.string.val_invalid_start)
-            entry.endMinutes !in 1..24 * 60 -> app.getString(R.string.val_invalid_end)
-            entry.startMinutes >= entry.endMinutes -> app.getString(R.string.val_end_before_start)
-            recurrence == RecurrenceType.WEEKLY && semesterStartDate == null -> app.getString(R.string.val_invalid_semester_date)
-            recurrence == RecurrenceType.WEEKLY && weekRule == WeekRule.CUSTOM && customWeeks.isEmpty() -> {
-                app.getString(R.string.val_empty_custom_weeks)
-            }
-            recurrence == RecurrenceType.WEEKLY && !occursOnDate(entry, entryDate) -> {
-                app.getString(R.string.val_week_mismatch)
-            }
-            recurrence != RecurrenceType.WEEKLY && weekRule != WeekRule.ALL -> {
-                app.getString(R.string.val_non_weekly_odd_even)
-            }
-            recurrence != RecurrenceType.WEEKLY && customWeeks.isNotEmpty() -> {
-                app.getString(R.string.val_non_weekly_custom)
-            }
-            recurrence != RecurrenceType.WEEKLY && skipWeeks.isNotEmpty() -> {
-                app.getString(R.string.val_non_weekly_skip)
-            }
-            else -> null
-        }
+        val error = EntryValidator.validate(entry) ?: return null
+        return app.getString(error.messageResId)
     }
 
 

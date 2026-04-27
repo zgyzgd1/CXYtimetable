@@ -28,8 +28,12 @@ import kotlinx.coroutines.withContext
 @Composable
 fun AppBackgroundLayer(backgroundAppearance: BackgroundAppearance) {
     val context = LocalContext.current
-    val customBackground by produceState<ImageBitmap?>(initialValue = null, backgroundAppearance) {
-        value = if (backgroundAppearance.mode == AppBackgroundMode.CUSTOM_IMAGE) {
+    // Only decode custom background when mode is CUSTOM_IMAGE; cache bitmap until mode changes
+    val customBackground by produceState<ImageBitmap?>(
+        initialValue = null,
+        key1 = backgroundAppearance.mode,
+    ) {
+        if (backgroundAppearance.mode == AppBackgroundMode.CUSTOM_IMAGE) {
             withContext(Dispatchers.IO) {
                 BackgroundImageManager.customBackgroundFile(context)
                     .takeIf { it.isFile }
@@ -42,15 +46,17 @@ fun AppBackgroundLayer(backgroundAppearance: BackgroundAppearance) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        when {
-            customBackground != null -> {
-                CustomBackgroundImage(
-                    bitmap = customBackground!!,
-                    imageTransform = backgroundAppearance.imageTransform,
-                    modifier = Modifier.fillMaxSize(),
-                )
+        when (backgroundAppearance.mode) {
+            AppBackgroundMode.CUSTOM_IMAGE -> {
+                customBackground?.let { bitmap ->
+                    CustomBackgroundImage(
+                        bitmap = bitmap,
+                        imageTransform = backgroundAppearance.imageTransform,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
-            backgroundAppearance.mode != AppBackgroundMode.GRADIENT -> {
+            AppBackgroundMode.BUNDLED_IMAGE -> {
                 Image(
                     painter = painterResource(id = R.drawable.default_background_image),
                     contentDescription = null,
@@ -59,6 +65,7 @@ fun AppBackgroundLayer(backgroundAppearance: BackgroundAppearance) {
                     alignment = BiasAlignment(horizontalBias = 0.28f, verticalBias = -0.10f),
                 )
             }
+            AppBackgroundMode.GRADIENT -> { /* No image layer for gradient mode */ }
         }
 
         BackgroundTintOverlays(modifier = Modifier.fillMaxSize())

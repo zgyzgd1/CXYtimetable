@@ -5,7 +5,8 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.AccessTime
@@ -29,14 +29,18 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,30 +54,34 @@ import com.example.timetable.R
 import com.example.timetable.data.TimetableEntry
 import com.example.timetable.data.dayLabel
 import com.example.timetable.data.formatMinutes
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 
-internal val courseAccentColors = listOf(
-    Color(0xFF7986CB),
-    Color(0xFF4DB6AC),
-    Color(0xFFFF8A65),
-    Color(0xFFA1887F),
-    Color(0xFF4FC3F7),
-    Color(0xFFAED581),
-    Color(0xFFBA68C8),
-    Color(0xFFFFB74D),
-    Color(0xFFF06292),
-    Color(0xFF4DD0E1),
-)
+internal fun accentColorFor(title: String, colors: List<Color> = LightCourseAccentColors): Color =
+    colors[(title.hashCode() and Int.MAX_VALUE) % colors.size]
 
-data class NextCourseCardState(
-    val title: String,
-    val timeRange: String,
-    val location: String,
-    val statusText: String,
-)
+private fun buildEntryCardContentDescription(
+    entry: TimetableEntry,
+    unnamedLabel: String,
+    locationLabel: String,
+    noteLabel: String,
+): String {
+    val parts = mutableListOf<String>()
+    parts.add(entry.title.ifBlank { unnamedLabel })
+    parts.add("${formatMinutes(entry.startMinutes)} - ${formatMinutes(entry.endMinutes)}")
+    parts.add(dayLabel(entry.dayOfWeek))
+    if (entry.location.isNotBlank()) {
+        parts.add("$locationLabel ${entry.location}")
+    }
+    if (entry.note.isNotBlank()) {
+        parts.add("$noteLabel ${entry.note}")
+    }
+    return parts.joinToString(", ")
+}
 
-internal fun accentColorFor(title: String): Color =
-    courseAccentColors[(title.hashCode() and Int.MAX_VALUE) % courseAccentColors.size]
-
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun EntryCard(
     entry: TimetableEntry,
@@ -82,46 +90,57 @@ fun EntryCard(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val accent = remember(entry.title) { accentColorFor(entry.title) }
+    val courseColors = LocalCourseAccentColors.current
+    val accent = remember(entry.title, courseColors) { accentColorFor(entry.title, courseColors) }
     val unnamedCourse = stringResource(R.string.label_unnamed_course)
+    val contentDesc = buildEntryCardContentDescription(
+        entry = entry,
+        unnamedLabel = unnamedCourse,
+        locationLabel = stringResource(R.string.content_desc_course_location),
+        noteLabel = stringResource(R.string.content_desc_course_note),
+    )
+    var showMenu by remember { mutableStateOf(false) }
 
-    Card(
-        modifier = modifier
-            .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
-            .clickable(onClick = onEdit),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.80f)),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Min),
+    Box {
+        Card(
+            modifier = modifier
+                .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+                .combinedClickable(
+                    onClick = onEdit,
+                    onLongClick = { showMenu = true },
+                )
+                .semantics {
+                    role = Role.Button
+                    this.contentDescription = contentDesc
+                },
+            shape = AppShape.CardLarge,
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.80f)),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         ) {
-            Box(
-                modifier = Modifier
-                    .width(7.dp)
-                    .fillMaxHeight()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                accent.copy(alpha = 0.98f),
-                                accent.copy(alpha = 0.72f),
-                            ),
-                        ),
-                    ),
-            )
-
             Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 18.dp, end = 10.dp, top = 18.dp, bottom = 18.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Min),
             ) {
+                Box(
+                    modifier = Modifier
+                        .width(7.dp)
+                        .fillMaxHeight()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    accent.copy(alpha = 0.98f),
+                                    accent.copy(alpha = 0.72f),
+                                ),
+                            ),
+                        ),
+                )
+
                 Column(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 18.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Text(
@@ -138,7 +157,7 @@ fun EntryCard(
                     ) {
                         Surface(
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
-                            shape = RoundedCornerShape(999.dp),
+                            shape = AppShape.Pill,
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -147,7 +166,7 @@ fun EntryCard(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.AccessTime,
-                                    contentDescription = null,
+                                    contentDescription = stringResource(R.string.content_desc_course_time),
                                     modifier = Modifier.size(13.dp),
                                     tint = accent,
                                 )
@@ -161,7 +180,7 @@ fun EntryCard(
                         Spacer(modifier = Modifier.width(6.dp))
                         Surface(
                             color = accent.copy(alpha = 0.14f),
-                            shape = RoundedCornerShape(999.dp),
+                            shape = AppShape.Pill,
                         ) {
                             Text(
                                 text = dayLabel(entry.dayOfWeek),
@@ -178,8 +197,8 @@ fun EntryCard(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             Icon(
-                                imageVector = Icons.Default.LocationOn,
-                                contentDescription = null,
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = stringResource(R.string.content_desc_course_location),
                                 modifier = Modifier.size(13.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -199,8 +218,8 @@ fun EntryCard(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Notes,
-                                contentDescription = null,
+                                    imageVector = Icons.AutoMirrored.Filled.Notes,
+                                    contentDescription = stringResource(R.string.content_desc_course_note),
                                 modifier = Modifier.size(13.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -214,55 +233,61 @@ fun EntryCard(
                         }
                     }
                 }
-
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    IconButton(
-                        onClick = onEdit,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.78f))
-                            .size(38.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = stringResource(R.string.card_edit),
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    IconButton(
-                        onClick = onDuplicate,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.78f))
-                            .size(38.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ContentCopy,
-                            contentDescription = stringResource(R.string.card_copy),
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.78f))
-                            .size(38.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = stringResource(R.string.card_delete_content_desc),
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
-                        )
-                    }
-                }
             }
+        }
+
+        DropdownMenu(
+            expanded = showMenu,
+            onDismissRequest = { showMenu = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.card_menu_edit)) },
+                onClick = {
+                    showMenu = false
+                    onEdit()
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = stringResource(R.string.card_menu_edit),
+                        modifier = Modifier.size(18.dp),
+                    )
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.card_menu_duplicate)) },
+                onClick = {
+                    showMenu = false
+                    onDuplicate()
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.ContentCopy,
+                        contentDescription = stringResource(R.string.card_menu_duplicate),
+                        modifier = Modifier.size(18.dp),
+                    )
+                },
+            )
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        text = stringResource(R.string.card_menu_delete),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                },
+                onClick = {
+                    showMenu = false
+                    onDelete()
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = stringResource(R.string.card_menu_delete),
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                },
+            )
         }
     }
 }
@@ -275,7 +300,7 @@ fun NextCourseCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = AppShape.CardMedium,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.80f)),
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -298,7 +323,7 @@ fun NextCourseCard(
                 )
                 Surface(
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
-                    shape = RoundedCornerShape(999.dp),
+                    shape = AppShape.Pill,
                 ) {
                     Text(
                         text = state.statusText,
@@ -323,7 +348,7 @@ fun NextCourseCard(
             ) {
                 Icon(
                     imageVector = Icons.Default.AccessTime,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.content_desc_course_time),
                     modifier = Modifier.size(14.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -339,10 +364,10 @@ fun NextCourseCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = stringResource(R.string.content_desc_course_location),
+                    modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
@@ -357,7 +382,7 @@ fun NextCourseCard(
 
             FilledTonalButton(
                 onClick = onViewDay,
-                shape = RoundedCornerShape(12.dp),
+                shape = AppShape.Chip,
             ) {
                 Text(stringResource(R.string.card_view_day_schedule))
             }
@@ -368,7 +393,7 @@ fun NextCourseCard(
 @Composable
 fun EmptyStateCard(onAdd: () -> Unit) {
     Card(
-        shape = RoundedCornerShape(24.dp),
+        shape = AppShape.CardLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.80f)),
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -401,11 +426,11 @@ fun EmptyStateCard(onAdd: () -> Unit) {
             }
             FilledTonalButton(
                 onClick = onAdd,
-                shape = RoundedCornerShape(12.dp),
+                shape = AppShape.Chip,
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.content_desc_add),
                     modifier = Modifier.size(16.dp),
                 )
                 Spacer(modifier = Modifier.width(6.dp))

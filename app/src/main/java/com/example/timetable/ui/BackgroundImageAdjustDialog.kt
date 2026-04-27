@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -100,7 +99,7 @@ fun BackgroundImageAdjustDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(24.dp),
-            shape = RoundedCornerShape(28.dp),
+            shape = AppShape.Dialog,
             tonalElevation = 6.dp,
         ) {
             Column(
@@ -127,7 +126,7 @@ fun BackgroundImageAdjustDialog(
                             .align(Alignment.CenterHorizontally)
                             .width(156.dp)
                             .aspectRatio(previewAspectRatio)
-                            .clip(RoundedCornerShape(26.dp))
+                            .clip(AppShape.DialogContent)
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f)),
                     ) {
                         CustomBackgroundImage(
@@ -144,7 +143,7 @@ fun BackgroundImageAdjustDialog(
                         ) {
                             Surface(
                                 color = Color.White.copy(alpha = 0.22f),
-                                shape = RoundedCornerShape(16.dp),
+                                shape = AppShape.CardSmall,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(34.dp),
@@ -153,7 +152,7 @@ fun BackgroundImageAdjustDialog(
                                 repeat(3) {
                                     Surface(
                                         color = Color.White.copy(alpha = 0.20f),
-                                        shape = RoundedCornerShape(14.dp),
+                                        shape = AppShape.CardExtraSmall,
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(28.dp),
@@ -165,7 +164,7 @@ fun BackgroundImageAdjustDialog(
                 } else {
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
-                        shape = RoundedCornerShape(18.dp),
+                        shape = AppShape.CalendarDay,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(

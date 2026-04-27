@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Icon
@@ -54,7 +53,7 @@ import java.time.LocalDate
 import java.time.temporal.WeekFields
 import java.util.Locale
 
-// Course accent colors are now unified via accentColorFor() from TimetableCards.kt
+// Course accent colors are unified via accentColorFor() + LocalCourseAccentColors
 
 @Composable
 fun WeekScheduleBoard(
@@ -97,12 +96,12 @@ fun WeekScheduleBoard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(24.dp))
+                .clip(AppShape.CardLarge)
                 .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.25f))
                 .border(
                     width = 1.dp,
                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
-                    shape = RoundedCornerShape(24.dp),
+                    shape = AppShape.CardLarge,
                 ),
         ) {
             WeekOverviewHeader(
@@ -260,7 +259,7 @@ private fun SummaryPill(
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(12.dp),
+        shape = AppShape.Chip,
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -349,13 +348,13 @@ private fun DayHeaderCell(
             .width(width)
             .height(height)
             .padding(horizontal = 2.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(AppShape.CardSmall)
             .background(if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else Color.Transparent),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = chineseWeekday(day.dayOfWeek, LocalContext.current),
+            text = weekdayLabel(day.dayOfWeek, LocalContext.current),
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
@@ -414,14 +413,15 @@ private fun WeekDayLane(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(slotHeight)
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(AppShape.CardSmall)
                         .background(if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.08f)),
                 )
             }
         }
 
+        val courseColors = LocalCourseAccentColors.current
         layouts.forEach { layout ->
-            val color = accentColorFor(layout.entry.title)
+            val color = accentColorFor(layout.entry.title, courseColors)
             WeekEntryBlock(
                 modifier = Modifier
                     .align(Alignment.TopStart)
@@ -465,7 +465,7 @@ private fun TimeSlotCell(
         modifier = Modifier
             .width(width)
             .height(height)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(AppShape.Chip)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
             .semantics {
                 role = Role.Button
@@ -513,7 +513,7 @@ private fun GlassActionChip(
         onClick = onClick,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(12.dp),
+        shape = AppShape.Chip,
         shadowElevation = 0.dp,
     ) {
         Text(
@@ -534,11 +534,11 @@ private fun WeekEntryBlock(
     val entryContext = LocalContext.current
     BoxWithConstraints(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(AppShape.CardSmall)
             .border(
                 width = 1.dp,
                 color = Color.White.copy(alpha = 0.16f),
-                shape = RoundedCornerShape(16.dp),
+                shape = AppShape.CardSmall,
             )
             .background(color)
             .semantics {
@@ -559,8 +559,8 @@ private fun WeekEntryBlock(
         val innerSpacing = if (maxHeight >= 120.dp) 4.dp else 2.dp
         // Ensure readable text: use dark text when card color is too light
         val luminance = 0.2126f * color.red + 0.7152f * color.green + 0.0722f * color.blue
-        val textColor = if (luminance > 0.5f) Color(0xDE1C1B1F) else Color.White
-        val subTextColor = if (luminance > 0.5f) Color(0x991C1B1F) else Color.White.copy(alpha = 0.92f)
+        val textColor = if (luminance > 0.5f) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.87f) else Color.White
+        val subTextColor = if (luminance > 0.5f) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.92f)
 
         Column(
             modifier = Modifier
@@ -631,7 +631,7 @@ private data class TimeAnchor(
     val positionPx: Float,
 )
 
-internal fun chineseWeekday(dayOfWeek: DayOfWeek, context: Context): String = when (dayOfWeek) {
+internal fun weekdayLabel(dayOfWeek: DayOfWeek, context: Context): String = when (dayOfWeek) {
     DayOfWeek.MONDAY -> context.getString(R.string.weekday_mon)
     DayOfWeek.TUESDAY -> context.getString(R.string.weekday_tue)
     DayOfWeek.WEDNESDAY -> context.getString(R.string.weekday_wed)
