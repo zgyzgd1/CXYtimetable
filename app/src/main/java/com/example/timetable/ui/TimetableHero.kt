@@ -99,8 +99,8 @@ fun HeroSection(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = AppShape.CardLarge,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.84f)),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.surfaceCardLighter()),
+        border = BorderStroke(1.dp, Color.White.borderCard()),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(
@@ -109,8 +109,8 @@ fun HeroSection(
                 .background(
                     Brush.linearGradient(
                         colors = listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.92f),
-                            MaterialTheme.colorScheme.tertiary.copy(alpha = 0.78f),
+                            MaterialTheme.colorScheme.primary.overlayPrimaryHigh(),
+                            MaterialTheme.colorScheme.tertiary.overlayHint(),
                         ),
                     ),
                 )
@@ -126,7 +126,7 @@ fun HeroSection(
                 Text(
                     text = stringResource(R.string.hero_subtitle, config.courseCount),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
+                    color = MaterialTheme.colorScheme.onPrimary.overlaySecondary(),
                 )
             }
 
@@ -218,7 +218,7 @@ private fun HeroActionChip(
                 contentDescription = buildHeroActionContentDescription(context, label)
             }
             .clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.18f),
+        color = MaterialTheme.colorScheme.onPrimary.overlayActive(),
         shape = AppShape.CardExtraSmall,
     ) {
         Column(
@@ -238,7 +238,7 @@ private fun HeroActionChip(
                 text = label,
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.Medium,
-                    fontSize = 11.sp,
+                    fontSize = MaterialTheme.typography.labelSmall.fontSize,
                 ),
                 color = MaterialTheme.colorScheme.onPrimary,
                 maxLines = 1,
@@ -287,7 +287,7 @@ private fun AppearanceDialog(
                     Text(
                         text = stringResource(R.string.bg_custom_hint),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.overlayPrimaryMedium(),
                     )
                     Button(
                         onClick = {
@@ -623,7 +623,7 @@ fun ViewModeSwitcher(
     currentDestination: AppDestination,
     onDestinationChange: (AppDestination) -> Unit,
 ) {
-    NavigationBar(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.80f)) {
+    NavigationBar(containerColor = MaterialTheme.colorScheme.surface.navigationBar()) {
         NavigationBarItem(
             selected = currentDestination == AppDestination.DAY,
             onClick = { onDestinationChange(AppDestination.DAY) },

@@ -97,10 +97,10 @@ fun WeekScheduleBoard(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(AppShape.CardLarge)
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.25f))
+                .background(MaterialTheme.colorScheme.surface.weekBoard())
                 .border(
                     width = 1.dp,
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
+                    color = MaterialTheme.colorScheme.outline.overlayActive(),
                     shape = AppShape.CardLarge,
                 ),
         ) {
@@ -216,7 +216,7 @@ private fun WeekOverviewHeader(
                         stringResource(R.string.label_week_course_count, weekEntries.size, selectedDayEntries.size)
                     },
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.overlayDisabled(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -257,7 +257,7 @@ private fun SummaryPill(
     value: String,
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+        color = MaterialTheme.colorScheme.surfaceVariant.weekBoard(),
         contentColor = MaterialTheme.colorScheme.onSurface,
         shape = AppShape.Chip,
     ) {
@@ -295,7 +295,7 @@ private fun TimeColumnHeader(
         Surface(
             onClick = onAddSlot,
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+            color = MaterialTheme.colorScheme.surfaceVariant.overlaySelected(),
             contentColor = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.size(36.dp),
         ) {
@@ -349,7 +349,7 @@ private fun DayHeaderCell(
             .height(height)
             .padding(horizontal = 2.dp)
             .clip(AppShape.CardSmall)
-            .background(if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else Color.Transparent),
+            .background(if (selected) MaterialTheme.colorScheme.primaryContainer.overlaySelected() else Color.Transparent),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -414,7 +414,7 @@ private fun WeekDayLane(
                         .fillMaxWidth()
                         .height(slotHeight)
                         .clip(AppShape.CardSmall)
-                        .background(if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.08f)),
+                        .background(if (selected) MaterialTheme.colorScheme.primaryContainer.accentMedium() else MaterialTheme.colorScheme.surfaceVariant.overlayLightest()),
                 )
             }
         }
@@ -432,7 +432,7 @@ private fun WeekDayLane(
                     .width(with(density) { layout.widthPx.toDp() })
                     .height(with(density) { layout.heightPx.toDp() }),
                 entry = layout.entry,
-                color = colorWithHueShift(color, cardHue).copy(alpha = cardAlpha),
+                color = colorWithHueShift(color, cardHue).copy(alpha = cardAlpha.coerceIn(0f, 1f)),
                 onClick = { onEntryClick(layout.entry) },
             )
         }
@@ -445,7 +445,7 @@ private fun WeekDayLane(
                 Text(
                     text = stringResource(R.string.card_empty_title),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.overlayVeryFaint(),
                 )
             }
         }
@@ -466,7 +466,7 @@ private fun TimeSlotCell(
             .width(width)
             .height(height)
             .clip(AppShape.Chip)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
+            .background(MaterialTheme.colorScheme.surfaceVariant.overlayHover())
             .semantics {
                 role = Role.Button
                 contentDescription = buildTimeSlotContentDescription(slotContext, index, slot)
@@ -511,7 +511,7 @@ private fun GlassActionChip(
 ) {
     Surface(
         onClick = onClick,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+        color = MaterialTheme.colorScheme.surfaceVariant.overlaySelected(),
         contentColor = MaterialTheme.colorScheme.onSurface,
         shape = AppShape.Chip,
         shadowElevation = 0.dp,
@@ -537,7 +537,7 @@ private fun WeekEntryBlock(
             .clip(AppShape.CardSmall)
             .border(
                 width = 1.dp,
-                color = Color.White.copy(alpha = 0.16f),
+                color = Color.White.overlayActiveLight(),
                 shape = AppShape.CardSmall,
             )
             .background(color)
@@ -559,8 +559,8 @@ private fun WeekEntryBlock(
         val innerSpacing = if (maxHeight >= 120.dp) 4.dp else 2.dp
         // Ensure readable text: use dark text when card color is too light
         val luminance = 0.2126f * color.red + 0.7152f * color.green + 0.0722f * color.blue
-        val textColor = if (luminance > 0.5f) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.87f) else Color.White
-        val subTextColor = if (luminance > 0.5f) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.92f)
+        val textColor = if (luminance > 0.5f) MaterialTheme.colorScheme.onSurface.overlayPrimaryMedium() else Color.White
+        val subTextColor = if (luminance > 0.5f) MaterialTheme.colorScheme.onSurfaceVariant.overlayFaint() else Color.White.overlayPrimaryHigh()
 
         Column(
             modifier = Modifier

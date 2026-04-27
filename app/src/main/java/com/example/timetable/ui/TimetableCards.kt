@@ -114,8 +114,8 @@ fun EntryCard(
                     this.contentDescription = contentDesc
                 },
             shape = AppShape.CardLarge,
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.80f)),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.surfaceCard()),
+            border = BorderStroke(1.dp, Color.White.borderCard()),
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         ) {
             Row(
@@ -130,8 +130,8 @@ fun EntryCard(
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(
-                                    accent.copy(alpha = 0.98f),
-                                    accent.copy(alpha = 0.72f),
+                                    accent.accentHighest(),
+                                    accent.accentHigh(),
                                 ),
                             ),
                         ),
@@ -156,7 +156,7 @@ fun EntryCard(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         Surface(
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+                            color = MaterialTheme.colorScheme.surfaceVariant.overlayDecorative(),
                             shape = AppShape.Pill,
                         ) {
                             Row(
@@ -179,7 +179,7 @@ fun EntryCard(
                         }
                         Spacer(modifier = Modifier.width(6.dp))
                         Surface(
-                            color = accent.copy(alpha = 0.14f),
+                            color = accent.accentMedium(),
                             shape = AppShape.Pill,
                         ) {
                             Text(
@@ -301,8 +301,8 @@ fun NextCourseCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = AppShape.CardMedium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.80f)),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.surfaceCard()),
+        border = BorderStroke(1.dp, Color.White.borderCard()),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
@@ -322,7 +322,7 @@ fun NextCourseCard(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Surface(
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                    color = MaterialTheme.colorScheme.primary.accentMedium(),
                     shape = AppShape.Pill,
                 ) {
                     Text(
@@ -394,8 +394,8 @@ fun NextCourseCard(
 fun EmptyStateCard(onAdd: () -> Unit) {
     Card(
         shape = AppShape.CardLarge,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.80f)),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.surfaceCard()),
+        border = BorderStroke(1.dp, Color.White.borderCard()),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(

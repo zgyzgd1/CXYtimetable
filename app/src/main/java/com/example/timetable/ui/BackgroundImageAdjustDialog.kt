@@ -127,7 +127,7 @@ fun BackgroundImageAdjustDialog(
                             .width(156.dp)
                             .aspectRatio(previewAspectRatio)
                             .clip(AppShape.DialogContent)
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f)),
+                            .background(MaterialTheme.colorScheme.surfaceVariant.overlayHover()),
                     ) {
                         CustomBackgroundImage(
                             bitmap = customBackground!!,
@@ -142,7 +142,7 @@ fun BackgroundImageAdjustDialog(
                             verticalArrangement = Arrangement.SpaceBetween,
                         ) {
                             Surface(
-                                color = Color.White.copy(alpha = 0.22f),
+                                color = Color.White.overlayActive(),
                                 shape = AppShape.CardSmall,
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -151,7 +151,7 @@ fun BackgroundImageAdjustDialog(
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 repeat(3) {
                                     Surface(
-                                        color = Color.White.copy(alpha = 0.20f),
+                                        color = Color.White.overlayHover(),
                                         shape = AppShape.CardExtraSmall,
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -163,7 +163,7 @@ fun BackgroundImageAdjustDialog(
                     }
                 } else {
                     Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                        color = MaterialTheme.colorScheme.surfaceVariant.overlayMediumHigher(),
                         shape = AppShape.CalendarDay,
                         modifier = Modifier.fillMaxWidth(),
                     ) {

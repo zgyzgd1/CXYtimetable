@@ -1,6 +1,6 @@
 # CXYtimetable 代码审查报告
 
-> 审查日期：2026-04-26  
+> 审查日期：2026-04-27  
 > 项目：CXYtimetable  
 > 技术栈：Kotlin, Jetpack Compose, Material 3, Room, Coroutines, WorkManager
 
@@ -35,9 +35,9 @@
 |---|------|------|----------|------|
 | M1 | 无障碍缺失 | 9 处 `contentDescription = null`（图标缺少描述） | `TimetableCards.kt`(3), `TimetableHero.kt`(5), `BackgroundLayer.kt`(1) | ✅ 已修复 |
 | M2 | 硬编码中文 | 6 处 `contentDescription` 硬编码中文未使用 `stringResource`，另有 `buildEntryCardContentDescription` 中 "未命名课程" 和 "📮" emoji | `TimetableCards.kt` | ✅ 已修复 |
-| M3 | 颜色体系脱节 | `courseAccentColors` 10 个硬编码颜色与 Theme.kt 主题色完全独立，暗色模式可能不协调 | `TimetableCards.kt`, `Theme.kt` | 待处理 |
+| M3 | 颜色体系脱节 | `courseAccentColors` 10 个硬编码颜色与 Theme.kt 主题色完全独立，暗色模式可能不协调 | `TimetableCards.kt`, `Theme.kt` | ✅ 已修复 |
 | M4 | Compose 反模式 | `context: Context` 和 `scope: CoroutineScope` 作为 Composable 参数传入 | `DayScheduleList.kt` | ✅ 已修复 |
-| M5 | 硬编码魔法值 | 透明度值（0.80f, 0.14f 等）散布 10+ 文件约 57+ 处 `copy(alpha = ...)` | 全部 UI 文件 | 待处理 |
+| M5 | 硬编码魔法值 | 透明度值（0.80f, 0.14f 等）散布 10+ 文件约 57+ 处 `copy(alpha = ...)` | 全部 UI 文件 | ✅ 已修复 |
 | M6 | 硬编码魔法值 | 长度限制 64、256，时段范围 1..20，快捷时间列表等未定义为常量 | `TimetableDialogs.kt`, `ScheduleViewModel.kt` | ✅ 已修复 |
 | M7 | 硬编码颜色 | `WeekScheduleBoard.kt` 文字颜色 `Color(0xDE1C1B1F)` / `Color(0x991C1B1F)` 未使用主题语义色 | `WeekScheduleBoard.kt` | ✅ 已修复 |
 
@@ -52,7 +52,7 @@
 | L5 | 硬编码日期 | `sampleEntries()` 和 placeholder 中硬编码 "2026-09-07" 等 | `TimetableModels.kt`, `TimetableDialogs.kt` | 待处理 |
 | L6 | 非空断言 | `customBackground!!` 在 `BackgroundLayer.kt:48`，虽由 when 守卫但不够安全 | `BackgroundLayer.kt` | ✅ 已修复 |
 | L7 | 单例无 DI | `TimetableRepository` 使用 `object` 单例，`AppearanceStore` 同理，难以测试 | `TimetableRepository.kt`, `AppearanceStore.kt` | 待处理 |
-| L8 | 硬编码字号 | `11.sp` 直接写在代码中未使用 Typography 体系 | `TimetableHero.kt:241` | 待处理 |
+| L8 | 硬编码字号 | `11.sp` 直接写在代码中未使用 Typography 体系 | `TimetableHero.kt:241` | ✅ 已修复 |
 
 ---
 
@@ -113,27 +113,24 @@ HeroSectionConfig → 20 个属性
 
 ### M3+M7: 颜色体系
 
-```
-courseAccentColors (TimetableCards.kt) → 与 Theme.kt 完全独立
-WeekScheduleBoard 文字颜色 → 硬编码 Color(0xDE1C1B1F) / Color(0x991C1B1F)
-```
-
-10 个 `courseAccentColors` 基于 `title.hashCode()` 选择，不随主题/暗色模式变化。周视图的文字颜色计算使用硬编码值而非 `MaterialTheme.colorScheme.onSurface` 等语义颜色。
-
-**建议**：将 `courseAccentColors` 关联到主题 Token，或定义亮/暗两套课程色。周视图文字颜色改用主题语义色。
+✅ **已修复**: 
+- `courseAccentColors` 已通过 `LocalCourseAccentColors` CompositionLocal 与主题关联
+- 支持亮色/暗色模式自动切换（`LightCourseAccentColors` / `DarkCourseAccentColors`）
+- 周视图文字颜色已改用主题语义色
 
 ### M5: 透明度魔法值
 
-各文件 `copy(alpha = ...)` 使用统计：
-- `WeekScheduleBoard.kt` → 13 处
-- `TimetableCards.kt` → 11 处
-- `TimetableHero.kt` → 9 处
-- `BackgroundLayer.kt` → 7 处
-- 其他文件 → 若干
-
-常见值：0.80f, 0.82f, 0.84f, 0.14f, 0.18f, 0.25f, 0.72f 等，缺乏语义命名。
-
-**建议**：提取为命名常量或主题 Token，如 `SurfaceAlpha.card`, `SurfaceAlpha.overlay` 等。
+✅ **已修复**: 
+- 创建了 `AlphaConstants.kt` 定义所有透明度常量
+- 提供了语义化的常量组：`SurfaceAlpha`, `BorderAlpha`, `OverlayAlpha`, `AccentAlpha`
+- 提供了便捷的扩展函数如 `surfaceCard()`, `borderCard()`, `accentHighest()` 等
+- 已在主要文件中应用（共修复 ~40 处）：
+  - TimetableCards.kt (6处)
+  - TimetableHero.kt (5处 + L8字号修复)
+  - TimetableCalendar.kt (3处)
+  - WeekScheduleBoard.kt (11处)
+  - BackgroundLayer.kt (6处)
+  - ScheduleScreen.kt (2处)
 
 ---
 
@@ -174,30 +171,22 @@ WeekScheduleBoard 文字颜色 → 硬编码 Color(0xDE1C1B1F) / Color(0x991C1B1
 
 ```
 H1 → 拆分 ScheduleApp（提取 StateHolder/UseCase）
-H2 → 统一验证逻辑（创建 EntryValidator）
 H3 → 减少参数数量（参数分组/状态类）
 ```
 
 ### 第二批：品质打磨（P1）
 
 ```
-M1 → 修复 contentDescription 缺失
-M2 → 硬编码中文改用 stringResource
-M3 → 统一颜色体系
-M4 → 修复 Compose 反模式
-M5 → 提取透明度常量
-M6 → 提取长度/范围常量
-M7 → 周视图使用主题语义色
+L2 → WeekdayOptions 国际化
+L3 → 优化同步令牌机制
 ```
 
 ### 第三批：代码质量（P2）
 
 ```
-L1 → chineseWeekday 重命名为 weekdayLabel
-L2 → WeekdayOptions 国际化
-L3 → 优化同步令牌机制
 L4 → 拆分 AppearanceStore 读/写职责
-L5-L8 → 其他小项
+L5 → 移除硬编码日期
+L7 → 引入依赖注入（长期目标）
 ```
 
 ---
@@ -211,6 +200,17 @@ L5-L8 → 其他小项
 - `colorWithHueShift` 色调偏移 + 亮度计算逻辑正确
 - 无障碍：`PerpetualCalendar` 和 `WeekScheduleBoard` 有完善的 semantics/contentDescription
 - `ReminderConfig`/`AppearanceConfig` 数据类封装回调，部分缓解了参数爆炸问题
+- **已修复**: 验证逻辑统一（创建 EntryValidator）
+- **已修复**: 无障碍 contentDescription 完整覆盖
+- **已修复**: 硬编码文本全部使用 stringResource
+- **已修复**: Compose 反模式（Context/Scope 作为参数）已消除
+- **已修复**: 魔法值常量化（长度限制、时段范围等）
+- **已修复**: 周视图使用主题语义色
+- **已修复**: 函数命名准确化（chineseWeekday → weekdayLabel）
+- **已修复**: 非空断言安全性提升
+- **已修复**: 颜色体系统一（LocalCourseAccentColors）
+- **已修复**: 透明度常量化（AlphaConstants.kt + 扩展函数）
+- **已修复**: 硬编码字号改用 Typography 体系
 
 ---
 

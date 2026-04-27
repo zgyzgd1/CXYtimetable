@@ -106,8 +106,8 @@ fun PerpetualCalendar(
 
     Card(
         shape = AppShape.CardLarge,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f)),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.surfaceCardLight()),
+        border = BorderStroke(1.dp, Color.White.borderCard()),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
@@ -166,7 +166,7 @@ fun PerpetualCalendar(
                             label = "calendarContainerColor",
                         ).value
                     } else {
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+                        MaterialTheme.colorScheme.surfaceVariant.overlayDecorative()
                     }
                     val textColor = if (isSelected || isToday) {
                         animateColorAsState(
@@ -211,7 +211,7 @@ fun PerpetualCalendar(
                             Text(
                                 text = weekdayLabel(date.dayOfWeek, LocalContext.current),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = textColor.copy(alpha = 0.8f),
+                                color = textColor.overlaySecondary(),
                                 textAlign = TextAlign.Center,
                             )
                             Text(

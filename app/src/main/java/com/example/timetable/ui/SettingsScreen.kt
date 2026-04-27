@@ -34,7 +34,7 @@ fun SettingsScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
+                containerColor = MaterialTheme.colorScheme.surface.overlayHint(),
             ),
         ) {
             Column(

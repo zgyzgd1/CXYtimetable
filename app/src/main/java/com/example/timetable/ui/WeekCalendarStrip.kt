@@ -87,9 +87,9 @@ fun WeekCalendarStrip(
         modifier = modifier.fillMaxWidth(),
         shape = AppShape.CardLarge,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.80f),
+            containerColor = MaterialTheme.colorScheme.surface.surfaceCard(),
         ),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
+        border = BorderStroke(1.dp, Color.White.borderCard()),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
@@ -130,7 +130,7 @@ private fun WeekCalendarDayCell(
     val containerColor = when {
         selected -> MaterialTheme.colorScheme.primary
         today -> MaterialTheme.colorScheme.primaryContainer
-        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f)
+        else -> MaterialTheme.colorScheme.surfaceVariant.overlaySelected()
     }
     val contentColor = when {
         selected -> MaterialTheme.colorScheme.onPrimary
@@ -170,7 +170,7 @@ private fun WeekCalendarDayCell(
             Text(
                 text = weekdayLabel(date.dayOfWeek, LocalContext.current),
                 style = MaterialTheme.typography.labelSmall,
-                color = contentColor.copy(alpha = 0.82f),
+                color = contentColor.overlaySecondary(),
                 textAlign = TextAlign.Center,
                 maxLines = 1,
             )

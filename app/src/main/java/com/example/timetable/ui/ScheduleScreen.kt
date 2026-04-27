@@ -286,7 +286,7 @@ fun ScheduleApp(
                             },
                             colors = TopAppBarDefaults.topAppBarColors(
                                 containerColor = Color.Transparent,
-                                scrolledContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.68f),
+                                scrolledContainerColor = MaterialTheme.colorScheme.surface.scrolledContainer(),
                                 titleContentColor = MaterialTheme.colorScheme.onBackground,
                             ),
                         )
@@ -301,7 +301,7 @@ fun ScheduleApp(
                     exit = scaleOut() + fadeOut(),
                 ) {
                     FloatingActionButton(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.86f),
+                        containerColor = MaterialTheme.colorScheme.surface.stickyHeader(),
                         contentColor = MaterialTheme.colorScheme.onSurface,
                         onClick = {
                             editingEntry = createQuickEntryTemplate(
