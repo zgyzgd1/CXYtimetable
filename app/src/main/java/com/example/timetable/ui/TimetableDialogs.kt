@@ -234,8 +234,8 @@ fun EntryEditorDialog(
                                 TimetableEntry.create(
                                     id = initial.id,
                                     title = title.trim(),
-                                    date = parsedDate.toString(),
-                                    dayOfWeek = parsedDate.dayOfWeek.value,
+                                    date = parsedDate!!.toString(),
+                                    dayOfWeek = parsedDate!!.dayOfWeek.value,
                                     startMinutes = parsedStart!!,
                                     endMinutes = parsedEnd!!,
                                     location = location.trim(),

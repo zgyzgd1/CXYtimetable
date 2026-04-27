@@ -155,8 +155,7 @@ fun PerpetualCalendar(
                     val hasCourse = datesWithEntries[date] == true
                     val dayContext = LocalContext.current
 
-                    // Only animate color for selected items; static items use direct colors
-                    val containerColor by if (isSelected || isToday) {
+                    val containerColor = if (isSelected || isToday) {
                         animateColorAsState(
                             targetValue = when {
                                 isSelected -> MaterialTheme.colorScheme.primary
@@ -165,13 +164,11 @@ fun PerpetualCalendar(
                             },
                             animationSpec = tween(durationMillis = 350, easing = EaseInOutQuad),
                             label = "calendarContainerColor",
-                        )
+                        ).value
                     } else {
-                        remember {
-                            mutableStateOf(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f))
-                        }
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
                     }
-                    val textColor by if (isSelected || isToday) {
+                    val textColor = if (isSelected || isToday) {
                         animateColorAsState(
                             targetValue = when {
                                 isSelected -> MaterialTheme.colorScheme.onPrimary
@@ -180,11 +177,9 @@ fun PerpetualCalendar(
                             },
                             animationSpec = tween(durationMillis = 350, easing = EaseInOutQuad),
                             label = "calendarTextColor",
-                        )
+                        ).value
                     } else {
-                        remember {
-                            mutableStateOf(MaterialTheme.colorScheme.onSurface)
-                        }
+                        MaterialTheme.colorScheme.onSurface
                     }
 
                     Card(

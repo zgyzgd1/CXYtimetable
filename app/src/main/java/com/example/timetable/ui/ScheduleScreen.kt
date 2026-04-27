@@ -680,6 +680,13 @@ data class AppearanceConfig(
     val onWeekCardHueChange: (Float) -> Unit,
 )
 
+data class NextCourseCardState(
+    val title: String,
+    val timeRange: String,
+    val location: String,
+    val statusText: String,
+)
+
 internal fun NextCourseSnapshot.toCardState(unnamedLabel: String = ""): NextCourseCardState {
     return NextCourseCardState(
         title = entry.title.ifBlank { unnamedLabel },
