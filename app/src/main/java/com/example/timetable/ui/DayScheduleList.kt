@@ -33,7 +33,6 @@ internal fun DayScheduleList(
     entries: List<TimetableEntry>,
     selectedDate: String,
     selectedLocalDate: java.time.LocalDate,
-    filteredEntries: List<TimetableEntry>,
     selectedDayEntries: List<TimetableEntry>,
     dateRangeEntriesCache: DateRangeEntriesCache,
     nextCourseSnapshot: NextCourseSnapshot?,
@@ -41,11 +40,7 @@ internal fun DayScheduleList(
     exportLauncher: ActivityResultLauncher<String>,
     reminderConfig: ReminderConfig,
     appearanceConfig: AppearanceConfig,
-    onDateChanged: (String) -> Unit,
-    onEditEntry: (TimetableEntry) -> Unit,
-    onDuplicateEntry: (TimetableEntry) -> Unit,
-    onDeleteEntry: (TimetableEntry) -> Unit,
-    onCreateEntry: (java.time.LocalDate, List<TimetableEntry>) -> Unit,
+    callbacks: DayListCallbacks,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -114,7 +109,7 @@ internal fun DayScheduleList(
             item {
                 NextCourseCard(
                     state = upcoming.toCardState(unnamedLabel = context.getString(R.string.label_unnamed_course)),
-                    onViewDay = { onDateChanged(upcoming.occurrenceDate.toString()) },
+                    onViewDay = { callbacks.onDateChanged(upcoming.occurrenceDate.toString()) },
                 )
             }
         }
@@ -123,25 +118,25 @@ internal fun DayScheduleList(
                 selectedDate = selectedDate,
                 entries = entries,
                 entriesByDateResolver = dateRangeEntriesCache::resolve,
-                onDateChanged = onDateChanged,
+                onDateChanged = callbacks.onDateChanged,
             )
         }
         item {
             SectionHeader(title = formatDateLabel(selectedDate))
         }
-        if (filteredEntries.isEmpty()) {
+        if (selectedDayEntries.isEmpty()) {
             item {
                 EmptyStateCard(
-                    onAdd = { onCreateEntry(selectedLocalDate, selectedDayEntries) },
+                    onAdd = { callbacks.onCreateEntry(selectedLocalDate, selectedDayEntries) },
                 )
             }
         } else {
-            items(filteredEntries, key = { it.id }) { entry ->
+            items(selectedDayEntries, key = { it.id }) { entry ->
                 EntryCard(
                     entry = entry,
-                    onEdit = { onEditEntry(entry) },
-                    onDuplicate = { onDuplicateEntry(entry) },
-                    onDelete = { onDeleteEntry(entry) },
+                    onEdit = { callbacks.onEditEntry(entry) },
+                    onDuplicate = { callbacks.onDuplicateEntry(entry) },
+                    onDelete = { callbacks.onDeleteEntry(entry) },
                     modifier = Modifier.animateItem(),
                 )
             }

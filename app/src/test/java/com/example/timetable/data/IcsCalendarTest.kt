@@ -30,6 +30,33 @@ class IcsCalendarTest {
         assertEquals("2026-04-13", parsed.first().date)
     }
 
+    @Test(timeout = 1000)
+    fun parseWeeklyByDayBeyondSupportedDateRangeTerminates() {
+        val content = """
+            BEGIN:VCALENDAR
+            VERSION:2.0
+            PRODID:-//Test//CN
+            BEGIN:VEVENT
+            UID:test-upper-bound
+            SUMMARY:边界课程
+            DTSTART;TZID=Asia/Shanghai:21001231T080000
+            DTEND;TZID=Asia/Shanghai:21001231T090000
+            RRULE:FREQ=WEEKLY;BYDAY=MO
+            END:VEVENT
+            END:VCALENDAR
+        """.trimIndent()
+
+        val parsed = IcsCalendar.parse(content)
+
+        assertTrue(parsed.isEmpty())
+    }
+
+    @Test
+    fun unescapeTextProtectsLiteralBackslashBeforeNewlineEscape() {
+        assertEquals("\\n", icsUnescapeText("\\\\n"))
+        assertEquals("\n", icsUnescapeText("\\n"))
+    }
+
     @Test
     fun writeAddsDtStampField() {
         val entry = TimetableEntry(

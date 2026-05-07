@@ -86,12 +86,15 @@ internal fun icsEscapeText(value: String): String {
 }
 
 internal fun icsUnescapeText(value: String): String {
+    // ⚠️ 反斜杠转义必须最先处理，否则后续的 \n 等替换会错误地消费已转义的反斜杠。
+    // 例如 "\\\\n" 应解义为字面量 "\\n"（反斜杠 + n），而非换行符。
     return value
+        .replace("\\\\", "\u0000")  // 先用占位符保护已转义的反斜杠
         .replace("\\n", "\n")
         .replace("\\N", "\n")
         .replace("\\,", ",")
         .replace("\\;", ";")
-        .replace("\\\\", "\\")
+        .replace("\u0000", "\\")    // 还原占位符为字面反斜杠
 }
 
 internal fun icsParseDateTime(value: String, tzid: String? = null): LocalDateTime? {

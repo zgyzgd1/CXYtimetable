@@ -77,6 +77,66 @@ class ImportPreviewTest {
     }
 
     @Test
+    fun countImportConflictsIncludesExistingScheduleConflicts() {
+        val existing = listOf(
+            TimetableEntry(
+                id = "existing",
+                title = "Math",
+                date = "2026-09-07",
+                dayOfWeek = 1,
+                startMinutes = 8 * 60,
+                endMinutes = 9 * 60,
+            ),
+        )
+        val imported = listOf(
+            TimetableEntry(
+                id = "imported",
+                title = "Physics",
+                date = "2026-09-07",
+                dayOfWeek = 1,
+                startMinutes = 8 * 60 + 30,
+                endMinutes = 9 * 60 + 30,
+            ),
+        )
+
+        assertEquals(1, countImportConflicts(imported, existing))
+    }
+
+    @Test
+    fun countImportConflictsCountsEachExistingConflictPair() {
+        val existing = listOf(
+            TimetableEntry(
+                id = "existing-1",
+                title = "Math",
+                date = "2026-09-07",
+                dayOfWeek = 1,
+                startMinutes = 8 * 60,
+                endMinutes = 9 * 60,
+            ),
+            TimetableEntry(
+                id = "existing-2",
+                title = "Chemistry",
+                date = "2026-09-07",
+                dayOfWeek = 1,
+                startMinutes = 8 * 60 + 15,
+                endMinutes = 9 * 60 + 15,
+            ),
+        )
+        val imported = listOf(
+            TimetableEntry(
+                id = "imported",
+                title = "Physics",
+                date = "2026-09-07",
+                dayOfWeek = 1,
+                startMinutes = 8 * 60 + 30,
+                endMinutes = 9 * 60 + 30,
+            ),
+        )
+
+        assertEquals(2, countImportConflicts(imported, existing))
+    }
+
+    @Test
     fun emptyImportPreviewHasZeroCounts() {
         val preview = ImportPreview(
             validEntries = emptyList(),

@@ -84,6 +84,97 @@ private val appDestinationNameStateSaver = Saver<String, Any>(
 )
 
 /**
+ * 文件操作启动器集合。
+ *
+ * 封装课程表应用中导入、导出和背景图片三个文件操作启动器，
+ * 以便从 [ScheduleApp] 中提取出样板式的 launcher 注册逻辑。
+ *
+ * @param import ICS 文件导入启动器
+ * @param export ICS 文件导出启动器
+ * @param backgroundImage 背景图片选择启动器
+ */
+internal data class ScheduleLaunchers(
+    val import: androidx.activity.result.ActivityResultLauncher<Array<String>>,
+    val export: androidx.activity.result.ActivityResultLauncher<String>,
+    val backgroundImage: androidx.activity.result.ActivityResultLauncher<String>,
+)
+
+/**
+ * 创建并记住课程表应用所需的文件操作启动器。
+ *
+ * 包含三个启动器：
+ * - **import**: 通过 `OpenDocument` 选择 `.ics` 文件并触发导入
+ * - **export**: 通过 `CreateDocument` 创建 `.ics` 文件并写入导出内容
+ * - **backgroundImage**: 通过 `GetContent` 选择图片并设置自定义背景
+ *
+ * @param viewModel 课程表视图模型
+ * @param snackbarHostState 用于显示操作结果的 Snackbar 状态
+ * @param onBackgroundAppearanceChange 背景外观变更回调
+ * @param onShowBackgroundAdjustDialogChange 显示背景调整对话框回调
+ */
+@Composable
+private fun rememberScheduleLaunchers(
+    viewModel: ScheduleViewModel,
+    snackbarHostState: SnackbarHostState,
+    onBackgroundAppearanceChange: (com.example.timetable.data.BackgroundAppearance) -> Unit,
+    onShowBackgroundAdjustDialogChange: (Boolean) -> Unit,
+): ScheduleLaunchers {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            viewModel.importFromIcs(context.contentResolver, uri)
+        }
+    }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/calendar"),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                try {
+                    val text = viewModel.exportIcs()
+                    context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { writer ->
+                        writer.write(text)
+                    }
+                    snackbarHostState.showSnackbar(context.getString(R.string.msg_export_success))
+                } catch (error: Exception) {
+                    snackbarHostState.showSnackbar(context.getString(R.string.msg_export_failed, error.message ?: context.getString(R.string.msg_unknown_error)))
+                }
+            }
+        }
+    }
+
+    val backgroundImageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent(),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                try {
+                    BackgroundImageManager.saveCustomBackground(context, context.contentResolver, uri)
+                    onBackgroundAppearanceChange(AppearanceStore.getBackgroundAppearance(context))
+                    onShowBackgroundAdjustDialogChange(true)
+                    snackbarHostState.showSnackbar(context.getString(R.string.msg_background_updated))
+                } catch (error: Exception) {
+                    snackbarHostState.showSnackbar(
+                        context.getString(R.string.msg_background_failed, error.message ?: context.getString(R.string.msg_unknown_error)),
+                    )
+                }
+            }
+        }
+    }
+
+    return ScheduleLaunchers(
+        import = importLauncher,
+        export = exportLauncher,
+        backgroundImage = backgroundImageLauncher,
+    )
+}
+
+/**
  * 课程表应用主组件。
  *
  * 应用的主入口点，包含日视图、周视图和设置页面的切换逻辑。
@@ -175,6 +266,13 @@ fun ScheduleApp(
     var deletingEntry by remember { mutableStateOf<TimetableEntry?>(null) }
     var importPreviewState by remember { mutableStateOf<ImportPreview?>(null) }
 
+    val launchers = rememberScheduleLaunchers(
+        viewModel = viewModel,
+        snackbarHostState = snackbarHostState,
+        onBackgroundAppearanceChange = { backgroundAppearance = it },
+        onShowBackgroundAdjustDialogChange = { showBackgroundAdjustDialog = it },
+    )
+
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -203,51 +301,6 @@ fun ScheduleApp(
 
     LaunchedEffect(Unit) {
         viewModel.messages.collect(snackbarHostState::showSnackbar)
-    }
-
-    val importLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
-    ) { uri ->
-        if (uri != null) {
-            viewModel.importFromIcs(context.contentResolver, uri)
-        }
-    }
-
-    val exportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("text/calendar"),
-    ) { uri ->
-        if (uri != null) {
-            scope.launch {
-                try {
-                    val text = viewModel.exportIcs()
-                    context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { writer ->
-                        writer.write(text)
-                    }
-                    snackbarHostState.showSnackbar(context.getString(R.string.msg_export_success))
-                } catch (error: Exception) {
-                    snackbarHostState.showSnackbar(context.getString(R.string.msg_export_failed, error.message ?: context.getString(R.string.msg_unknown_error)))
-                }
-            }
-        }
-    }
-
-    val backgroundImageLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent(),
-    ) { uri ->
-        if (uri != null) {
-            scope.launch {
-                try {
-                    BackgroundImageManager.saveCustomBackground(context, context.contentResolver, uri)
-                    backgroundAppearance = AppearanceStore.getBackgroundAppearance(context)
-                    showBackgroundAdjustDialog = true
-                    snackbarHostState.showSnackbar(context.getString(R.string.msg_background_updated))
-                } catch (error: Exception) {
-                    snackbarHostState.showSnackbar(
-                        context.getString(R.string.msg_background_failed, error.message ?: context.getString(R.string.msg_unknown_error)),
-                    )
-                }
-            }
-        }
     }
 
     val dateRangeEntriesCache = remember(entries) {
@@ -362,8 +415,8 @@ fun ScheduleApp(
                         dateRangeEntriesCache = dateRangeEntriesCache,
                         nextCourseSnapshot = nextCourseSnapshot,
                         snackbarHostState = snackbarHostState,
-                        importLauncher = importLauncher,
-                        exportLauncher = exportLauncher,
+                        importLauncher = launchers.import,
+                        exportLauncher = launchers.export,
                         reminderConfig = ReminderConfig(
                             minutes = reminderMinutes,
                             options = reminderOptions,
@@ -380,7 +433,7 @@ fun ScheduleApp(
                         ),
                         appearanceConfig = AppearanceConfig(
                             backgroundAppearance = backgroundAppearance,
-                            onSelectBackgroundImage = { backgroundImageLauncher.launch("image/*") },
+                            onSelectBackgroundImage = { launchers.backgroundImage.launch("image/*") },
                             onAdjustCustomBackground = { showBackgroundAdjustDialog = true },
                             onBackgroundAppearanceChange = { backgroundAppearance = it },
                             weekCardAlpha = weekCardAlpha,
@@ -394,18 +447,20 @@ fun ScheduleApp(
                                 AppearanceStore.setWeekCardHue(context, hue)
                             },
                         ),
-                        onDateChanged = { selectedDate = it },
-                        onEditEntry = { editingEntry = it },
-                        onDuplicateEntry = { entry ->
-                            editingEntry = duplicateEntryTemplate(entry)
-                            scope.launch {
-                                snackbarHostState.showSnackbar(context.getString(R.string.msg_entry_duplicated))
-                            }
-                        },
-                        onDeleteEntry = { deletingEntry = it },
-                        onCreateEntry = { date, existing ->
-                            editingEntry = createQuickEntryTemplate(date, existing)
-                        },
+                        callbacks = DayListCallbacks(
+                            onDateChanged = { selectedDate = it },
+                            onEditEntry = { editingEntry = it },
+                            onDuplicateEntry = { entry ->
+                                editingEntry = duplicateEntryTemplate(entry)
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(context.getString(R.string.msg_entry_duplicated))
+                                }
+                            },
+                            onDeleteEntry = { deletingEntry = it },
+                            onCreateEntry = { date, existing ->
+                                editingEntry = createQuickEntryTemplate(date, existing)
+                            },
+                        ),
                     )
                 }
                 AppDestination.SETTINGS -> {
@@ -489,25 +544,9 @@ fun ScheduleApp(
  * @param snackbarHostState  Snackbar 主机状态
  * @param importLauncher 导入启动器
  * @param exportLauncher 导出启动器
- * @param notificationPermissionLauncher 通知权限启动器
- * @param exactAlarmSettingsLauncher 精确闹钟设置启动器
- * @param exactAlarmEnabled 精确闹钟是否启用
- * @param reminderMinutes 提醒分钟数
- * @param reminderOptions 提醒选项
- * @param onReminderMinutesChange 提醒分钟数变更回调
- * @param backgroundAppearance 背景外观
- * @param onBackgroundAppearanceChange 背景外观变更回调
- * @param onSelectBackgroundImage 选择背景图片回调
- * @param onAdjustCustomBackground 调整自定义背景回调
- * @param weekCardAlpha 周卡片透明度
- * @param onWeekCardAlphaChange 周卡片透明度变更回调
- * @param weekCardHue 周卡片色调
- * @param onWeekCardHueChange 周卡片色调变更回调
- * @param onDateChanged 日期变更回调
- * @param onEditEntry 编辑课程条目回调
- * @param onDuplicateEntry 复制课程条目回调
- * @param onDeleteEntry 删除课程条目回调
- * @param onCreateEntry 创建课程条目回调
+ * @param reminderConfig 提醒设置与权限入口
+ * @param appearanceConfig 背景和周卡片外观设置
+ * @param callbacks 日视图交互回调
  */
 @Composable
 private fun DayViewContent(
@@ -525,11 +564,7 @@ private fun DayViewContent(
     exportLauncher: androidx.activity.result.ActivityResultLauncher<String>,
     reminderConfig: ReminderConfig,
     appearanceConfig: AppearanceConfig,
-    onDateChanged: (String) -> Unit,
-    onEditEntry: (TimetableEntry) -> Unit,
-    onDuplicateEntry: (TimetableEntry) -> Unit,
-    onDeleteEntry: (TimetableEntry) -> Unit,
-    onCreateEntry: (LocalDate, List<TimetableEntry>) -> Unit,
+    callbacks: DayListCallbacks,
 ) {
     val isWeekMode = false
     Box(
@@ -544,11 +579,11 @@ private fun DayViewContent(
                         when {
                             totalHorizontalDrag > swipeThresholdPx -> {
                                 val previousDate = selectedLocalDate.minusDays(1)
-                                if (previousDate >= minDate) onDateChanged(previousDate.toString())
+                                if (previousDate >= minDate) callbacks.onDateChanged(previousDate.toString())
                             }
                             totalHorizontalDrag < -swipeThresholdPx -> {
                                 val nextDate = selectedLocalDate.plusDays(1)
-                                if (nextDate <= maxDate) onDateChanged(nextDate.toString())
+                                if (nextDate <= maxDate) callbacks.onDateChanged(nextDate.toString())
                             }
                         }
                         totalHorizontalDrag = 0f
@@ -565,7 +600,6 @@ private fun DayViewContent(
             entries = entries,
             selectedDate = selectedDate,
             selectedLocalDate = selectedLocalDate,
-            filteredEntries = selectedDayEntries,
             selectedDayEntries = selectedDayEntries,
             dateRangeEntriesCache = dateRangeEntriesCache,
             nextCourseSnapshot = nextCourseSnapshot,
@@ -573,11 +607,7 @@ private fun DayViewContent(
             exportLauncher = exportLauncher,
             reminderConfig = reminderConfig,
             appearanceConfig = appearanceConfig,
-            onDateChanged = onDateChanged,
-            onEditEntry = onEditEntry,
-            onDuplicateEntry = onDuplicateEntry,
-            onDeleteEntry = onDeleteEntry,
-            onCreateEntry = onCreateEntry,
+            callbacks = callbacks,
         )
     }
 }

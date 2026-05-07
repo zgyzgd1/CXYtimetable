@@ -139,6 +139,65 @@ class TimetableConflictsTest {
     }
 
     @Test
+    fun findConflictForEntryDetectsWeeklyOverlapAfterManySkippedWeeks() {
+        val skippedWeeks = (1..512).joinToString(",")
+        val existingWeekly = entry(
+            title = "Math",
+            date = LocalDate.of(2026, 3, 2),
+            startMinutes = 8 * 60,
+            endMinutes = 9 * 60,
+        ).copy(
+            recurrenceType = RecurrenceType.WEEKLY.name,
+            semesterStartDate = "2026-03-02",
+            weekRule = WeekRule.ALL.name,
+            skipWeekList = skippedWeeks,
+        )
+        val targetWeekly = entry(
+            title = "Physics",
+            date = LocalDate.of(2026, 3, 2),
+            startMinutes = 8 * 60 + 20,
+            endMinutes = 9 * 60 + 10,
+        ).copy(
+            recurrenceType = RecurrenceType.WEEKLY.name,
+            semesterStartDate = "2026-03-02",
+            weekRule = WeekRule.ALL.name,
+            skipWeekList = skippedWeeks,
+        )
+
+        val conflict = findConflictForEntry(targetWeekly, listOf(existingWeekly))
+
+        assertEquals(existingWeekly.id, conflict?.id)
+    }
+
+    @Test
+    fun findConflictForEntryDetectsOddEvenOverlapWithDifferentSemesterStarts() {
+        val existingOdd = entry(
+            title = "Math",
+            date = LocalDate.of(2026, 3, 2),
+            startMinutes = 8 * 60,
+            endMinutes = 9 * 60,
+        ).copy(
+            recurrenceType = RecurrenceType.WEEKLY.name,
+            semesterStartDate = "2026-03-02",
+            weekRule = WeekRule.ODD.name,
+        )
+        val targetEven = entry(
+            title = "Physics",
+            date = LocalDate.of(2026, 3, 2),
+            startMinutes = 8 * 60 + 20,
+            endMinutes = 9 * 60 + 10,
+        ).copy(
+            recurrenceType = RecurrenceType.WEEKLY.name,
+            semesterStartDate = "2026-02-23",
+            weekRule = WeekRule.EVEN.name,
+        )
+
+        val conflict = findConflictForEntry(targetEven, listOf(existingOdd))
+
+        assertEquals(existingOdd.id, conflict?.id)
+    }
+
+    @Test
     fun suggestAdjustedEntryAfterConflictsAccountsForWeeklyEntriesOnTargetDate() {
         val targetDate = LocalDate.of(2026, 3, 16)
         val weeklyBlocking = entry(
@@ -205,6 +264,31 @@ class TimetableConflictsTest {
                 ),
             ),
         )
+    }
+
+    @Test
+    fun countConflictPairsBetweenCountsEveryImportedExistingPair() {
+        val date = LocalDate.of(2026, 4, 22)
+        val imported = entry(
+            title = "Imported",
+            date = date,
+            startMinutes = 8 * 60 + 20,
+            endMinutes = 9 * 60 + 10,
+        )
+        val firstExisting = entry(
+            title = "Existing 1",
+            date = date,
+            startMinutes = 8 * 60,
+            endMinutes = 9 * 60,
+        )
+        val secondExisting = entry(
+            title = "Existing 2",
+            date = date,
+            startMinutes = 8 * 60 + 30,
+            endMinutes = 9 * 60 + 30,
+        )
+
+        assertEquals(2, countConflictPairsBetween(listOf(imported), listOf(firstExisting, secondExisting)))
     }
 
     private fun entry(

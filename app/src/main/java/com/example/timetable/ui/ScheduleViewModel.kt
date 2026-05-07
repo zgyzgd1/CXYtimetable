@@ -17,6 +17,7 @@ import com.example.timetable.data.TimetableEntry
 import com.example.timetable.data.TimetableRepository
 import com.example.timetable.data.WeekRule
 import com.example.timetable.data.countConflictPairs
+import com.example.timetable.data.countConflictPairsBetween
 import com.example.timetable.data.findConflictForEntry
 import com.example.timetable.data.formatMinutes
 import com.example.timetable.data.normalizeWeekListText
@@ -209,7 +210,7 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
                 return@launch
             }
 
-            val preview = buildImportPreview(imported)
+            val preview = buildImportPreview(imported, entries.value)
             if (preview.validEntries.isEmpty()) {
                 postMessage(getApplication<Application>().getString(R.string.vm_import_no_effective))
                 return@launch
@@ -255,7 +256,10 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    private fun buildImportPreview(imported: List<TimetableEntry>): ImportPreview {
+    private fun buildImportPreview(
+        imported: List<TimetableEntry>,
+        existingEntries: List<TimetableEntry>,
+    ): ImportPreview {
         val validEntries = mutableListOf<TimetableEntry>()
         var invalidCount = 0
 
@@ -268,7 +272,7 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
                 validEntries += entry
             }
 
-        val conflictCount = if (validEntries.isNotEmpty()) countConflictPairs(validEntries) else 0
+        val conflictCount = countImportConflicts(validEntries, existingEntries)
         val truncated = imported.size >= MAX_EXPANDED_OCCURRENCES
         return ImportPreview(
             validEntries = validEntries,
@@ -382,6 +386,17 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
             _messages.emit(message)
         }
     }
+}
+
+internal fun countImportConflicts(
+    validEntries: List<TimetableEntry>,
+    existingEntries: List<TimetableEntry>,
+): Int {
+    if (validEntries.isEmpty()) return 0
+
+    val internalConflicts = countConflictPairs(validEntries)
+    val existingConflicts = countConflictPairsBetween(validEntries, existingEntries)
+    return internalConflicts + existingConflicts
 }
 
 internal fun readLimitedUtf8Text(inputStream: InputStream, maxBytes: Int): String {

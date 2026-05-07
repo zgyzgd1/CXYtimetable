@@ -15,6 +15,20 @@ class CourseReminderReceiverTest {
     private val context: Context = RuntimeEnvironment.getApplication()
 
     @Test
+    fun oneTimeActionRunsOnlyOnce() {
+        val oneTimeAction = OneTimeAction()
+        var invokeCount = 0
+
+        repeat(3) {
+            oneTimeAction.run {
+                invokeCount++
+            }
+        }
+
+        assertEquals(1, invokeCount)
+    }
+
+    @Test
     fun formatReminderLeadTimeSupportsMinutesAndHours() {
         val result20 = formatReminderLeadTime(20, context)
         val result60 = formatReminderLeadTime(60, context)

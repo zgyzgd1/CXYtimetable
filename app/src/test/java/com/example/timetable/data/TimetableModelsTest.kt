@@ -103,5 +103,7 @@ class TimetableModelsTest {
     fun parseWeekListSupportsRangeAndRejectsInvalidText() {
         assertEquals(setOf(1, 2, 3, 6), parseWeekList("1-3,6"))
         assertNull(parseWeekList("2-a"))
+        assertNull(parseWeekList("${MAX_WEEK_LIST_WEEK + 1}"))
+        assertNull(parseWeekList("${MAX_WEEK_LIST_WEEK - 1}-${MAX_WEEK_LIST_WEEK + 1}"))
     }
 }

@@ -6,6 +6,22 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.temporal.ChronoUnit
 
+/**
+ * context == null 时的回退字符串（用于单元测试和无上下文场景）。
+ * 这些常量集中管理便于未来国际化时统一替换。
+ */
+private object FbStrings {
+    const val ONGOING_REMAINING = "正在进行，距离下课 %d 分钟"
+    const val ONGOING = "正在进行"
+    const val STARTING_SOON = "即将开始"
+    const val MINUTES_LATER = "%d 分钟后开始"
+    const val TODAY = "今天"
+    const val TOMORROW = "明天"
+    const val DAY_AFTER_TOMORROW = "后天"
+    const val DAYS_LATER = "%d 天后"
+    const val DAY_START = "%s %s 开始"
+}
+
 internal data class NextCourseSnapshot(
     val entry: TimetableEntry,
     val occurrenceDate: LocalDate,
@@ -31,9 +47,9 @@ internal fun findNextCourseSnapshot(
             }
         } else {
             if (remainingMinutes > 0) {
-                "正在进行，距离下课 $remainingMinutes 分钟"
+                FbStrings.ONGOING_REMAINING.format(remainingMinutes)
             } else {
-                "正在进行"
+                FbStrings.ONGOING
             }
         }
         return NextCourseSnapshot(
@@ -54,9 +70,9 @@ internal fun findNextCourseSnapshot(
             }
         } else {
             if (waitMinutes == 0) {
-                "即将开始"
+                FbStrings.STARTING_SOON
             } else {
-                "$waitMinutes 分钟后开始"
+                FbStrings.MINUTES_LATER.format(waitMinutes)
             }
         }
         return NextCourseSnapshot(
@@ -94,10 +110,10 @@ internal fun findNextCourseSnapshot(
         }
     } else {
         when (dayOffset) {
-            0 -> "今天"
-            1 -> "明天"
-            2 -> "后天"
-            else -> "$dayOffset 天后"
+            0 -> FbStrings.TODAY
+            1 -> FbStrings.TOMORROW
+            2 -> FbStrings.DAY_AFTER_TOMORROW
+            else -> FbStrings.DAYS_LATER.format(dayOffset)
         }
     }
     val startLabel = formatMinutes(resolvedEntry.startMinutes)
@@ -107,7 +123,7 @@ internal fun findNextCourseSnapshot(
         statusText = if (context != null) {
             context.getString(R.string.status_day_start, dayLabel, startLabel)
         } else {
-            "$dayLabel $startLabel 开始"
+            FbStrings.DAY_START.format(dayLabel, startLabel)
         },
     )
 }
@@ -178,15 +194,10 @@ internal class DateRangeEntriesCache(
         if (endDate.isBefore(startDate)) return emptyMap()
 
         val key = RangeKey(startDate, endDate)
-        synchronized(rangeCache) {
-            val cached = rangeCache[key]
-            if (cached != null) return cached
+        return synchronized(rangeCache) {
+            rangeCache[key] ?: entriesByDateInRange(entries, startDate, endDate).also {
+                rangeCache[key] = it
+            }
         }
-
-        val computed = entriesByDateInRange(entries, startDate, endDate)
-        synchronized(rangeCache) {
-            rangeCache[key] = computed
-        }
-        return computed
     }
 }

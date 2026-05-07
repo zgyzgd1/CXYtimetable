@@ -2,7 +2,12 @@ package com.example.timetable.data
 
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
+
+private const val MIN_RECURRING_CONFLICT_SEARCH_WEEKS = 2
+private const val RECURRING_CONFLICT_SEARCH_PADDING_WEEKS = 6
+private val MAX_RECURRING_CONFLICT_SEARCH_DATE = LocalDate.of(2100, 12, 31)
 
 fun findConflictForEntry(
     target: TimetableEntry,
@@ -62,6 +67,27 @@ fun countConflictPairs(entriesList: List<TimetableEntry>): Int {
     return pairs
 }
 
+fun countConflictPairsBetween(
+    targetEntries: List<TimetableEntry>,
+    existingEntries: List<TimetableEntry>,
+): Int {
+    var pairs = 0
+    val sortedExisting = existingEntries.sortedBy { it.startMinutes }
+    targetEntries.forEach { target ->
+        for (existing in sortedExisting) {
+            if (existing.startMinutes >= target.endMinutes) break
+            if (
+                target.id != existing.id &&
+                timeRangesOverlap(target, existing) &&
+                entriesShareAnyOccurrenceDate(target, existing)
+            ) {
+                pairs++
+            }
+        }
+    }
+    return pairs
+}
+
 internal fun entriesShareAnyOccurrenceDate(
     first: TimetableEntry,
     second: TimetableEntry,
@@ -92,22 +118,11 @@ internal fun entriesShareAnyOccurrenceDate(
         firstCustomDates != null -> firstCustomDates.any { occursOnDate(second, it) }
         secondCustomDates != null -> secondCustomDates.any { occursOnDate(first, it) }
         else -> {
-            val firstRule = resolveWeekRule(first.weekRule) ?: WeekRule.ALL
-            val secondRule = resolveWeekRule(second.weekRule) ?: WeekRule.ALL
-            val firstSkips = parseWeekList(first.skipWeekList).orEmpty()
-            val secondSkips = parseWeekList(second.skipWeekList).orEmpty()
-
-            if (firstRule == WeekRule.ODD && secondRule == WeekRule.EVEN && firstSkips.isEmpty() && secondSkips.isEmpty()) {
-                false
-            } else if (firstRule == WeekRule.EVEN && secondRule == WeekRule.ODD && firstSkips.isEmpty() && secondSkips.isEmpty()) {
-                false
-            } else {
-                val searchStart = maxOf(firstDate, secondDate)
-                val candidateCount = maxOf(relevantSearchWeeks(first), relevantSearchWeeks(second)) + 6
-                generateSequence(searchStart) { it.plusWeeks(1) }
-                    .take(candidateCount.coerceIn(2, 30))
-                    .any { date -> occursOnDate(first, date) && occursOnDate(second, date) }
-            }
+            val searchStart = maxOf(firstDate, secondDate)
+            val candidateCount = recurringConflictSearchWeekCount(first, second, searchStart)
+            generateSequence(searchStart) { it.plusWeeks(1) }
+                .take(candidateCount)
+                .any { date -> occursOnDate(first, date) && occursOnDate(second, date) }
         }
     }
 }
@@ -159,4 +174,16 @@ private fun relevantSearchWeeks(entry: TimetableEntry): Int {
         customWeeks.maxOrNull() ?: 0,
         skippedWeeks.maxOrNull() ?: 0,
     )
+}
+
+private fun recurringConflictSearchWeekCount(
+    first: TimetableEntry,
+    second: TimetableEntry,
+    searchStart: LocalDate,
+): Int {
+    val relevantWeeks = maxOf(relevantSearchWeeks(first), relevantSearchWeeks(second)) +
+        RECURRING_CONFLICT_SEARCH_PADDING_WEEKS
+    val supportedWeeks = ChronoUnit.WEEKS.between(searchStart, MAX_RECURRING_CONFLICT_SEARCH_DATE).toInt() + 1
+    if (supportedWeeks <= 0) return 0
+    return minOf(relevantWeeks.coerceAtLeast(MIN_RECURRING_CONFLICT_SEARCH_WEEKS), supportedWeeks)
 }

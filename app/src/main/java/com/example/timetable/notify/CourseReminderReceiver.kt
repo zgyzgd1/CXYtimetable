@@ -10,19 +10,29 @@ import com.example.timetable.MainActivity
 import com.example.timetable.R
 import com.example.timetable.data.formatMinutes
 import com.example.timetable.ui.AppDestination
+import java.util.concurrent.atomic.AtomicBoolean
+
+internal class OneTimeAction {
+    private val fired = AtomicBoolean(false)
+
+    fun run(action: () -> Unit) {
+        if (fired.compareAndSet(false, true)) {
+            action()
+        }
+    }
+}
 
 class CourseReminderReceiver : BroadcastReceiver() {
     @android.annotation.SuppressLint("MissingPermission")
     override fun onReceive(context: Context, intent: Intent) {
         val pendingResult = goAsync()
+        val finishOnce = OneTimeAction()
 
         // Timeout protection: goAsync() has a 10s limit; set 8s timeout to ensure pendingResult.finish() is called
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
         val timeoutRunnable = Runnable {
-            try {
+            finishOnce.run {
                 pendingResult.finish()
-            } catch (_: Exception) {
-                // Ignore if already finished
             }
         }
         handler.postDelayed(timeoutRunnable, 8_000L)
@@ -82,11 +92,15 @@ class CourseReminderReceiver : BroadcastReceiver() {
             // Relay mechanism: after current reminder is sent, immediately schedule the next nearest reminder
             CourseReminderScheduler.resyncFromStorage(context) {
                 handler.removeCallbacks(timeoutRunnable)
-                pendingResult.finish()
+                finishOnce.run {
+                    pendingResult.finish()
+                }
             }
         } catch (throwable: Throwable) {
             handler.removeCallbacks(timeoutRunnable)
-            pendingResult.finish()
+            finishOnce.run {
+                pendingResult.finish()
+            }
             throw throwable
         }
     }

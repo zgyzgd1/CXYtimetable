@@ -87,15 +87,15 @@ object IcsImport {
 
         if (rrule.freq == "WEEKLY" && rrule.byDays.isNotEmpty()) {
             var weekAnchor = occurrence.start.toLocalDate().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-            var emitted = 0
+            var occurrenceIndex = 0
             var reachedUntil = false
 
             while (
-                emitted < MAX_EXPANDED_OCCURRENCES &&
-                    (rrule.count == null || emitted < rrule.count)
+                occurrenceIndex < MAX_EXPANDED_OCCURRENCES &&
+                    (rrule.count == null || occurrenceIndex < rrule.count)
             ) {
                 for (day in rrule.byDays) {
-                    if (rrule.count != null && emitted >= rrule.count) break
+                    if (rrule.count != null && occurrenceIndex >= rrule.count) break
 
                     val occurrenceDate = weekAnchor.plusDays((day.value - 1).toLong())
                     val recurringStart = LocalDateTime.of(occurrenceDate, occurrence.start.toLocalTime())
@@ -104,11 +104,14 @@ object IcsImport {
                         reachedUntil = true
                         break
                     }
+
+                    val currentIndex = occurrenceIndex
+                    occurrenceIndex++
                     if (icsNormalizeMinute(recurringStart) in exDates) continue
 
                     val occurrenceEnd = recurringStart.plusMinutes(durationMinutes)
                     buildEntry(
-                        id = "$uidBase#$emitted",
+                        id = "$uidBase#$currentIndex",
                         title = occurrence.title,
                         start = recurringStart,
                         end = occurrenceEnd,
@@ -116,11 +119,12 @@ object IcsImport {
                         note = occurrence.note,
                     )?.let {
                         result += it
-                        emitted++
                     }
                 }
 
                 if (reachedUntil) break
+                if (rrule.count != null && occurrenceIndex >= rrule.count) break
+                if (occurrenceIndex >= MAX_EXPANDED_OCCURRENCES) break
                 weekAnchor = weekAnchor.plusWeeks(interval.toLong())
                 val nextWeekFirstStart = LocalDateTime.of(weekAnchor, occurrence.start.toLocalTime())
                 if (rrule.until != null && nextWeekFirstStart.isAfter(rrule.until)) break

@@ -32,7 +32,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -169,112 +168,6 @@ fun WeekScheduleBoard(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun WeekOverviewHeader(
-    selectedDate: LocalDate,
-    weekStart: LocalDate,
-    weekEnd: LocalDate,
-    weekNumber: Int,
-    weekEntries: List<TimetableEntry>,
-    selectedDayEntries: List<TimetableEntry>,
-    slotCount: Int,
-    onCustomizeSlotCount: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(
-                    text = "${selectedDate.year}/${selectedDate.monthValue}/${selectedDate.dayOfMonth}",
-                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = stringResource(R.string.label_week_number, weekNumber) + "  " + formatWeekRange(weekStart, weekEnd),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = if (weekEntries.isEmpty()) {
-                        stringResource(R.string.label_week_no_courses)
-                    } else {
-                        stringResource(R.string.label_week_course_count, weekEntries.size, selectedDayEntries.size)
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.overlayDisabled(),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.padding(start = 12.dp),
-            ) {
-                GlassActionChip(
-                    label = stringResource(R.string.label_slot_count, slotCount),
-                    onClick = onCustomizeSlotCount,
-                )
-                WeekMiniStats(
-                    selectedCount = selectedDayEntries.size,
-                    weekCount = weekEntries.size,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun WeekMiniStats(
-    selectedCount: Int,
-    weekCount: Int,
-) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        SummaryPill(label = stringResource(R.string.label_today), value = selectedCount.toString())
-        SummaryPill(label = stringResource(R.string.label_this_week), value = weekCount.toString())
-    }
-}
-
-@Composable
-private fun SummaryPill(
-    label: String,
-    value: String,
-) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.weekBoard(),
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = AppShape.Chip,
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(1.dp),
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-            )
         }
     }
 }
@@ -505,26 +398,6 @@ private fun TimeSlotCell(
 }
 
 @Composable
-private fun GlassActionChip(
-    label: String,
-    onClick: () -> Unit,
-) {
-    Surface(
-        onClick = onClick,
-        color = MaterialTheme.colorScheme.surfaceVariant.overlaySelected(),
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = AppShape.Chip,
-        shadowElevation = 0.dp,
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
-        )
-    }
-}
-
-@Composable
 private fun WeekEntryBlock(
     modifier: Modifier,
     entry: TimetableEntry,
@@ -607,30 +480,6 @@ private fun WeekEntryBlock(
     }
 }
 
-internal data class WeekEntryLayout(
-    val entry: TimetableEntry,
-    val topPx: Float,
-    val heightPx: Float,
-    val leftPx: Float,
-    val widthPx: Float,
-)
-
-private data class EntryColumnAssignment(
-    val entry: TimetableEntry,
-    val columnIndex: Int,
-    val columnCount: Int,
-)
-
-private data class MutableEntryColumnAssignment(
-    val entry: TimetableEntry,
-    val columnIndex: Int,
-)
-
-private data class TimeAnchor(
-    val minute: Int,
-    val positionPx: Float,
-)
-
 internal fun weekdayLabel(dayOfWeek: DayOfWeek, context: Context): String = when (dayOfWeek) {
     DayOfWeek.MONDAY -> context.getString(R.string.weekday_mon)
     DayOfWeek.TUESDAY -> context.getString(R.string.weekday_tue)
@@ -641,154 +490,7 @@ internal fun weekdayLabel(dayOfWeek: DayOfWeek, context: Context): String = when
     DayOfWeek.SUNDAY -> context.getString(R.string.weekday_sun)
 }
 
-private fun formatWeekRange(start: LocalDate, end: LocalDate): String {
-    return if (start.month == end.month) {
-        "${start.monthValue}/${start.dayOfMonth} - ${end.dayOfMonth}"
-    } else {
-        "${start.monthValue}/${start.dayOfMonth} - ${end.monthValue}/${end.dayOfMonth}"
-    }
-}
-
 private fun calculateLaneHeight(slotCount: Int, slotHeight: Dp, slotGap: Dp): Dp {
     if (slotCount <= 0) return 0.dp
     return slotHeight * slotCount.toFloat() + slotGap * (slotCount - 1).toFloat()
-}
-
-internal fun buildWeekEntryLayouts(
-    entries: List<TimetableEntry>,
-    slots: List<WeekTimeSlot>,
-    laneWidthPx: Float,
-    slotHeightPx: Float,
-    slotGapPx: Float,
-): List<WeekEntryLayout> {
-    if (entries.isEmpty() || slots.isEmpty() || laneWidthPx <= 0f) return emptyList()
-
-    val sortedSlots = slots.sortedBy { it.startMinutes }
-    val firstMinute = sortedSlots.first().startMinutes
-    val lastMinute = sortedSlots.last().endMinutes
-    val anchors = buildLaneTimeAnchors(sortedSlots, slotHeightPx, slotGapPx)
-    val columnGapPx = 6f
-
-    return assignEntryColumns(
-        entries = entries.filter { it.endMinutes > firstMinute && it.startMinutes < lastMinute },
-    ).map { assignment ->
-        val top = mapMinuteToLanePosition(
-            minute = assignment.entry.startMinutes.coerceAtLeast(firstMinute),
-            anchors = anchors,
-        )
-        val bottom = mapMinuteToLanePosition(
-            minute = assignment.entry.endMinutes.coerceAtMost(lastMinute),
-            anchors = anchors,
-        )
-        val columnCount = assignment.columnCount.coerceAtLeast(1)
-        val totalGapPx = columnGapPx * (columnCount - 1)
-        val widthPx = ((laneWidthPx - totalGapPx) / columnCount).coerceAtLeast(1f)
-
-        WeekEntryLayout(
-            entry = assignment.entry,
-            topPx = top,
-            heightPx = (bottom - top).coerceAtLeast(1f),
-            leftPx = assignment.columnIndex * (widthPx + columnGapPx),
-            widthPx = widthPx,
-        )
-    }.sortedWith(compareBy<WeekEntryLayout> { it.topPx }.thenBy { it.leftPx })
-}
-
-private fun buildLaneTimeAnchors(
-    slots: List<WeekTimeSlot>,
-    slotHeightPx: Float,
-    slotGapPx: Float,
-): List<TimeAnchor> {
-    if (slots.isEmpty()) return emptyList()
-
-    val anchors = mutableListOf<TimeAnchor>()
-    slots.forEachIndexed { index, slot ->
-        anchors += TimeAnchor(
-            minute = slot.startMinutes,
-            positionPx = index * (slotHeightPx + slotGapPx),
-        )
-    }
-
-    val lastTopPx = (slots.lastIndex) * (slotHeightPx + slotGapPx)
-    anchors += TimeAnchor(
-        minute = slots.last().endMinutes,
-        positionPx = lastTopPx + slotHeightPx,
-    )
-    return anchors
-}
-
-private fun mapMinuteToLanePosition(
-    minute: Int,
-    anchors: List<TimeAnchor>,
-): Float {
-    if (anchors.isEmpty()) return 0f
-
-    val clampedMinute = minute.coerceIn(anchors.first().minute, anchors.last().minute)
-    for (index in 0 until anchors.lastIndex) {
-        val start = anchors[index]
-        val end = anchors[index + 1]
-        if (clampedMinute <= end.minute) {
-            if (end.minute <= start.minute) return end.positionPx
-            val fraction = (clampedMinute - start.minute).toFloat() / (end.minute - start.minute).toFloat()
-            return start.positionPx + (end.positionPx - start.positionPx) * fraction
-        }
-    }
-    return anchors.last().positionPx
-}
-
-private fun assignEntryColumns(entries: List<TimetableEntry>): List<EntryColumnAssignment> {
-    if (entries.isEmpty()) return emptyList()
-
-    val sortedEntries = entries.sortedWith(
-        compareBy<TimetableEntry> { it.startMinutes }
-            .thenBy { it.endMinutes }
-            .thenBy { it.id },
-    )
-    val assignments = mutableListOf<EntryColumnAssignment>()
-    val currentGroup = mutableListOf<MutableEntryColumnAssignment>()
-    val columnEnds = mutableListOf<Int>()
-    var groupMaxEnd = Int.MIN_VALUE
-
-    fun flushGroup() {
-        if (currentGroup.isEmpty()) return
-        val columnCount = columnEnds.size.coerceAtLeast(1)
-        currentGroup.forEach { assignment ->
-            assignments += EntryColumnAssignment(
-                entry = assignment.entry,
-                columnIndex = assignment.columnIndex,
-                columnCount = columnCount,
-            )
-        }
-        currentGroup.clear()
-        columnEnds.clear()
-        groupMaxEnd = Int.MIN_VALUE
-    }
-
-    sortedEntries.forEach { entry ->
-        if (currentGroup.isNotEmpty() && entry.startMinutes >= groupMaxEnd) {
-            flushGroup()
-        }
-
-        val reusableColumn = columnEnds.indexOfFirst { columnEnd -> columnEnd <= entry.startMinutes }
-        val columnIndex = if (reusableColumn >= 0) {
-            columnEnds[reusableColumn] = entry.endMinutes
-            reusableColumn
-        } else {
-            columnEnds += entry.endMinutes
-            columnEnds.lastIndex
-        }
-
-        currentGroup += MutableEntryColumnAssignment(entry = entry, columnIndex = columnIndex)
-        groupMaxEnd = maxOf(groupMaxEnd, entry.endMinutes)
-    }
-
-    flushGroup()
-    return assignments
-}
-
-internal fun colorWithHueShift(base: Color, hueShift: Float): Color {
-    val hsv = FloatArray(3)
-    android.graphics.Color.colorToHSV(base.toArgb(), hsv)
-    hsv[0] = (hsv[0] + hueShift) % 360f
-    return Color(android.graphics.Color.HSVToColor(hsv))
 }

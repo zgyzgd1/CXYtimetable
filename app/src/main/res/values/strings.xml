@@ -59,7 +59,7 @@
     <!-- Import preview -->
     <string name="msg_import_parsed">解析到 %1$d 条课程，其中有效 %2$d 条。</string>
     <string name="msg_import_skipped">跳过无效课程 %1$d 条。</string>
-    <string name="msg_import_conflicts">检测到 %1$d 组时间冲突，继续导入将替换当前课表。</string>
+    <string name="msg_import_conflicts">检测到 %1$d 组时间冲突，继续导入会保留当前课表并合并新课程。</string>
 
     <!-- Conflict dialog -->
     <string name="msg_conflict_overlap">与 %1$s（%2$s-%3$s）重叠。你可以返回修改，或继续保存。</string>

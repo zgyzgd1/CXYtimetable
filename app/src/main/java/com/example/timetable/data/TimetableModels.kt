@@ -211,8 +211,10 @@ private val entryDateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 private val minSupportedDate = LocalDate.of(1970, 1, 1)
 private val maxSupportedDate = LocalDate.of(2100, 12, 31)
 
+internal const val MAX_WEEK_LIST_WEEK = 7000
+
 /** 安全上限：跳过周次时的最大迭代次数，防止由于大的 skipWeekList 导致长循环。 */
-private const val MAX_SKIP_WEEK_ITERATIONS = 200
+private const val MAX_SKIP_WEEK_ITERATIONS = MAX_WEEK_LIST_WEEK
 
 /**
  * 解析条目日期字符串为 LocalDate 对象。
@@ -297,13 +299,13 @@ fun parseWeekList(raw: String): Set<Int>? {
             if (parts.size != 2) return null
             val start = parts[0].toIntOrNull() ?: return null
             val end = parts[1].toIntOrNull() ?: return null
-            if (start <= 0 || end <= 0 || end < start) return null
+            if (start <= 0 || end <= 0 || end < start || end > MAX_WEEK_LIST_WEEK) return null
             for (week in start..end) {
                 result += week
             }
         } else {
             val week = token.toIntOrNull() ?: return null
-            if (week <= 0) return null
+            if (week <= 0 || week > MAX_WEEK_LIST_WEEK) return null
             result += week
         }
     }
