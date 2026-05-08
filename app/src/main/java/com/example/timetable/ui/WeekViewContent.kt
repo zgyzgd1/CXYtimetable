@@ -1,9 +1,6 @@
 package com.example.timetable.ui
 
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,22 +15,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
-import androidx.compose.ui.input.pointer.util.VelocityTracker
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.stringResource
@@ -45,220 +31,155 @@ import com.example.timetable.data.WeekTimeSlot
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 
-private const val SWIPE_THRESHOLD_DP = 48f
-private val HORIZONTAL_PADDING = 12.dp
-private val VERTICAL_PADDING = 8.dp
-private val SPACING = 12.dp
-private val BUTTON_HORIZONTAL_PADDING = 14.dp
-private val BUTTON_VERTICAL_PADDING = 8.dp
-private const val FIXED_TIME_BUTTON_ALPHA = 0.3f
-private const val BACK_TO_TODAY_BUTTON_ALPHA = 0.15f
-
-/**
- * 周视图配置数据类
- */
-data class WeekViewConfig(
-    val selectedDate: String,
-    val selectedLocalDate: LocalDate,
-    val selectedWeekStart: LocalDate,
-    val selectedWeekEnd: LocalDate,
-    val minDate: LocalDate,
-    val maxDate: LocalDate
-)
-
-/**
- * 周视图数据类
- */
-internal data class WeekViewData(
-    val entries: List<TimetableEntry>,
-    val dateRangeEntriesCache: DateRangeEntriesCache,
-    val weekTimeSlots: List<WeekTimeSlot>,
-    val weekCardAlpha: Float,
-    val weekCardHue: Float
-)
-
-/**
- * 周视图回调函数类
- */
-data class WeekViewCallbacks(
-    val onDateChanged: (String) -> Unit,
-    val onEditEntry: (TimetableEntry) -> Unit,
-    val onEditWeekSlot: (Int) -> Unit,
-    val onAddWeekSlot: (WeekTimeSlot) -> Unit,
-    val onEditFixedWeekSchedule: () -> Unit
-)
-
 /**
  * 周视图内容。
  *
  * 显示一周的课程表，包含日历条、周课程表和操作按钮。
  *
- * @param config 周视图配置
- * @param data 周视图数据
+ * @param selectedDate 选中的日期
+ * @param selectedLocalDate 选中的本地日期
+ * @param selectedWeekStart 选中周的开始日期
+ * @param selectedWeekEnd 选中周的结束日期
+ * @param minDate 最小日期
+ * @param maxDate 最大日期
+ * @param entries 所有课程条目
+ * @param dateRangeEntriesCache 日期范围课程缓存
+ * @param weekTimeSlots 周时段列表
+ * @param weekCardAlpha 周卡片透明度
+ * @param weekCardHue 周卡片色调
  * @param snackbarHostState  Snackbar 主机状态
- * @param callbacks 周视图回调函数
+ * @param onDateChanged 日期变更回调
+ * @param onEditEntry 编辑课程条目回调
+ * @param onEditWeekSlot 编辑周时段回调
+ * @param onAddWeekSlot 添加周时段回调
+ * @param onEditFixedWeekSchedule 编辑固定周时间表回调
  * @param contentPadding 内边距
  */
 @Composable
 internal fun WeekViewContent(
-    config: WeekViewConfig,
-    data: WeekViewData,
+    selectedDate: String,
+    selectedLocalDate: LocalDate,
+    selectedWeekStart: LocalDate,
+    selectedWeekEnd: LocalDate,
+    minDate: LocalDate,
+    maxDate: LocalDate,
+    entries: List<TimetableEntry>,
+    dateRangeEntriesCache: DateRangeEntriesCache,
+    weekTimeSlots: List<WeekTimeSlot>,
+    weekCardAlpha: Float,
+    weekCardHue: Float,
     snackbarHostState: SnackbarHostState,
-    callbacks: WeekViewCallbacks,
+    onDateChanged: (String) -> Unit,
+    onEditEntry: (TimetableEntry) -> Unit,
+    onEditWeekSlot: (Int) -> Unit,
+    onAddWeekSlot: (WeekTimeSlot) -> Unit,
+    onEditFixedWeekSchedule: () -> Unit,
     contentPadding: PaddingValues = PaddingValues(),
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val isWeekMode = true
 
-    // Pre-read string resources for use in callbacks
-    val msgNoMoreSlots = stringResource(R.string.msg_no_more_slots)
-    val msgSlotAddedSuccess = stringResource(R.string.msg_slot_added_success)
-
-    // 主布局：垂直排列的列
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding)
-            .padding(horizontal = HORIZONTAL_PADDING, vertical = VERTICAL_PADDING),
-        verticalArrangement = Arrangement.spacedBy(SPACING),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // 1. 周日历条：显示当前周的日期，支持日期选择
         WeekCalendarStrip(
-            selectedDate = config.selectedLocalDate,
+            selectedDate = selectedLocalDate,
             onDateSelected = { date ->
-                // 检查日期是否在有效范围内
-                if (date in config.minDate..config.maxDate) {
-                    callbacks.onDateChanged(date.toString())
+                if (date in minDate..maxDate) {
+                    onDateChanged(date.toString())
                 }
             },
         )
-        // 2. 操作按钮行：包含固定时间和返回今天按钮
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(SPACING, Alignment.End),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
         ) {
             Surface(
-                onClick = callbacks.onEditFixedWeekSchedule,
+                onClick = onEditFixedWeekSchedule,
                 shape = AppShape.Chip,
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = FIXED_TIME_BUTTON_ALPHA),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
                 contentColor = MaterialTheme.colorScheme.onSurface,
             ) {
                 Text(
                     text = stringResource(R.string.action_fixed_time),
-                    modifier = Modifier.padding(horizontal = BUTTON_HORIZONTAL_PADDING, vertical = BUTTON_VERTICAL_PADDING),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                     style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
                 )
             }
             val today = LocalDate.now()
-            if (config.selectedLocalDate != today) {
+            if (selectedLocalDate != today) {
                 Surface(
-                    onClick = { callbacks.onDateChanged(today.toString()) },
+                    onClick = { onDateChanged(today.toString()) },
                     shape = AppShape.Chip,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = BACK_TO_TODAY_BUTTON_ALPHA),
-                contentColor = MaterialTheme.colorScheme.primary,
-            ) {
-                Text(
-                    text = stringResource(R.string.action_back_to_today),
-                    modifier = Modifier.padding(horizontal = BUTTON_HORIZONTAL_PADDING, vertical = BUTTON_VERTICAL_PADDING),
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
-                )
-            }
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                    contentColor = MaterialTheme.colorScheme.primary,
+                ) {
+                    Text(
+                        text = stringResource(R.string.action_back_to_today),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
+                    )
+                }
             }
         }
-        // 3. 周课程表：显示一周的课程安排，支持水平拖动切换周
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                // 水平拖动手势：左滑切换到下一周，右滑切换到上一周
-                // 方向锁定：水平拖动开始后消费所有事件，避免与垂直滚动冲突
-                .pointerInput(config.selectedDate) {
+                .pointerInput(selectedDate, isWeekMode) {
                     var totalHorizontalDrag = 0f
-                    var horizontalDragLocked = false
-                    val directionLockThreshold = viewConfiguration.touchSlop
                     detectHorizontalDragGestures(
-                        onDragStart = {
-                            horizontalDragLocked = false
-                            totalHorizontalDrag = 0f
-                        },
                         onHorizontalDrag = { change, dragAmount ->
+                            // 只处理水平方向的拖动，忽略垂直分量
                             change.consume()
                             totalHorizontalDrag += dragAmount
-                            // Once horizontal drag exceeds touch slop, lock direction
-                            if (!horizontalDragLocked && kotlin.math.abs(totalHorizontalDrag) > directionLockThreshold) {
-                                horizontalDragLocked = true
-                            }
                         },
                         onDragEnd = {
-                            val swipeThresholdPx = density * SWIPE_THRESHOLD_DP
+                            val swipeThresholdPx = density * 48f
                             when {
                                 totalHorizontalDrag > swipeThresholdPx -> {
-                                    // 右滑：切换到上一周
-                                    val previousDate = config.selectedLocalDate.minusDays(7)
-                                    if (previousDate >= config.minDate) callbacks.onDateChanged(previousDate.toString())
+                                    val previousDate = selectedLocalDate.minusDays(7)
+                                    if (previousDate >= minDate) onDateChanged(previousDate.toString())
                                 }
                                 totalHorizontalDrag < -swipeThresholdPx -> {
-                                    // 左滑：切换到下一周
-                                    val nextDate = config.selectedLocalDate.plusDays(7)
-                                    if (nextDate <= config.maxDate) callbacks.onDateChanged(nextDate.toString())
+                                    val nextDate = selectedLocalDate.plusDays(7)
+                                    if (nextDate <= maxDate) onDateChanged(nextDate.toString())
                                 }
                             }
                             totalHorizontalDrag = 0f
-                            horizontalDragLocked = false
-                        },
-                        onDragCancel = {
-                            totalHorizontalDrag = 0f
-                            horizontalDragLocked = false
                         },
                     )
                 }
         ) {
-            AnimatedContent(
-                targetState = config.selectedWeekStart,
-                transitionSpec = {
-                    val direction = if (targetState > initialState) 1 else -1
-                    (slideInHorizontally(tween(350)) { width -> direction * width / 3 } + fadeIn(tween(250)))
-                        .togetherWith(
-                            slideOutHorizontally(tween(350)) { width -> -direction * width / 3 } + fadeOut(tween(250))
-                        )
-                        .using(SizeTransform(clip = false))
-                },
-                label = "weekTransition",
-            ) { weekStart ->
-            val visibleEntriesByDate = data.dateRangeEntriesCache.resolve(weekStart, weekStart.plusDays(6))
+            val visibleEntriesByDate = dateRangeEntriesCache.resolve(selectedWeekStart, selectedWeekEnd)
             WeekScheduleBoard(
-                selectedDate = config.selectedLocalDate,
-                weekStart = weekStart,
-                weekEnd = weekStart.plusDays(6),
+                selectedDate = selectedLocalDate,
+                weekStart = selectedWeekStart,
+                weekEnd = selectedWeekEnd,
                 entriesByDay = visibleEntriesByDate,
-                slots = data.weekTimeSlots,
-                cardAlpha = data.weekCardAlpha,
-                cardHue = data.weekCardHue,
+                slots = weekTimeSlots,
+                cardAlpha = weekCardAlpha,
+                cardHue = weekCardHue,
                 onAddSlot = {
-                    val nextSlot = defaultNewWeekSlot(data.weekTimeSlots)
+                    val nextSlot = defaultNewWeekSlot(weekTimeSlots)
                     if (nextSlot == null) {
                         scope.launch {
-                            snackbarHostState.showSnackbar(
-                                message = msgNoMoreSlots,
-                                duration = androidx.compose.material3.SnackbarDuration.Short
-                            )
+                            snackbarHostState.showSnackbar(context.getString(R.string.msg_no_more_slots))
                         }
                     } else {
-                        callbacks.onAddWeekSlot(nextSlot)
-                        scope.launch {
-                            snackbarHostState.showSnackbar(
-                                message = msgSlotAddedSuccess,
-                                duration = androidx.compose.material3.SnackbarDuration.Short
-                            )
-                        }
+                        onAddWeekSlot(nextSlot)
                     }
                 },
-                onCustomizeSlotCount = callbacks.onEditFixedWeekSchedule,
-                onEntryClick = callbacks.onEditEntry,
-                onSlotClick = callbacks.onEditWeekSlot,
+                onCustomizeSlotCount = onEditFixedWeekSchedule,
+                onEntryClick = onEditEntry,
+                onSlotClick = onEditWeekSlot,
             )
-            }
         }
     }
 }

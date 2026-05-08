@@ -34,6 +34,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
@@ -426,10 +427,12 @@ private fun WeekEntryBlock(
     BoxWithConstraints(
         modifier = modifier
             .graphicsLayer {
-                alpha = animAlpha.value
                 scaleX = animScale.value
                 scaleY = animScale.value
             }
+            .then(
+                if (animAlpha.value < 1f) Modifier.alpha(animAlpha.value) else Modifier
+            )
             .clip(AppShape.CardSmall)
             .border(
                 width = 1.dp,
@@ -453,10 +456,9 @@ private fun WeekEntryBlock(
         }
         val innerPadding = if (maxHeight >= 120.dp) 10.dp else 6.dp
         val innerSpacing = if (maxHeight >= 120.dp) 4.dp else 2.dp
-        // Ensure readable text: use dark text when card color is too light
         val luminance = 0.2126f * color.red + 0.7152f * color.green + 0.0722f * color.blue
-        val textColor = if (luminance > 0.5f) MaterialTheme.colorScheme.onSurface.overlayPrimaryMedium() else Color.White
-        val subTextColor = if (luminance > 0.5f) MaterialTheme.colorScheme.onSurfaceVariant.overlayFaint() else Color.White.overlayPrimaryHigh()
+        val textColor = if (luminance > 0.5f) Color.Black.copy(alpha = 0.90f) else Color.White
+        val subTextColor = if (luminance > 0.5f) Color.Black.copy(alpha = 0.72f) else Color.White.copy(alpha = 0.88f)
 
         Column(
             modifier = Modifier
