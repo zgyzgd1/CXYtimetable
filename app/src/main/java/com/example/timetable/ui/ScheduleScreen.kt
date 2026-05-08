@@ -206,29 +206,23 @@ private fun ScheduleAppContent(state: ScheduleAppState) {
                 when (destination) {
                     AppDestination.WEEK -> {
                         WeekViewContent(
-                            config = WeekViewConfig(
-                                selectedDate = state.selectedDate,
-                                selectedLocalDate = state.selectedLocalDate,
-                                selectedWeekStart = state.selectedWeekStart,
-                                selectedWeekEnd = state.selectedWeekEnd,
-                                minDate = state.minDate,
-                                maxDate = state.maxDate,
-                            ),
-                            data = WeekViewData(
-                                entries = state.entries,
-                                dateRangeEntriesCache = dateRangeEntriesCache,
-                                weekTimeSlots = state.weekTimeSlots,
-                                weekCardAlpha = state.weekCardAlpha,
-                                weekCardHue = state.weekCardHue,
-                            ),
+                            selectedDate = state.selectedDate,
+                            selectedLocalDate = state.selectedLocalDate,
+                            selectedWeekStart = state.selectedWeekStart,
+                            selectedWeekEnd = state.selectedWeekEnd,
+                            minDate = state.minDate,
+                            maxDate = state.maxDate,
+                            entries = state.entries,
+                            dateRangeEntriesCache = dateRangeEntriesCache,
+                            weekTimeSlots = state.weekTimeSlots,
+                            weekCardAlpha = state.weekCardAlpha,
+                            weekCardHue = state.weekCardHue,
                             snackbarHostState = state.snackbarHostState,
-                            callbacks = WeekViewCallbacks(
-                                onDateChanged = { state.selectedDate = it },
-                                onEditEntry = { state.editingEntry = it },
-                                onEditWeekSlot = { state.editingWeekSlotIndex = it },
-                                onAddWeekSlot = { state.addingWeekSlotInitial = it },
-                                onEditFixedWeekSchedule = { state.editingFixedWeekSchedule = true },
-                            ),
+                            onDateChanged = { state.selectedDate = it },
+                            onEditEntry = { state.editingEntry = it },
+                            onEditWeekSlot = { state.editingWeekSlotIndex = it },
+                            onAddWeekSlot = { state.addingWeekSlotInitial = it },
+                            onEditFixedWeekSchedule = { state.editingFixedWeekSchedule = true },
                             contentPadding = padding,
                         )
                     }
