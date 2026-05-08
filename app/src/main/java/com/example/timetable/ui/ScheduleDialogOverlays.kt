@@ -57,6 +57,18 @@ fun ScheduleDialogOverlays(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    // Pre-read string resources for use in callbacks
+    val msgBackgroundRangeUpdated = stringResource(R.string.msg_background_range_updated)
+    val msgWeekSlotsUpdated = stringResource(R.string.msg_week_slots_updated)
+    val msgNoDeferrableSlot = stringResource(R.string.msg_no_deferrable_slot)
+    val msgSlotTimeOverlap = stringResource(R.string.msg_slot_time_overlap)
+    val titleAddSlot = stringResource(R.string.title_add_slot)
+    val titleEditSlotTemplate = stringResource(R.string.title_edit_slot, "%d")
+    val msgSlotDeletedTemplate = stringResource(R.string.msg_slot_deleted, "%d")
+    val msgSlotAddedTemplate = stringResource(R.string.msg_slot_added, "%d")
+    val msgSlotsResizedTemplate = stringResource(R.string.msg_slots_resized, "%d")
+    val msgSlotsResizeLimitedTemplate = stringResource(R.string.msg_slots_resize_limited, "%d")
+
     deletingEntry?.let { toDelete ->
         DeleteEntryDialog(
             entry = toDelete,
@@ -90,7 +102,7 @@ fun ScheduleDialogOverlays(
                 AppearanceStore.setBackgroundImageTransform(context, transform)
                 onBackgroundAppearanceChange(AppearanceStore.getBackgroundAppearance(context))
                 onShowBackgroundAdjustDialogChange(false)
-                scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.msg_background_range_updated)) }
+                scope.launch { snackbarHostState.showSnackbar(msgBackgroundRangeUpdated) }
             },
         )
     }
@@ -103,7 +115,7 @@ fun ScheduleDialogOverlays(
             onSave = { updatedSlots ->
                 onWeekTimeSlotsChange(AppearanceStore.setWeekTimeSlots(context, updatedSlots))
                 onEditingFixedWeekScheduleChange(false)
-                scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.msg_week_slots_updated)) }
+                scope.launch { snackbarHostState.showSnackbar(msgWeekSlotsUpdated) }
             },
         )
     }
@@ -154,7 +166,7 @@ fun ScheduleDialogOverlays(
                     val adjusted = viewModel.suggestResolvedEntry(state.updatedEntry)
                     if (adjusted == null) {
                         scope.launch {
-                            snackbarHostState.showSnackbar(context.getString(R.string.msg_no_deferrable_slot))
+                            snackbarHostState.showSnackbar(msgNoDeferrableSlot)
                         }
                     } else {
                         applyEntrySave(adjusted, false)
@@ -168,7 +180,7 @@ fun ScheduleDialogOverlays(
     editingWeekSlotIndex?.let { index ->
         val currentSlot = weekTimeSlots.getOrNull(index) ?: return@let
         WeekSlotEditorDialog(
-            title = context.getString(R.string.title_edit_slot, index + 1),
+            title = titleEditSlotTemplate.format(index + 1),
             initial = currentSlot,
             onDismiss = { onEditingWeekSlotIndexChange(null) },
             onSave = { updatedSlot ->
@@ -176,7 +188,7 @@ fun ScheduleDialogOverlays(
                     this[index] = updatedSlot
                 }.sortedBy { it.startMinutes }
                 if (!areWeekTimeSlotsNonOverlapping(updatedSlots)) {
-                    scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.msg_slot_time_overlap)) }
+                    scope.launch { snackbarHostState.showSnackbar(msgSlotTimeOverlap) }
                     return@WeekSlotEditorDialog
                 }
                 onWeekTimeSlotsChange(AppearanceStore.setWeekTimeSlots(context, updatedSlots))
@@ -187,7 +199,7 @@ fun ScheduleDialogOverlays(
                     val updatedSlots = weekTimeSlots.toMutableList().apply { removeAt(index) }
                     onWeekTimeSlotsChange(AppearanceStore.setWeekTimeSlots(context, updatedSlots))
                     onEditingWeekSlotIndexChange(null)
-                    scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.msg_slot_deleted, index + 1)) }
+                    scope.launch { snackbarHostState.showSnackbar(msgSlotDeletedTemplate.format(index + 1)) }
                 }
             } else {
                 null
@@ -197,18 +209,18 @@ fun ScheduleDialogOverlays(
 
     addingWeekSlotInitial?.let { initialSlot ->
         WeekSlotEditorDialog(
-            title = context.getString(R.string.title_add_slot),
+            title = titleAddSlot,
             initial = initialSlot,
             onDismiss = { onAddingWeekSlotInitialChange(null) },
             onSave = { newSlot ->
                 val updatedSlots = (weekTimeSlots + newSlot).sortedBy { it.startMinutes }
                 if (!areWeekTimeSlotsNonOverlapping(updatedSlots)) {
-                    scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.msg_slot_time_overlap)) }
+                    scope.launch { snackbarHostState.showSnackbar(msgSlotTimeOverlap) }
                     return@WeekSlotEditorDialog
                 }
                 onWeekTimeSlotsChange(AppearanceStore.setWeekTimeSlots(context, updatedSlots))
                 onAddingWeekSlotInitialChange(null)
-                scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.msg_slot_added, updatedSlots.indexOf(newSlot) + 1)) }
+                scope.launch { snackbarHostState.showSnackbar(msgSlotAddedTemplate.format(updatedSlots.indexOf(newSlot) + 1)) }
             },
         )
     }
@@ -223,9 +235,9 @@ fun ScheduleDialogOverlays(
                 onEditingWeekSlotCountChange(false)
                 scope.launch {
                     val message = if (updatedSlots.size == count) {
-                        context.getString(R.string.msg_slots_resized, count)
+                        msgSlotsResizedTemplate.format(count)
                     } else {
-                        context.getString(R.string.msg_slots_resize_limited, updatedSlots.size)
+                        msgSlotsResizeLimitedTemplate.format(updatedSlots.size)
                     }
                     snackbarHostState.showSnackbar(message)
                 }

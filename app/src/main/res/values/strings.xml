@@ -216,7 +216,7 @@
     <string name="nav_week_view">周视图</string>
     <string name="nav_settings">设置</string>
 
-    <!-- Weekday names -->
+    <!-- Weekday names (short, used in calendar strips) -->
     <string name="weekday_mon">一</string>
     <string name="weekday_tue">二</string>
     <string name="weekday_wed">三</string>
@@ -224,6 +224,15 @@
     <string name="weekday_fri">五</string>
     <string name="weekday_sat">六</string>
     <string name="weekday_sun">日</string>
+
+    <!-- Weekday full names (used in entry cards, accessibility, labels) -->
+    <string name="weekday_name_mon">星期一</string>
+    <string name="weekday_name_tue">星期二</string>
+    <string name="weekday_name_wed">星期三</string>
+    <string name="weekday_name_thu">星期四</string>
+    <string name="weekday_name_fri">星期五</string>
+    <string name="weekday_name_sat">星期六</string>
+    <string name="weekday_name_sun">星期日</string>
 
     <!-- Placeholder hints -->
     <string name="hint_custom_weeks_format">1,3,5 或 1-16</string>
@@ -260,6 +269,31 @@
     <string name="hint_cache_description">清除应用缓存和临时文件，不会删除课表数据、自定义背景和你的设置。</string>
     <string name="action_clearing">清理中…</string>
     <string name="action_clear_cache">清除缓存</string>
+    <string name="settings_section_appearance">外观</string>
+    <string name="settings_section_reminders">提醒</string>
+    <string name="settings_section_data">数据管理</string>
+    <string name="settings_section_about">关于</string>
+    <string name="settings_theme_mode">主题模式</string>
+    <string name="settings_theme_follow_system">跟随系统</string>
+    <string name="settings_theme_light">浅色</string>
+    <string name="settings_theme_dark">深色</string>
+    <string name="settings_background_mode">背景图片</string>
+    <string name="settings_background_bundled">默认背景</string>
+    <string name="settings_background_custom">自定义图片</string>
+    <string name="settings_background_gradient">纯色渐变</string>
+    <string name="settings_card_opacity">周视图卡片不透明度</string>
+    <string name="settings_card_hue">周视图卡片色调</string>
+    <string name="settings_import_ics">导入 ICS 课程表</string>
+    <string name="settings_export_ics">导出 ICS 课程表</string>
+    <string name="settings_version">版本 %1$s</string>
+    <string name="settings_app_name_version">课程表助手</string>
+    <string name="settings_notification_label">通知权限</string>
+    <string name="settings_notification_granted">已授权</string>
+    <string name="settings_notification_denied">未授权</string>
+    <string name="settings_exact_alarm_label">精确提醒</string>
+    <string name="settings_exact_alarm_enabled">已开启</string>
+    <string name="settings_exact_alarm_disabled">未开启</string>
+    <string name="settings_reminder_time">提前提醒时间</string>
 
     <!-- BackgroundImageAdjustDialog -->
     <string name="title_adjust_background">调整背景展示范围</string>
@@ -308,6 +342,7 @@
     <string name="card_empty_title">今天暂无课程</string>
     <string name="card_empty_hint">切换日期查看，或点击下方按钮添加课程</string>
     <string name="card_add_course">添加课程</string>
+    <string name="week_empty_day">无课程</string>
 
     <!-- TimetableCalendar -->
     <string name="label_calendar_month">%1$d年%2$d月</string>

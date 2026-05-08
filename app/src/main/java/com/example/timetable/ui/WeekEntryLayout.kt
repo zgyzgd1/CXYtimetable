@@ -93,7 +93,7 @@ internal fun buildWeekEntryLayouts(
 internal fun colorWithHueShift(base: Color, hueShift: Float): Color {
     val hsv = FloatArray(3)
     android.graphics.Color.colorToHSV(base.toArgb(), hsv)
-    hsv[0] = (hsv[0] + hueShift) % 360f
+    hsv[0] = ((hsv[0] + hueShift) % 360f + 360f) % 360f
     return Color(android.graphics.Color.HSVToColor(hsv))
 }
 

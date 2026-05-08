@@ -1,6 +1,8 @@
 package com.example.timetable.ui
 
 import android.graphics.BitmapFactory
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -32,8 +34,9 @@ fun AppBackgroundLayer(backgroundAppearance: BackgroundAppearance) {
     val customBackground by produceState<ImageBitmap?>(
         initialValue = null,
         key1 = backgroundAppearance.mode,
+        key2 = backgroundAppearance.revision,
     ) {
-        if (backgroundAppearance.mode == AppBackgroundMode.CUSTOM_IMAGE) {
+        value = if (backgroundAppearance.mode == AppBackgroundMode.CUSTOM_IMAGE) {
             withContext(Dispatchers.IO) {
                 BackgroundImageManager.customBackgroundFile(context)
                     .takeIf { it.isFile }
@@ -46,26 +49,32 @@ fun AppBackgroundLayer(backgroundAppearance: BackgroundAppearance) {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        when (backgroundAppearance.mode) {
-            AppBackgroundMode.CUSTOM_IMAGE -> {
-                customBackground?.let { bitmap ->
-                    CustomBackgroundImage(
-                        bitmap = bitmap,
-                        imageTransform = backgroundAppearance.imageTransform,
+        Crossfade(
+            targetState = backgroundAppearance.mode,
+            animationSpec = tween(500),
+            label = "backgroundMode",
+        ) { mode ->
+            when (mode) {
+                AppBackgroundMode.CUSTOM_IMAGE -> {
+                    customBackground?.let { bitmap ->
+                        CustomBackgroundImage(
+                            bitmap = bitmap,
+                            imageTransform = backgroundAppearance.imageTransform,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+                AppBackgroundMode.BUNDLED_IMAGE -> {
+                    Image(
+                        painter = painterResource(id = R.drawable.default_background_image),
+                        contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                        alignment = BiasAlignment(horizontalBias = 0.28f, verticalBias = -0.10f),
                     )
                 }
+                AppBackgroundMode.GRADIENT -> { /* No image layer for gradient mode */ }
             }
-            AppBackgroundMode.BUNDLED_IMAGE -> {
-                Image(
-                    painter = painterResource(id = R.drawable.default_background_image),
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
-                    alignment = BiasAlignment(horizontalBias = 0.28f, verticalBias = -0.10f),
-                )
-            }
-            AppBackgroundMode.GRADIENT -> { /* No image layer for gradient mode */ }
         }
 
         BackgroundTintOverlays(modifier = Modifier.fillMaxSize())

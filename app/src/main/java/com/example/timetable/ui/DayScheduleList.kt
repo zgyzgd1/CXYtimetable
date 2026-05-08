@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.timetable.data.AppBackgroundMode
 import com.example.timetable.data.AppearanceStore
@@ -44,6 +45,14 @@ internal fun DayScheduleList(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // Pre-read string resources for use in callbacks
+    val exportFilename = stringResource(R.string.export_filename)
+    val msgSwitchedDefaultBg = stringResource(R.string.msg_switched_default_background)
+    val msgDisabledImageBg = stringResource(R.string.msg_disabled_image_background)
+    val msgClearedCustomBg = stringResource(R.string.msg_cleared_custom_background)
+    val labelUnnamedCourse = stringResource(R.string.label_unnamed_course)
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
@@ -66,7 +75,7 @@ internal fun DayScheduleList(
                             ),
                         )
                     },
-                    onExport = { exportLauncher.launch(context.getString(R.string.export_filename)) },
+                    onExport = { exportLauncher.launch(exportFilename) },
                     onEnableNotifications = reminderConfig.onEnableNotifications,
                     exactAlarmPermissionRequired = CourseReminderScheduler.exactAlarmPermissionRequired(),
                     exactAlarmEnabled = reminderConfig.exactAlarmEnabled,
@@ -80,12 +89,12 @@ internal fun DayScheduleList(
                     onUseBundledBackground = {
                         AppearanceStore.setBackgroundMode(context, AppBackgroundMode.BUNDLED_IMAGE)
                         appearanceConfig.onBackgroundAppearanceChange(AppearanceStore.getBackgroundAppearance(context))
-                        scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.msg_switched_default_background)) }
+                        scope.launch { snackbarHostState.showSnackbar(msgSwitchedDefaultBg) }
                     },
                     onUseGradientBackground = {
                         AppearanceStore.setBackgroundMode(context, AppBackgroundMode.GRADIENT)
                         appearanceConfig.onBackgroundAppearanceChange(AppearanceStore.getBackgroundAppearance(context))
-                        scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.msg_disabled_image_background)) }
+                        scope.launch { snackbarHostState.showSnackbar(msgDisabledImageBg) }
                     },
                     onAdjustCustomBackground = appearanceConfig.onAdjustCustomBackground,
                     onClearCustomBackground = {
@@ -95,7 +104,7 @@ internal fun DayScheduleList(
                                 AppearanceStore.setBackgroundMode(context, AppBackgroundMode.BUNDLED_IMAGE)
                             }
                             appearanceConfig.onBackgroundAppearanceChange(AppearanceStore.getBackgroundAppearance(context))
-                            snackbarHostState.showSnackbar(context.getString(R.string.msg_cleared_custom_background))
+                            snackbarHostState.showSnackbar(msgClearedCustomBg)
                         }
                     },
                     weekCardAlpha = appearanceConfig.weekCardAlpha,
@@ -108,7 +117,7 @@ internal fun DayScheduleList(
         nextCourseSnapshot?.let { upcoming ->
             item {
                 NextCourseCard(
-                    state = upcoming.toCardState(unnamedLabel = context.getString(R.string.label_unnamed_course)),
+                    state = upcoming.toCardState(unnamedLabel = labelUnnamedCourse),
                     onViewDay = { callbacks.onDateChanged(upcoming.occurrenceDate.toString()) },
                 )
             }
@@ -122,7 +131,7 @@ internal fun DayScheduleList(
             )
         }
         item {
-            SectionHeader(title = formatDateLabel(selectedDate))
+            SectionHeader(title = formatDateLabel(selectedDate, context))
         }
         if (selectedDayEntries.isEmpty()) {
             item {

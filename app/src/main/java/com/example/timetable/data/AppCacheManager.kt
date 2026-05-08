@@ -34,7 +34,7 @@ object AppCacheManager {
         val digitGroup = (ln(safeBytes.toDouble()) / ln(1024.0)).toInt().coerceIn(1, units.size)
         val unitValue = 1024.0.pow(digitGroup.toDouble())
         val formatted = safeBytes / unitValue
-        return String.format("%.1f %s", formatted, units[digitGroup - 1])
+        return String.format(java.util.Locale.US, "%.1f %s", formatted, units[digitGroup - 1])
     }
 
     internal fun clearDirectoryContents(directory: File): CacheClearResult {

@@ -5,6 +5,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -47,6 +49,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -58,6 +61,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 
 internal fun accentColorFor(title: String, colors: List<Color> = LightCourseAccentColors): Color =
     colors[(title.hashCode() and Int.MAX_VALUE) % colors.size]
@@ -67,11 +72,12 @@ private fun buildEntryCardContentDescription(
     unnamedLabel: String,
     locationLabel: String,
     noteLabel: String,
+    weekdayLabel: String,
 ): String {
     val parts = mutableListOf<String>()
     parts.add(entry.title.ifBlank { unnamedLabel })
     parts.add("${formatMinutes(entry.startMinutes)} - ${formatMinutes(entry.endMinutes)}")
-    parts.add(dayLabel(entry.dayOfWeek))
+    parts.add(weekdayLabel)
     if (entry.location.isNotBlank()) {
         parts.add("$locationLabel ${entry.location}")
     }
@@ -93,13 +99,16 @@ fun EntryCard(
     val courseColors = LocalCourseAccentColors.current
     val accent = remember(entry.title, courseColors) { accentColorFor(entry.title, courseColors) }
     val unnamedCourse = stringResource(R.string.label_unnamed_course)
+    val weekdayLabel = dayLabel(entry.dayOfWeek, LocalContext.current)
     val contentDesc = buildEntryCardContentDescription(
         entry = entry,
         unnamedLabel = unnamedCourse,
         locationLabel = stringResource(R.string.content_desc_course_location),
         noteLabel = stringResource(R.string.content_desc_course_note),
+        weekdayLabel = weekdayLabel,
     )
     var showMenu by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
 
     Box {
         Card(
@@ -107,7 +116,10 @@ fun EntryCard(
                 .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
                 .combinedClickable(
                     onClick = onEdit,
-                    onLongClick = { showMenu = true },
+                    onLongClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        showMenu = true
+                    },
                 )
                 .semantics {
                     role = Role.Button
@@ -116,7 +128,7 @@ fun EntryCard(
             shape = AppShape.CardLarge,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.surfaceCard()),
             border = BorderStroke(1.dp, Color.White.borderCard()),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         ) {
             Row(
                 modifier = Modifier
@@ -183,7 +195,7 @@ fun EntryCard(
                             shape = AppShape.Pill,
                         ) {
                             Text(
-                                text = dayLabel(entry.dayOfWeek),
+                                text = weekdayLabel,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                                 color = accent,
@@ -303,7 +315,7 @@ fun NextCourseCard(
         shape = AppShape.CardMedium,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.surfaceCard()),
         border = BorderStroke(1.dp, Color.White.borderCard()),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
     ) {
         Column(
             modifier = Modifier
@@ -396,7 +408,7 @@ fun EmptyStateCard(onAdd: () -> Unit) {
         shape = AppShape.CardLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.surfaceCard()),
         border = BorderStroke(1.dp, Color.White.borderCard()),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
     ) {
         Column(
             modifier = Modifier
@@ -405,10 +417,27 @@ fun EmptyStateCard(onAdd: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(
-                text = "📮",
-                style = MaterialTheme.typography.displaySmall,
-            )
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primaryContainer,
+                                MaterialTheme.colorScheme.secondaryContainer,
+                            ),
+                        ),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.EventNote,
+                    contentDescription = null,
+                    modifier = Modifier.size(36.dp),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(6.dp),

@@ -2,6 +2,10 @@ package com.example.timetable.ui
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.EaseInOutQuad
@@ -10,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -50,6 +55,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import com.example.timetable.R
 import com.example.timetable.data.TimetableEntry
 import com.example.timetable.data.entriesByDateInRange
@@ -108,7 +115,7 @@ fun PerpetualCalendar(
         shape = AppShape.CardLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.surfaceCardLight()),
         border = BorderStroke(1.dp, Color.White.borderCard()),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(
             modifier = Modifier
@@ -144,48 +151,58 @@ fun PerpetualCalendar(
                 }
             }
 
-            LazyRow(
-                state = listState,
-                contentPadding = PaddingValues(horizontal = 14.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            BoxWithConstraints(
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                items(daysInMonth, key = { it.toEpochDay() }) { date ->
-                    val isSelected = date == selected
-                    val isToday = date == today
-                    val hasCourse = datesWithEntries[date] == true
-                    val dayContext = LocalContext.current
+                val availableWidth = maxWidth - 28.dp // horizontal padding (14.dp * 2)
+                val gapCount = 6
+                val interItemGap = 10.dp
+                val computedCellWidth = ((availableWidth - interItemGap * gapCount) / 7f).coerceIn(44.dp, 64.dp)
+                val cellWidth = remember(computedCellWidth) { computedCellWidth }
 
-                    val containerColor = if (isSelected || isToday) {
-                        animateColorAsState(
-                            targetValue = when {
-                                isSelected -> MaterialTheme.colorScheme.primary
-                                isToday -> MaterialTheme.colorScheme.primaryContainer
-                                else -> Color.Transparent
-                            },
-                            animationSpec = tween(durationMillis = 350, easing = EaseInOutQuad),
-                            label = "calendarContainerColor",
-                        ).value
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant.overlayDecorative()
-                    }
-                    val textColor = if (isSelected || isToday) {
-                        animateColorAsState(
-                            targetValue = when {
-                                isSelected -> MaterialTheme.colorScheme.onPrimary
-                                isToday -> MaterialTheme.colorScheme.onPrimaryContainer
-                                else -> MaterialTheme.colorScheme.onSurface
-                            },
-                            animationSpec = tween(durationMillis = 350, easing = EaseInOutQuad),
-                            label = "calendarTextColor",
-                        ).value
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    }
+                LazyRow(
+                    state = listState,
+                    contentPadding = PaddingValues(horizontal = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(interItemGap),
+                ) {
+                    items(daysInMonth, key = { it.toEpochDay() }) { date ->
+                        val isSelected = date == selected
+                        val isToday = date == today
+                        val hasCourse = datesWithEntries[date] == true
+                        val dayContext = LocalContext.current
+                        val haptic = LocalHapticFeedback.current
 
-                    Card(
-                        modifier = Modifier
-                            .width(54.dp)
-                            .semantics {
+                        val containerColor = if (isSelected || isToday) {
+                            animateColorAsState(
+                                targetValue = when {
+                                    isSelected -> MaterialTheme.colorScheme.primary
+                                    isToday -> MaterialTheme.colorScheme.primaryContainer
+                                    else -> Color.Transparent
+                                },
+                                animationSpec = tween(durationMillis = 350, easing = EaseInOutQuad),
+                                label = "calendarContainerColor",
+                            ).value
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.overlayDecorative()
+                        }
+                        val textColor = if (isSelected || isToday) {
+                            animateColorAsState(
+                                targetValue = when {
+                                    isSelected -> MaterialTheme.colorScheme.onPrimary
+                                    isToday -> MaterialTheme.colorScheme.onPrimaryContainer
+                                    else -> MaterialTheme.colorScheme.onSurface
+                                },
+                                animationSpec = tween(durationMillis = 350, easing = EaseInOutQuad),
+                                label = "calendarTextColor",
+                            ).value
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        }
+
+                        Card(
+                            modifier = Modifier
+                                .width(cellWidth)
+                                .semantics {
                                 role = Role.Button
                                 this.selected = isSelected
                                 contentDescription = buildCalendarDayContentDescription(
@@ -196,10 +213,13 @@ fun PerpetualCalendar(
                                     hasCourse = hasCourse,
                                 )
                             }
-                            .clickable { onDateChanged(date.toString()) },
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onDateChanged(date.toString())
+                            },
                         shape = AppShape.CalendarDay,
                         colors = CardDefaults.cardColors(containerColor = containerColor),
-                        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 2.dp else 0.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 4.dp else 1.dp),
                     ) {
                         Column(
                             modifier = Modifier
@@ -222,9 +242,25 @@ fun PerpetualCalendar(
                                 color = textColor,
                                 textAlign = TextAlign.Center,
                             )
+                            val shouldPulse = isToday && hasCourse
+                            val dotSize = if (shouldPulse) {
+                                val infiniteTransition = rememberInfiniteTransition(label = "todayPulse")
+                                val pulseValue by infiniteTransition.animateFloat(
+                                    initialValue = 6f,
+                                    targetValue = 8f,
+                                    animationSpec = infiniteRepeatable(
+                                        animation = tween(durationMillis = 800, easing = EaseInOutQuad),
+                                        repeatMode = RepeatMode.Reverse,
+                                    ),
+                                    label = "todayDotPulse",
+                                )
+                                pulseValue.dp
+                            } else {
+                                6.dp
+                            }
                             Box(
                                 modifier = Modifier
-                                    .size(6.dp)
+                                    .size(dotSize)
                                     .clip(CircleShape)
                                     .background(
                                         if (hasCourse) textColor else Color.Transparent,
@@ -236,4 +272,5 @@ fun PerpetualCalendar(
             }
         }
     }
+}
 }

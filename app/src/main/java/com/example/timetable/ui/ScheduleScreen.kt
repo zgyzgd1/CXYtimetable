@@ -6,11 +6,18 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -43,6 +50,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import com.example.timetable.R
@@ -122,6 +131,13 @@ private fun rememberScheduleLaunchers(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
+    // Pre-read string resources for use in launcher callbacks
+    val msgExportSuccess = stringResource(R.string.msg_export_success)
+    val msgExportFailedTemplate = stringResource(R.string.msg_export_failed, "%s")
+    val msgUnknownError = stringResource(R.string.msg_unknown_error)
+    val msgBackgroundUpdated = stringResource(R.string.msg_background_updated)
+    val msgBackgroundFailedTemplate = stringResource(R.string.msg_background_failed, "%s")
+
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -140,9 +156,9 @@ private fun rememberScheduleLaunchers(
                     context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { writer ->
                         writer.write(text)
                     }
-                    snackbarHostState.showSnackbar(context.getString(R.string.msg_export_success))
+                    snackbarHostState.showSnackbar(msgExportSuccess)
                 } catch (error: Exception) {
-                    snackbarHostState.showSnackbar(context.getString(R.string.msg_export_failed, error.message ?: context.getString(R.string.msg_unknown_error)))
+                    snackbarHostState.showSnackbar(msgExportFailedTemplate.format(error.message ?: msgUnknownError))
                 }
             }
         }
@@ -157,10 +173,10 @@ private fun rememberScheduleLaunchers(
                     BackgroundImageManager.saveCustomBackground(context, context.contentResolver, uri)
                     onBackgroundAppearanceChange(AppearanceStore.getBackgroundAppearance(context))
                     onShowBackgroundAdjustDialogChange(true)
-                    snackbarHostState.showSnackbar(context.getString(R.string.msg_background_updated))
+                    snackbarHostState.showSnackbar(msgBackgroundUpdated)
                 } catch (error: Exception) {
                     snackbarHostState.showSnackbar(
-                        context.getString(R.string.msg_background_failed, error.message ?: context.getString(R.string.msg_unknown_error)),
+                        msgBackgroundFailedTemplate.format(error.message ?: msgUnknownError),
                     )
                 }
             }
@@ -273,12 +289,25 @@ fun ScheduleApp(
         onShowBackgroundAdjustDialogChange = { showBackgroundAdjustDialog = it },
     )
 
+    // Pre-read string resources for launcher callbacks
+    val msgNotificationsEnabled = stringResource(R.string.msg_notifications_enabled)
+    val msgNotificationsDisabledWarning = stringResource(R.string.msg_notifications_disabled_warning)
+    val msgExactAlarmEnabled = stringResource(R.string.msg_exact_alarm_enabled)
+    val msgExactAlarmDisabledWarning = stringResource(R.string.msg_exact_alarm_disabled_warning)
+    val msgExactAlarmStillDisabled = stringResource(R.string.msg_exact_alarm_still_disabled)
+    val msgEntryDuplicated = stringResource(R.string.msg_entry_duplicated)
+    val msgCacheClearedTemplate = stringResource(R.string.msg_cache_cleared, "%s")
+    val msgCacheEmpty = stringResource(R.string.msg_cache_empty)
+    val msgCacheClearFailedTemplate = stringResource(R.string.msg_cache_clear_failed, "%s")
+    val msgUnknownError = stringResource(R.string.msg_unknown_error)
+    val exportFilename = stringResource(R.string.export_filename)
+
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
         scope.launch {
             snackbarHostState.showSnackbar(
-                if (granted) context.getString(R.string.msg_notifications_enabled) else context.getString(R.string.msg_notifications_disabled_warning),
+                if (granted) msgNotificationsEnabled else msgNotificationsDisabledWarning,
             )
         }
     }
@@ -290,11 +319,11 @@ fun ScheduleApp(
         scope.launch {
             if (enabled) {
                 viewModel.resyncReminderSchedule()
-                snackbarHostState.showSnackbar(context.getString(R.string.msg_exact_alarm_enabled))
+                snackbarHostState.showSnackbar(msgExactAlarmEnabled)
             } else if (result.resultCode == Activity.RESULT_CANCELED) {
-                snackbarHostState.showSnackbar(context.getString(R.string.msg_exact_alarm_disabled_warning))
+                snackbarHostState.showSnackbar(msgExactAlarmDisabledWarning)
             } else {
-                snackbarHostState.showSnackbar(context.getString(R.string.msg_exact_alarm_still_disabled))
+                snackbarHostState.showSnackbar(msgExactAlarmStillDisabled)
             }
         }
     }
@@ -350,13 +379,15 @@ fun ScheduleApp(
             floatingActionButton = {
                 AnimatedVisibility(
                     visible = !isSettingsPage,
-                    enter = scaleIn() + fadeIn(),
-                    exit = scaleOut() + fadeOut(),
+                    enter = slideInVertically(tween(300)) { it / 2 } + scaleIn(tween(300)) + fadeIn(tween(300)),
+                    exit = scaleOut(tween(200)) + fadeOut(tween(200)),
                 ) {
+                    val haptic = LocalHapticFeedback.current
                     FloatingActionButton(
                         containerColor = MaterialTheme.colorScheme.surface.stickyHeader(),
                         contentColor = MaterialTheme.colorScheme.onSurface,
                         onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             editingEntry = createQuickEntryTemplate(
                                 date = selectedLocalDate,
                                 existingEntries = selectedDayEntries,
@@ -374,7 +405,19 @@ fun ScheduleApp(
                 )
             },
         ) { padding ->
-            when (currentDestination) {
+            AnimatedContent(
+                targetState = currentDestination,
+                transitionSpec = {
+                    val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                    (slideInHorizontally(tween(300)) { width -> direction * width / 4 } + fadeIn(tween(300)))
+                        .togetherWith(
+                            slideOutHorizontally(tween(300)) { width -> -direction * width / 4 } + fadeOut(tween(300))
+                        )
+                        .using(SizeTransform(clip = false))
+                },
+                label = "pageTransition",
+            ) { destination ->
+            when (destination) {
                 AppDestination.WEEK -> {
                     WeekViewContent(
                         config = WeekViewConfig(
@@ -453,7 +496,7 @@ fun ScheduleApp(
                             onDuplicateEntry = { entry ->
                                 editingEntry = duplicateEntryTemplate(entry)
                                 scope.launch {
-                                    snackbarHostState.showSnackbar(context.getString(R.string.msg_entry_duplicated))
+                                    snackbarHostState.showSnackbar(msgEntryDuplicated)
                                 }
                             },
                             onDeleteEntry = { deletingEntry = it },
@@ -475,25 +518,66 @@ fun ScheduleApp(
                                         AppCacheManager.clearAppCaches(context)
                                     }
                                     val message = if (result.bytesCleared > 0L) {
-                                        context.getString(R.string.msg_cache_cleared, AppCacheManager.formatBytes(result.bytesCleared))
+                                        msgCacheClearedTemplate.format(AppCacheManager.formatBytes(result.bytesCleared))
                                     } else {
-                                        context.getString(R.string.msg_cache_empty)
+                                        msgCacheEmpty
                                     }
                                     snackbarHostState.showSnackbar(message)
                                 } catch (cancelled: CancellationException) {
                                     throw cancelled
                                 } catch (error: Exception) {
                                     snackbarHostState.showSnackbar(
-                                        context.getString(R.string.msg_cache_clear_failed, error.message ?: context.getString(R.string.msg_unknown_error)),
+                                        msgCacheClearFailedTemplate.format(error.message ?: msgUnknownError),
                                     )
                                 } finally {
                                     clearingCache = false
                                 }
                             }
                         },
+                        backgroundAppearance = backgroundAppearance,
+                        onBackgroundModeChange = { mode ->
+                            AppearanceStore.setBackgroundMode(context, mode)
+                            backgroundAppearance = AppearanceStore.getBackgroundAppearance(context)
+                        },
+                        onSelectBackgroundImage = { launchers.backgroundImage.launch("image/*") },
+                        weekCardAlpha = weekCardAlpha,
+                        onWeekCardAlphaChange = { alpha ->
+                            weekCardAlpha = alpha
+                            AppearanceStore.setWeekCardAlpha(context, alpha)
+                        },
+                        weekCardHue = weekCardHue,
+                        onWeekCardHueChange = { hue ->
+                            weekCardHue = hue
+                            AppearanceStore.setWeekCardHue(context, hue)
+                        },
+                        notificationGranted = CourseReminderScheduler.notificationsEnabled(context),
+                        exactAlarmEnabled = exactAlarmEnabled,
+                        onEnableNotifications = {
+                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        },
+                        onOpenExactAlarmSettings = {
+                            val intent = CourseReminderScheduler.buildExactAlarmSettingsIntent(context)
+                            if (intent != null) exactAlarmSettingsLauncher.launch(intent)
+                        },
+                        onImportIcs = {
+                            launchers.import.launch(
+                                arrayOf(
+                                    "text/calendar",
+                                    "text/plain",
+                                    "application/ics",
+                                    "application/x-ical",
+                                    "application/octet-stream",
+                                    "*/*",
+                                ),
+                            )
+                        },
+                        onExportIcs = {
+                            launchers.export.launch(exportFilename)
+                        },
                         modifier = Modifier.padding(padding),
                     )
                 }
+            }
             }
         }
     }

@@ -27,10 +27,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -236,30 +241,35 @@ private fun DayHeaderCell(
     height: Dp,
     selected: Boolean,
 ) {
-    Column(
+    Surface(
         modifier = Modifier
             .width(width)
             .height(height)
-            .padding(horizontal = 2.dp)
-            .clip(AppShape.CardSmall)
-            .background(if (selected) MaterialTheme.colorScheme.primaryContainer.overlaySelected() else Color.Transparent),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+            .padding(horizontal = 2.dp),
+        shape = AppShape.CardSmall,
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer.overlaySelected() else Color.Transparent,
+        shadowElevation = if (selected) 2.dp else 0.dp,
     ) {
-        Text(
-            text = weekdayLabel(day.dayOfWeek, LocalContext.current),
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = "${day.monthValue}/${day.dayOfMonth}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = weekdayLabel(day.dayOfWeek, LocalContext.current),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = "${day.monthValue}/${day.dayOfMonth}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -330,14 +340,14 @@ private fun WeekDayLane(
             )
         }
 
-        if (entries.isEmpty() && selected && slots.isNotEmpty()) {
+        if (entries.isEmpty() && slots.isNotEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = stringResource(R.string.card_empty_title),
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = stringResource(R.string.week_empty_day),
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.overlayVeryFaint(),
                 )
             }
@@ -405,8 +415,21 @@ private fun WeekEntryBlock(
     onClick: () -> Unit,
 ) {
     val entryContext = LocalContext.current
+    val animAlpha = remember { Animatable(0f) }
+    val animScale = remember { Animatable(0.92f) }
+    LaunchedEffect(entry.id) {
+        animAlpha.animateTo(1f, animationSpec = tween(300))
+    }
+    LaunchedEffect(entry.id) {
+        animScale.animateTo(1f, animationSpec = tween(300))
+    }
     BoxWithConstraints(
         modifier = modifier
+            .graphicsLayer {
+                alpha = animAlpha.value
+                scaleX = animScale.value
+                scaleY = animScale.value
+            }
             .clip(AppShape.CardSmall)
             .border(
                 width = 1.dp,

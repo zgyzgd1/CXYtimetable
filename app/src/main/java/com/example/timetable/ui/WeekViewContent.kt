@@ -18,6 +18,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -101,6 +109,10 @@ internal fun WeekViewContent(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // Pre-read string resources for use in callbacks
+    val msgNoMoreSlots = stringResource(R.string.msg_no_more_slots)
+    val msgSlotAddedSuccess = stringResource(R.string.msg_slot_added_success)
 
     // 主布局：垂直排列的列
     Column(
@@ -202,11 +214,23 @@ internal fun WeekViewContent(
                     )
                 }
         ) {
-            val visibleEntriesByDate = data.dateRangeEntriesCache.resolve(config.selectedWeekStart, config.selectedWeekEnd)
+            AnimatedContent(
+                targetState = config.selectedWeekStart,
+                transitionSpec = {
+                    val direction = if (targetState > initialState) 1 else -1
+                    (slideInHorizontally(tween(350)) { width -> direction * width / 3 } + fadeIn(tween(250)))
+                        .togetherWith(
+                            slideOutHorizontally(tween(350)) { width -> -direction * width / 3 } + fadeOut(tween(250))
+                        )
+                        .using(SizeTransform(clip = false))
+                },
+                label = "weekTransition",
+            ) { weekStart ->
+            val visibleEntriesByDate = data.dateRangeEntriesCache.resolve(weekStart, weekStart.plusDays(6))
             WeekScheduleBoard(
                 selectedDate = config.selectedLocalDate,
-                weekStart = config.selectedWeekStart,
-                weekEnd = config.selectedWeekEnd,
+                weekStart = weekStart,
+                weekEnd = weekStart.plusDays(6),
                 entriesByDay = visibleEntriesByDate,
                 slots = data.weekTimeSlots,
                 cardAlpha = data.weekCardAlpha,
@@ -216,7 +240,7 @@ internal fun WeekViewContent(
                     if (nextSlot == null) {
                         scope.launch {
                             snackbarHostState.showSnackbar(
-                                message = context.getString(R.string.msg_no_more_slots),
+                                message = msgNoMoreSlots,
                                 duration = androidx.compose.material3.SnackbarDuration.Short
                             )
                         }
@@ -224,7 +248,7 @@ internal fun WeekViewContent(
                         callbacks.onAddWeekSlot(nextSlot)
                         scope.launch {
                             snackbarHostState.showSnackbar(
-                                message = context.getString(R.string.msg_slot_added_success),
+                                message = msgSlotAddedSuccess,
                                 duration = androidx.compose.material3.SnackbarDuration.Short
                             )
                         }
@@ -234,6 +258,7 @@ internal fun WeekViewContent(
                 onEntryClick = callbacks.onEditEntry,
                 onSlotClick = callbacks.onEditWeekSlot,
             )
+            }
         }
     }
 }

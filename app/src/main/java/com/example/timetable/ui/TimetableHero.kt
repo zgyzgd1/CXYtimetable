@@ -101,7 +101,7 @@ fun HeroSection(
         shape = AppShape.CardLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.surfaceCardLighter()),
         border = BorderStroke(1.dp, Color.White.borderCard()),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
     ) {
         Column(
             modifier = Modifier

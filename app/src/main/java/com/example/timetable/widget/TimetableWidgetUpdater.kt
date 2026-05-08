@@ -143,7 +143,7 @@ internal fun buildTodayScheduleWidgetState(
     val emptyText = if (courseItems.isEmpty()) context.getString(R.string.widget_no_courses_today) else null
 
     return TodayScheduleWidgetState(
-        dateLabel = "${today.monthValue}/${today.dayOfMonth}${dayLabel(today.dayOfWeek.value)}",
+        dateLabel = "${today.monthValue}/${today.dayOfMonth}${dayLabel(today.dayOfWeek.value, context)}",
         courseItems = courseItems,
         emptyText = emptyText,
         targetDate = today,
@@ -362,5 +362,5 @@ private fun buildNextCourseTimeLabel(
 }
 
 internal fun formatWidgetDateLabel(date: LocalDate, context: Context): String {
-    return context.getString(R.string.widget_date_format, date.monthValue, date.dayOfMonth) + " " + dayLabel(date.dayOfWeek.value)
+    return context.getString(R.string.widget_date_format, date.monthValue, date.dayOfMonth) + " " + dayLabel(date.dayOfWeek.value, context)
 }

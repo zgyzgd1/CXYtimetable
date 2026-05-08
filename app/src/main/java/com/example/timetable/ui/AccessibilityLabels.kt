@@ -5,6 +5,7 @@ import com.example.timetable.R
 import com.example.timetable.data.TimetableEntry
 import com.example.timetable.data.WeekTimeSlot
 import com.example.timetable.data.dayLabel
+// Uses context-aware dayLabel(dayOfWeek, context)
 import com.example.timetable.data.formatMinutes
 import java.time.LocalDate
 
@@ -16,7 +17,7 @@ internal fun buildCalendarDayContentDescription(
     hasCourse: Boolean,
 ): String {
     val parts = mutableListOf(
-        context.getString(R.string.a11y_date_full, date.year, date.monthValue, date.dayOfMonth, dayLabel(date.dayOfWeek.value)),
+        context.getString(R.string.a11y_date_full, date.year, date.monthValue, date.dayOfMonth, dayLabel(date.dayOfWeek.value, context)),
     )
     if (today) parts += context.getString(R.string.a11y_today)
     if (selected) parts += context.getString(R.string.a11y_selected)
@@ -31,7 +32,7 @@ internal fun buildWeekCalendarDayContentDescription(
     today: Boolean,
 ): String {
     val parts = mutableListOf(
-        context.getString(R.string.a11y_date_short, date.monthValue, date.dayOfMonth, dayLabel(date.dayOfWeek.value)),
+        context.getString(R.string.a11y_date_short, date.monthValue, date.dayOfMonth, dayLabel(date.dayOfWeek.value, context)),
     )
     if (today) parts += context.getString(R.string.a11y_today)
     if (selected) parts += context.getString(R.string.a11y_currently_selected)

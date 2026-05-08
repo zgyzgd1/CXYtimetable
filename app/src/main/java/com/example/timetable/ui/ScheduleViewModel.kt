@@ -10,6 +10,7 @@ import com.example.timetable.R
 import com.example.timetable.data.EntryConstants
 import com.example.timetable.data.EntryValidationError
 import com.example.timetable.data.EntryValidator
+import com.example.timetable.data.AppearanceStore
 import com.example.timetable.data.IcsCalendar
 import com.example.timetable.data.MAX_EXPANDED_OCCURRENCES
 import com.example.timetable.data.RecurrenceType
@@ -79,6 +80,7 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
 
     init {
         ReminderFallbackWorker.ensureScheduled(application)
+        AppearanceStore.ensureDefaults(application)
         viewModelScope.launch {
             TimetableRepository.ensureMigrated(getApplication())
             TimetableRepository.getEntriesStream(getApplication()).collect { currentEntries ->

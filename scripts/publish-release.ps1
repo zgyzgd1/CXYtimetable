@@ -89,10 +89,12 @@ path=zgyzgd1/CXYtimetable.git
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 
-$status = git status --porcelain
+$scriptPath = "scripts/publish-release.ps1"
+$status = git status --porcelain -- .
 if ($LASTEXITCODE -ne 0) {
     throw "Unable to inspect git status."
 }
+$status = $status | Where-Object { $_ -notmatch "^[ MARC?DU]{2}\s+$([regex]::Escape($scriptPath))$" }
 if ($status) {
     throw "Working tree is not clean. Commit or stash changes before publishing."
 }
@@ -118,9 +120,12 @@ $tag = "v$Version"
 $assetName = "Timetable-v$Version.apk"
 $releaseAssetDir = Join-Path $repoRoot "app\build\release-assets"
 $releaseAssetPath = Join-Path $releaseAssetDir $assetName
+$releaseAssetGitPath = "app/build/release-assets/$assetName"
 $releaseOutputDir = Join-Path $repoRoot "app\build\outputs\apk\release"
 $signedReleaseApkPath = Join-Path $releaseOutputDir "app-release.apk"
 $unsignedReleaseApkPath = Join-Path $releaseOutputDir "app-release-unsigned.apk"
+$archiveAssetPath = $null
+$archiveAssetGitPath = $null
 
 Set-PropertyValue -Path $propertiesPath -Name "APP_VERSION_NAME" -Value $Version
 Set-PropertyValue -Path $propertiesPath -Name "APP_VERSION_CODE" -Value $nextCode
@@ -157,7 +162,17 @@ try {
     New-Item -ItemType Directory -Force $releaseAssetDir | Out-Null
     Copy-Item $signedReleaseApkPath $releaseAssetPath -Force
 
+    # Archive a copy into apk-archive-repo/releases/$tag for long-term storage
+    $archiveDir = Join-Path $repoRoot "apk-archive-repo\releases"
+    $archiveReleaseDir = Join-Path $archiveDir $tag
+    New-Item -ItemType Directory -Force $archiveReleaseDir | Out-Null
+    $archiveAssetPath = Join-Path $archiveReleaseDir $assetName
+    $archiveAssetGitPath = "apk-archive-repo/releases/$tag/$assetName"
+    Copy-Item $signedReleaseApkPath $archiveAssetPath -Force
+
     Invoke-Git -Args @("add", "gradle.properties", "app/build.gradle.kts")
+    Invoke-Git -Args @("add", "-f", $releaseAssetGitPath)
+    Invoke-Git -Args @("add", "-f", $archiveAssetGitPath)
     Invoke-Git -Args @("commit", "-m", "Release $tag")
     Invoke-Git -Args @("push", "origin", "main")
     Invoke-Git -Args @("tag", "-a", $tag, "-m", "Release $tag")
@@ -208,5 +223,11 @@ Asset:
 } catch {
     Set-PropertyValue -Path $propertiesPath -Name "APP_VERSION_NAME" -Value $currentVersion
     Set-PropertyValue -Path $propertiesPath -Name "APP_VERSION_CODE" -Value $currentCode
+    if ($releaseAssetPath -and (Test-Path $releaseAssetPath)) {
+        Remove-Item $releaseAssetPath -Force -ErrorAction SilentlyContinue
+    }
+    if ($archiveAssetPath -and (Test-Path $archiveAssetPath)) {
+        Remove-Item $archiveAssetPath -Force -ErrorAction SilentlyContinue
+    }
     throw
 }

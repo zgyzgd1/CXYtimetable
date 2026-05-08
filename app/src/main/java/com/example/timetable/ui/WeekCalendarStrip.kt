@@ -90,7 +90,7 @@ fun WeekCalendarStrip(
             containerColor = MaterialTheme.colorScheme.surface.surfaceCard(),
         ),
         border = BorderStroke(1.dp, Color.White.borderCard()),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(
             modifier = Modifier

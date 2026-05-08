@@ -80,10 +80,8 @@ fun EntryEditorDialog(
     val context = LocalContext.current
 
     // Pre-load string resources for use in validation logic
-    val validationErrorMessages = remember {
-        EntryValidationError.entries.associateWith { error ->
-            context.getString(error.messageResId)
-        }
+    val validationErrorMessages = EntryValidationError.entries.associateWith { error ->
+        stringResource(error.messageResId)
     }
 
     // Auto-fill semester start date from global config if empty

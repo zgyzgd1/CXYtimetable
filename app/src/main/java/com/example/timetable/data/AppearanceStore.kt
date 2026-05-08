@@ -114,6 +114,65 @@ object AppearanceStore {
         )
     }
 
+    /**
+     * 确保 SharedPreferences 中存在合理的默认值。
+     *
+     * 此方法执行一次性数据迁移：当存储值缺失或无效时写入合理默认值。
+     * 应在应用启动时（ViewModel 初始化时）调用一次，之后的 get 方法均为纯读取。
+     */
+    fun ensureDefaults(context: Context) {
+        val store = prefs(context)
+        val resolvedMode = resolvePersistedBackgroundMode(
+            storedModeValue = store.getString(KEY_BACKGROUND_MODE, null),
+            hasCustomBackground = BackgroundImageManager.hasCustomBackground(context),
+        )
+        val resolvedTransform = resolvePersistedBackgroundImageTransform(
+            storedScale = store.getOptionalFloat(KEY_BACKGROUND_IMAGE_SCALE),
+            storedHorizontalBias = store.getOptionalFloat(KEY_BACKGROUND_IMAGE_HORIZONTAL_BIAS),
+            storedVerticalBias = store.getOptionalFloat(KEY_BACKGROUND_IMAGE_VERTICAL_BIAS),
+        )
+        val hasWork = resolvedMode.shouldPersist || resolvedTransform.shouldPersist
+        if (!hasWork) return
+
+        val revision = if (resolvedMode.shouldPersist) {
+            nextBackgroundRevision(store)
+        } else {
+            store.getLong(KEY_BACKGROUND_REVISION, DEFAULT_BACKGROUND_REVISION)
+        }
+        store.edit()
+            .apply {
+                if (resolvedMode.shouldPersist) {
+                    putString(KEY_BACKGROUND_MODE, resolvedMode.mode.storageValue)
+                    putLong(KEY_BACKGROUND_REVISION, revision)
+                }
+                if (resolvedTransform.shouldPersist) {
+                    putFloat(KEY_BACKGROUND_IMAGE_SCALE, resolvedTransform.imageTransform.scale)
+                    putFloat(KEY_BACKGROUND_IMAGE_HORIZONTAL_BIAS, resolvedTransform.imageTransform.horizontalBias)
+                    putFloat(KEY_BACKGROUND_IMAGE_VERTICAL_BIAS, resolvedTransform.imageTransform.verticalBias)
+                }
+            }
+            .apply()
+
+        // Sanitize week time slots if corrupt
+        val rawSlots = rawWeekTimeSlots(context)
+        val sanitized = sanitizeWeekTimeSlots(rawSlots, defaultWeekTimeSlots())
+        if (sanitized != rawSlots) {
+            store.edit().putString(KEY_WEEK_TIME_SLOTS, serializedWeekTimeSlots(sanitized)).apply()
+        }
+    }
+
+    private fun rawWeekTimeSlots(context: Context): List<WeekTimeSlot> {
+        val raw = prefs(context).getString(KEY_WEEK_TIME_SLOTS, null).orEmpty()
+        return raw.split(';')
+            .mapNotNull { token ->
+                val parts = token.split('-')
+                if (parts.size != 2) return@mapNotNull null
+                val start = parts[0].toIntOrNull() ?: return@mapNotNull null
+                val end = parts[1].toIntOrNull() ?: return@mapNotNull null
+                WeekTimeSlot(start, end).takeIf { start in 0 until 24 * 60 && end in 1..24 * 60 && start < end }
+            }
+    }
+
     fun getBackgroundAppearance(context: Context): BackgroundAppearance {
         val store = prefs(context)
         val resolvedMode = resolvePersistedBackgroundMode(
@@ -125,27 +184,7 @@ object AppearanceStore {
             storedHorizontalBias = store.getOptionalFloat(KEY_BACKGROUND_IMAGE_HORIZONTAL_BIAS),
             storedVerticalBias = store.getOptionalFloat(KEY_BACKGROUND_IMAGE_VERTICAL_BIAS),
         )
-        val revision = if (resolvedMode.shouldPersist) {
-            nextBackgroundRevision(store)
-        } else {
-            store.getLong(KEY_BACKGROUND_REVISION, DEFAULT_BACKGROUND_REVISION)
-        }
-
-        if (resolvedMode.shouldPersist || resolvedTransform.shouldPersist) {
-            store.edit()
-                .apply {
-                    if (resolvedMode.shouldPersist) {
-                        putString(KEY_BACKGROUND_MODE, resolvedMode.mode.storageValue)
-                        putLong(KEY_BACKGROUND_REVISION, revision)
-                    }
-                    if (resolvedTransform.shouldPersist) {
-                        putFloat(KEY_BACKGROUND_IMAGE_SCALE, resolvedTransform.imageTransform.scale)
-                        putFloat(KEY_BACKGROUND_IMAGE_HORIZONTAL_BIAS, resolvedTransform.imageTransform.horizontalBias)
-                        putFloat(KEY_BACKGROUND_IMAGE_VERTICAL_BIAS, resolvedTransform.imageTransform.verticalBias)
-                    }
-                }
-                .apply()
-        }
+        val revision = store.getLong(KEY_BACKGROUND_REVISION, DEFAULT_BACKGROUND_REVISION)
 
         return BackgroundAppearance(
             mode = resolvedMode.mode,
@@ -184,13 +223,6 @@ object AppearanceStore {
             storedHorizontalBias = store.getOptionalFloat(KEY_BACKGROUND_IMAGE_HORIZONTAL_BIAS),
             storedVerticalBias = store.getOptionalFloat(KEY_BACKGROUND_IMAGE_VERTICAL_BIAS),
         )
-        if (resolved.shouldPersist) {
-            store.edit()
-                .putFloat(KEY_BACKGROUND_IMAGE_SCALE, resolved.imageTransform.scale)
-                .putFloat(KEY_BACKGROUND_IMAGE_HORIZONTAL_BIAS, resolved.imageTransform.horizontalBias)
-                .putFloat(KEY_BACKGROUND_IMAGE_VERTICAL_BIAS, resolved.imageTransform.verticalBias)
-                .apply()
-        }
         return resolved.imageTransform
     }
 
@@ -216,11 +248,11 @@ object AppearanceStore {
 
     fun getWeekCardHue(context: Context): Float {
         return prefs(context).getFloat(KEY_WEEK_CARD_HUE, DEFAULT_WEEK_CARD_HUE)
-            .coerceIn(0f, 360f)
+            .coerceIn(-180f, 180f)
     }
 
     fun setWeekCardHue(context: Context, value: Float) {
-        prefs(context).edit().putFloat(KEY_WEEK_CARD_HUE, value.coerceIn(0f, 360f)).apply()
+        prefs(context).edit().putFloat(KEY_WEEK_CARD_HUE, value.coerceIn(-180f, 180f)).apply()
     }
 
     fun getWeekTimeSlots(context: Context): List<WeekTimeSlot> {
@@ -236,12 +268,7 @@ object AppearanceStore {
         if (raw.isBlank()) {
             return defaultWeekTimeSlots()
         }
-
-        val sanitized = sanitizeWeekTimeSlots(parsed, defaultWeekTimeSlots())
-        if (sanitized != parsed) {
-            prefs(context).edit().putString(KEY_WEEK_TIME_SLOTS, serializedWeekTimeSlots(sanitized)).apply()
-        }
-        return sanitized
+        return sanitizeWeekTimeSlots(parsed, defaultWeekTimeSlots())
     }
 
     fun setWeekTimeSlots(context: Context, slots: List<WeekTimeSlot>): List<WeekTimeSlot> {
