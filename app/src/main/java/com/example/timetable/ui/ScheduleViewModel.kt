@@ -45,8 +45,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
+
 
 private const val MAX_ICS_IMPORT_BYTES = 1024 * 1024
 
@@ -442,30 +441,59 @@ internal fun reminderSyncToken(
     reminderMinutes: List<Int>,
 ): String {
     val normalizedReminderMinutes = CourseReminderScheduler.normalizeReminderMinutes(reminderMinutes)
-    return JSONObject()
-        .put("reminderMinutes", JSONArray(normalizedReminderMinutes))
-        .put("entries", JSONArray(entries.map(::entryTokenJson)))
-        .toString()
+    return buildToken {
+        appendListHeader("reminders", normalizedReminderMinutes.size)
+        normalizedReminderMinutes.forEach { appendInt(it) }
+        appendEntries(entries)
+    }
 }
 
 internal fun widgetRefreshToken(entries: List<TimetableEntry>): String {
-    return JSONArray(entries.map(::entryTokenJson)).toString()
+    return buildToken {
+        appendEntries(entries)
+    }
 }
 
-private fun entryTokenJson(entry: TimetableEntry): JSONObject {
-    return JSONObject()
-        .put("id", entry.id)
-        .put("title", entry.title)
-        .put("location", entry.location)
-        .put("date", entry.date)
-        .put("dayOfWeek", entry.dayOfWeek)
-        .put("startMinutes", entry.startMinutes)
-        .put("endMinutes", entry.endMinutes)
-        .put("recurrenceType", entry.recurrenceType)
-        .put("semesterStartDate", entry.semesterStartDate)
-        .put("weekRule", entry.weekRule)
-        .put("customWeekList", entry.customWeekList)
-        .put("skipWeekList", entry.skipWeekList)
+private fun buildToken(block: StringBuilder.() -> Unit): String {
+    return buildString(block)
+}
+
+private fun StringBuilder.appendEntries(entries: List<TimetableEntry>) {
+    appendListHeader("entries", entries.size)
+    entries.forEach { entry ->
+        appendField(entry.id)
+        appendField(entry.title)
+        appendField(entry.date)
+        appendInt(entry.dayOfWeek)
+        appendInt(entry.startMinutes)
+        appendInt(entry.endMinutes)
+        appendField(entry.location)
+        appendField(entry.note)
+        appendField(entry.recurrenceType)
+        appendField(entry.semesterStartDate)
+        appendField(entry.weekRule)
+        appendField(entry.customWeekList)
+        appendField(entry.skipWeekList)
+    }
+}
+
+private fun StringBuilder.appendListHeader(name: String, size: Int) {
+    append(name)
+    append('#')
+    append(size)
+    append(';')
+}
+
+private fun StringBuilder.appendInt(value: Int) {
+    append(value)
+    append(';')
+}
+
+private fun StringBuilder.appendField(value: String) {
+    append(value.length)
+    append(':')
+    append(value)
+    append(';')
 }
 
 /**

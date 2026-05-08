@@ -1,6 +1,7 @@
 package com.example.timetable.data
 
 import android.content.Context
+import androidx.core.content.edit
 import androidx.room.withTransaction
 import com.example.timetable.data.room.AppDatabase
 import java.io.File
@@ -43,7 +44,7 @@ object TimetableRepository {
     }
 
     private fun markSampleEntriesSeeded(context: Context) {
-        getPreferences(context).edit().putBoolean(KEY_SAMPLE_ENTRIES_SEEDED, true).apply()
+        getPreferences(context).edit { putBoolean(KEY_SAMPLE_ENTRIES_SEEDED, true) }
     }
 
     internal fun shouldSeedSampleEntries(hasEntries: Boolean, hasSeededSampleEntries: Boolean): Boolean {

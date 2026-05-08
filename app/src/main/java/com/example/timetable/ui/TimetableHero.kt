@@ -70,6 +70,8 @@ data class HeroSectionConfig(
     val onImport: () -> Unit,
     val onExport: () -> Unit,
     val onEnableNotifications: () -> Unit,
+    val notificationPermissionRequired: Boolean,
+    val notificationGranted: Boolean,
     val exactAlarmPermissionRequired: Boolean,
     val exactAlarmEnabled: Boolean,
     val onOpenExactAlarmSettings: () -> Unit,
@@ -166,6 +168,8 @@ fun HeroSection(
         ReminderPickerDialog(
             reminderMinutes = config.reminderMinutes,
             reminderOptions = config.reminderOptions,
+            notificationPermissionRequired = config.notificationPermissionRequired,
+            notificationGranted = config.notificationGranted,
             exactAlarmPermissionRequired = config.exactAlarmPermissionRequired,
             exactAlarmEnabled = config.exactAlarmEnabled,
             onDismiss = { showReminderSheet = false },
@@ -355,7 +359,8 @@ private fun AppearanceDialog(
                     Slider(
                         value = weekCardHue,
                         onValueChange = onWeekCardHueChange,
-                        valueRange = 0f..360f,
+                        valueRange = -180f..180f,
+                        steps = 36,
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -412,6 +417,8 @@ private fun AppearanceDialog(
 private fun ReminderPickerDialog(
     reminderMinutes: List<Int>,
     reminderOptions: List<Int>,
+    notificationPermissionRequired: Boolean,
+    notificationGranted: Boolean,
     exactAlarmPermissionRequired: Boolean,
     exactAlarmEnabled: Boolean,
     onDismiss: () -> Unit,
@@ -588,7 +595,9 @@ private fun ReminderPickerDialog(
         },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onEnableNotifications) { Text(stringResource(R.string.action_enable_permission)) }
+                if (notificationPermissionRequired && !notificationGranted) {
+                    TextButton(onClick = onEnableNotifications) { Text(stringResource(R.string.action_enable_permission)) }
+                }
                 TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
             }
         },

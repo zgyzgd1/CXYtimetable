@@ -1,6 +1,7 @@
 package com.example.timetable.data
 
 import android.content.Context
+import androidx.core.content.edit
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.TemporalAdjusters
@@ -35,18 +36,18 @@ object SemesterStore {
      * Saves the global semester start date.
      */
     fun setSemesterStartDate(context: Context, date: LocalDate) {
-        prefs(context).edit()
-            .putString(KEY_SEMESTER_START_DATE, date.toString())
-            .apply()
+        prefs(context).edit {
+            putString(KEY_SEMESTER_START_DATE, date.toString())
+        }
     }
 
     /**
      * Clears the global semester start date.
      */
     fun clearSemesterStartDate(context: Context) {
-        prefs(context).edit()
-            .remove(KEY_SEMESTER_START_DATE)
-            .apply()
+        prefs(context).edit {
+            remove(KEY_SEMESTER_START_DATE)
+        }
     }
 
     /**

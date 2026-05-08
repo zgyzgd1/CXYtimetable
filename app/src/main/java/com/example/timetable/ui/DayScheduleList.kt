@@ -77,6 +77,8 @@ internal fun DayScheduleList(
                     },
                     onExport = { exportLauncher.launch(exportFilename) },
                     onEnableNotifications = reminderConfig.onEnableNotifications,
+                    notificationPermissionRequired = reminderConfig.notificationPermissionRequired,
+                    notificationGranted = reminderConfig.notificationGranted,
                     exactAlarmPermissionRequired = CourseReminderScheduler.exactAlarmPermissionRequired(),
                     exactAlarmEnabled = reminderConfig.exactAlarmEnabled,
                     onOpenExactAlarmSettings = reminderConfig.onOpenExactAlarmSettings,

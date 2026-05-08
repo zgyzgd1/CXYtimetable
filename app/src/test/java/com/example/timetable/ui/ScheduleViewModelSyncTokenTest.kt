@@ -60,9 +60,31 @@ class ScheduleViewModelSyncTokenTest {
     }
 
     @Test
+    fun reminderSyncTokenDoesNotCollideForKnownStringHashCollision() {
+        val first = listOf(sampleEntry(title = "Aa"))
+        val second = listOf(sampleEntry(title = "BB"))
+
+        val firstToken = reminderSyncToken(first, listOf(20))
+        val secondToken = reminderSyncToken(second, listOf(20))
+
+        assertNotEquals(firstToken, secondToken)
+    }
+
+    @Test
     fun widgetRefreshTokenDoesNotCollideWhenFieldContainsDelimiters() {
         val first = listOf(sampleEntry(title = "A|B", location = "C\nD"))
         val second = listOf(sampleEntry(title = "A", location = "B|C\nD"))
+
+        val firstToken = widgetRefreshToken(first)
+        val secondToken = widgetRefreshToken(second)
+
+        assertNotEquals(firstToken, secondToken)
+    }
+
+    @Test
+    fun widgetRefreshTokenDoesNotCollideForKnownStringHashCollision() {
+        val first = listOf(sampleEntry(title = "Aa"))
+        val second = listOf(sampleEntry(title = "BB"))
 
         val firstToken = widgetRefreshToken(first)
         val secondToken = widgetRefreshToken(second)

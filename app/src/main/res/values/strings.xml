@@ -1,9 +1,8 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">课程表助手</string>
     <string name="widget_today_schedule_label">今日课表</string>
     <string name="widget_next_course_label">下一节课</string>
-    <string name="widget_today_schedule_title">今日课表</string>
-    <string name="widget_next_course_title">下一节课</string>
+
     <string name="action_save">保存</string>
     <string name="action_cancel">取消</string>
     <string name="action_delete">删除</string>
@@ -74,23 +73,20 @@
     <string name="label_unnamed_course">未命名课程</string>
 
     <!-- Day schedule list -->
-    <string name="msg_notifications_not_required">当前系统版本无需额外通知授权</string>
-    <string name="msg_exact_alarm_not_required">当前系统版本无需额外精确提醒授权</string>
     <string name="msg_switched_default_background">已切换到默认背景</string>
     <string name="msg_disabled_image_background">已关闭图片背景</string>
     <string name="msg_cleared_custom_background">已清除自定义背景</string>
     <string name="export_filename">课表导出.ics</string>
 
     <!-- Widget -->
+    <string name="widget_next_course_title">下一节课</string>
     <string name="widget_no_courses_today">今天暂无课程</string>
-    <string name="widget_today_course_count">今天共 %1$d 节</string>
-    <string name="widget_tap_to_add">点按打开课表并添加课程</string>
-    <string name="widget_more_hidden">还有 %1$d 节未显示</string>
     <string name="widget_empty_timetable">课表还是空的</string>
     <string name="widget_no_upcoming">当前没有待上课程</string>
     <string name="widget_next_course">下一节课</string>
     <string name="widget_tap_to_open">点按打开完整课表</string>
     <string name="widget_tap_to_view_date">点按查看对应日期</string>
+    <string name="widget_add_symbol" translatable="false">+</string>
     <string name="widget_today">今天</string>
     <string name="widget_tomorrow">明天</string>
     <string name="widget_day_after_tomorrow">后天</string>
@@ -143,13 +139,13 @@
     <string name="week_rule_even">双周</string>
     <string name="week_rule_custom">自定义</string>
     <string name="error_title_too_long">课程名称不能超过 64 个字符</string>
-    <string name="error_invalid_date">请输入合法日期，范围 1970-01-01 到 2100-12-31</string>
+    <string name="error_invalid_date" tools:ignore="TypographyDashes">请输入合法日期，范围 1970-01-01 到 2100-12-31</string>
     <string name="error_invalid_time">请输入合法时间，例如 08:00</string>
     <string name="error_location_too_long">地点不能超过 64 个字符</string>
     <string name="error_note_too_long">备注不能超过 256 个字符</string>
     <string name="error_invalid_semester_date">请输入合法的学期开学日期</string>
-    <string name="error_invalid_custom_weeks">自定义周次格式错误，请使用 1,3,5 或 1-16</string>
-    <string name="error_invalid_skip_weeks">跳过周次格式错误，请使用 8,12 或 1-3</string>
+    <string name="error_invalid_custom_weeks" tools:ignore="TypographyDashes">自定义周次格式错误，请使用 1,3,5 或 1-16</string>
+    <string name="error_invalid_skip_weeks" tools:ignore="TypographyDashes">跳过周次格式错误，请使用 8,12 或 1-3</string>
     <string name="error_empty_custom_weeks">自定义周次不能为空</string>
     <string name="title_custom_slot_count">自定义节数</string>
     <string name="label_total_slots">总节数</string>
@@ -164,7 +160,6 @@
     <string name="hint_fixed_schedule">先用固定规则快速生成节次，再在下面逐节微调。每一节之间可以留空档，不要求连续。</string>
     <string name="action_generate_by_rule">按固定规则生成</string>
     <string name="label_current_slot_count">当前 %1$d 节</string>
-    <string name="label_slot_index">第%1$d节</string>
     <string name="error_invalid_fixed_params">请先输入合法的固定时间参数</string>
     <string name="error_incomplete_slots">请先把每一节的开始和结束时间填写完整，例如 08:00</string>
     <string name="error_slot_end_before_start">每一节都需要满足结束时间晚于开始时间</string>
@@ -201,11 +196,11 @@
     <string name="label_exact_alarm_on">精确提醒：已开启</string>
     <string name="label_exact_alarm_off">精确提醒：未开启，系统可能延后提醒</string>
     <string name="action_enable_exact_alarm">开启精确提醒</string>
-    <string name="hint_custom_reminder">也可以输入 1-180 分钟的自定义提醒时间，最多保存 %1$d 档</string>
+    <string name="hint_custom_reminder">也可以输入 1–180 分钟的自定义提醒时间，最多保存 %1$d 档</string>
     <string name="label_custom_minutes">自定义分钟</string>
     <string name="hint_add_custom_reminder">输入后点击"添加自定义提醒"加入当前选择</string>
     <string name="action_add_custom_reminder">添加自定义提醒</string>
-    <string name="error_custom_reminder_range">请输入 1-180 分钟</string>
+    <string name="error_custom_reminder_range">请输入 1–180 分钟</string>
     <string name="error_reminder_exists">该提醒时间已存在</string>
     <string name="error_max_reminder_reached">最多选择 %1$d 档提醒</string>
     <string name="error_min_reminder_required">至少保留 1 档提醒</string>
@@ -235,16 +230,11 @@
     <string name="weekday_name_sun">星期日</string>
 
     <!-- Placeholder hints -->
-    <string name="hint_custom_weeks_format">1,3,5 或 1-16</string>
     <string name="hint_skip_weeks_format">如 8,12</string>
 
     <!-- TimetableCards -->
     <string name="card_next_course">下一节课</string>
     <string name="card_view_day_schedule">查看当天课表</string>
-    <string name="card_no_courses_today">今天暂无课程</string>
-    <string name="card_edit">编辑</string>
-    <string name="card_copy">复制</string>
-    <string name="card_delete_content_desc">删除</string>
 
     <!-- WeekCalendarStrip -->
     <string name="label_week_selector">周选择</string>
@@ -265,7 +255,6 @@
     <string name="a11y_note">备注 %1$s</string>
 
     <!-- SettingsScreen -->
-    <string name="title_cache_management">缓存管理</string>
     <string name="hint_cache_description">清除应用缓存和临时文件，不会删除课表数据、自定义背景和你的设置。</string>
     <string name="action_clearing">清理中…</string>
     <string name="action_clear_cache">清除缓存</string>
@@ -273,10 +262,6 @@
     <string name="settings_section_reminders">提醒</string>
     <string name="settings_section_data">数据管理</string>
     <string name="settings_section_about">关于</string>
-    <string name="settings_theme_mode">主题模式</string>
-    <string name="settings_theme_follow_system">跟随系统</string>
-    <string name="settings_theme_light">浅色</string>
-    <string name="settings_theme_dark">深色</string>
     <string name="settings_background_mode">背景图片</string>
     <string name="settings_background_bundled">默认背景</string>
     <string name="settings_background_custom">自定义图片</string>
@@ -293,7 +278,6 @@
     <string name="settings_exact_alarm_label">精确提醒</string>
     <string name="settings_exact_alarm_enabled">已开启</string>
     <string name="settings_exact_alarm_disabled">未开启</string>
-    <string name="settings_reminder_time">提前提醒时间</string>
 
     <!-- BackgroundImageAdjustDialog -->
     <string name="title_adjust_background">调整背景展示范围</string>
@@ -318,18 +302,9 @@
     <!-- ScheduleViewModel validateEntry -->
     <string name="val_invalid_recurrence">重复规则无效</string>
     <string name="val_invalid_week_rule">周次规则无效</string>
-    <string name="val_invalid_custom_weeks">自定义周次格式错误</string>
-    <string name="val_invalid_skip_weeks">跳过周次格式错误</string>
-    <string name="val_invalid_date">课程日期无效</string>
-    <string name="val_empty_title">课程名称不能为空</string>
-    <string name="val_title_too_long">课程名称不能超过 64 个字符</string>
-    <string name="val_location_too_long">地点不能超过 64 个字符</string>
-    <string name="val_note_too_long">备注不能超过 256 个字符</string>
     <string name="val_invalid_start">开始时间不合法</string>
     <string name="val_invalid_end">结束时间不合法</string>
     <string name="val_end_before_start">结束时间需要晚于开始时间</string>
-    <string name="val_invalid_semester_date">请设置合法的学期开学日期</string>
-    <string name="val_empty_custom_weeks">自定义周次不能为空</string>
     <string name="val_week_mismatch">首次上课日期不符合当前周次规则</string>
     <string name="val_non_weekly_odd_even">仅按周循环课程支持单双周或自定义周</string>
     <string name="val_non_weekly_custom">仅按周循环课程支持自定义周次</string>

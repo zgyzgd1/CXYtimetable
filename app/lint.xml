@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- Material 3 library generates internal resources that appear unused to Lint -->
+    <issue id="UnusedResources">
+        <ignore path="**/res/anim/**" />
+        <ignore path="**/res/color-v31/**" />
+        <ignore path="**/res/drawable/material_ic_*" />
+    </issue>
+    <!-- Current launcher assets intentionally share placeholder artwork across densities. -->
+    <issue id="IconLauncherShape">
+        <ignore path="**/res/mipmap-*/ic_launcher*.png" />
+    </issue>
+    <issue id="IconDuplicates">
+        <ignore path="**/res/mipmap-*/ic_launcher*.png" />
+    </issue>
+</lint>

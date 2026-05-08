@@ -23,7 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -68,13 +68,13 @@ fun BackgroundImageAdjustDialog(
     }
 
     var scale by remember(backgroundAppearance.imageTransform) {
-        mutableStateOf(backgroundAppearance.imageTransform.scale)
+        mutableFloatStateOf(backgroundAppearance.imageTransform.scale)
     }
     var horizontalBias by remember(backgroundAppearance.imageTransform) {
-        mutableStateOf(backgroundAppearance.imageTransform.horizontalBias)
+        mutableFloatStateOf(backgroundAppearance.imageTransform.horizontalBias)
     }
     var verticalBias by remember(backgroundAppearance.imageTransform) {
-        mutableStateOf(backgroundAppearance.imageTransform.verticalBias)
+        mutableFloatStateOf(backgroundAppearance.imageTransform.verticalBias)
     }
 
     val containerSizePx = windowInfo.containerSize

@@ -5,6 +5,7 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
+import androidx.core.net.toUri
 import android.view.View
 import android.widget.RemoteViews
 import com.example.timetable.MainActivity
@@ -313,7 +314,7 @@ private fun createOpenAppPendingIntent(
         selectedDate = selectedDate,
         destination = AppDestination.DAY,
     ).apply {
-        data = Uri.parse("timetable://widget/$widgetType/$appWidgetId?date=$selectedDate")
+        data = "timetable://widget/$widgetType/$appWidgetId?date=$selectedDate".toUri()
     }
     return PendingIntent.getActivity(
         context,
@@ -333,7 +334,7 @@ private fun createAddCoursePendingIntent(
         selectedDate = selectedDate,
         destination = AppDestination.DAY,
     ).apply {
-        data = Uri.parse("timetable://widget/add/$appWidgetId?date=$selectedDate")
+        data = "timetable://widget/add/$appWidgetId?date=$selectedDate".toUri()
         putExtra(EXTRA_WIDGET_ADD_COURSE, true)
     }
     return PendingIntent.getActivity(

@@ -12,7 +12,10 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.annotation.ChecksSdkIntAtLeast
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
+import androidx.core.net.toUri
 import com.example.timetable.R
 import com.example.timetable.data.RecurrenceType
 import com.example.timetable.data.TimetableEntry
@@ -148,10 +151,10 @@ object CourseReminderScheduler {
             scheduleAlarm(alarmManager, scheduled.triggerAtMillis, pendingIntent)
         }
 
-        prefs.edit()
-            .putStringSet(KEY_CODES, plan.newSchedules.keys.map { it.toString() }.toSet())
-            .putStringSet(KEY_SCHEDULE_SIGNATURES, encodeScheduledSignatures(plan.newSchedules))
-            .apply()
+        prefs.edit {
+            putStringSet(KEY_CODES, plan.newSchedules.keys.map { it.toString() }.toSet())
+            putStringSet(KEY_SCHEDULE_SIGNATURES, encodeScheduledSignatures(plan.newSchedules))
+        }
     }
 
     /**
@@ -342,10 +345,10 @@ object CourseReminderScheduler {
         val normalized = normalizeReminderMinutes(minutes)
         if (normalized.isEmpty()) return
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit()
-            .putInt(KEY_REMINDER_MINUTES, normalized.first())
-            .putStringSet(KEY_REMINDER_MINUTES_SET, normalized.map(Int::toString).toSet())
-            .apply()
+        prefs.edit {
+            putInt(KEY_REMINDER_MINUTES, normalized.first())
+            putStringSet(KEY_REMINDER_MINUTES_SET, normalized.map(Int::toString).toSet())
+        }
     }
 
     /**
@@ -459,9 +462,19 @@ object CourseReminderScheduler {
      * @return 通知是否启用
      */
     fun notificationsEnabled(context: Context): Boolean {
-        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+        return !notificationPermissionRequired() ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
     }
+
+    /**
+     * 检查是否需要运行时通知权限。
+     *
+     * Android 13 及以上需要申请 POST_NOTIFICATIONS；更低版本安装后默认可发通知。
+     *
+     * @return 是否需要运行时通知权限
+     */
+    @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.TIRAMISU)
+    fun notificationPermissionRequired(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 
     /**
      * 检查是否需要精确闹钟权限。
@@ -496,7 +509,7 @@ object CourseReminderScheduler {
      */
     fun buildExactAlarmSettingsIntent(context: Context): Intent? {
         if (!exactAlarmPermissionRequired()) return null
-        val packageUri = Uri.parse("package:${context.packageName}")
+        val packageUri = "package:${context.packageName}".toUri()
         val packageManager = context.packageManager
         val requestExactAlarmIntent = try {
             Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, packageUri)
