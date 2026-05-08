@@ -52,25 +52,33 @@ class ReminderFallbackWorker(
          * avoiding frequent cancel-and-reschedule cycles.
          */
         fun ensureScheduled(context: Context) {
-            val request = PeriodicWorkRequestBuilder<ReminderFallbackWorker>(
-                15, TimeUnit.MINUTES,
-            ).build()
+            try {
+                val request = PeriodicWorkRequestBuilder<ReminderFallbackWorker>(
+                    15, TimeUnit.MINUTES,
+                ).build()
 
-            WorkManager.getInstance(context.applicationContext)
-                .enqueueUniquePeriodicWork(
-                    UNIQUE_WORK_NAME,
-                    ExistingPeriodicWorkPolicy.KEEP,
-                    request,
-                )
-            Log.d(TAG, "Fallback reminder worker ensured")
+                WorkManager.getInstance(context.applicationContext)
+                    .enqueueUniquePeriodicWork(
+                        UNIQUE_WORK_NAME,
+                        ExistingPeriodicWorkPolicy.KEEP,
+                        request,
+                    )
+                Log.d(TAG, "Fallback reminder worker ensured")
+            } catch (error: Exception) {
+                Log.w(TAG, "Fallback reminder worker is unavailable; continuing without it.", error)
+            }
         }
 
         /**
          * Cancels the fallback worker. Use only in special cases (e.g., user disables all reminders).
          */
         fun cancel(context: Context) {
-            WorkManager.getInstance(context.applicationContext)
-                .cancelUniqueWork(UNIQUE_WORK_NAME)
+            try {
+                WorkManager.getInstance(context.applicationContext)
+                    .cancelUniqueWork(UNIQUE_WORK_NAME)
+            } catch (error: Exception) {
+                Log.w(TAG, "Fallback reminder worker cancellation skipped.", error)
+            }
         }
     }
 }

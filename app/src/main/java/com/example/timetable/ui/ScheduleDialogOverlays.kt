@@ -63,11 +63,11 @@ fun ScheduleDialogOverlays(
     val msgNoDeferrableSlot = stringResource(R.string.msg_no_deferrable_slot)
     val msgSlotTimeOverlap = stringResource(R.string.msg_slot_time_overlap)
     val titleAddSlot = stringResource(R.string.title_add_slot)
-    val titleEditSlotTemplate = stringResource(R.string.title_edit_slot, "%d")
-    val msgSlotDeletedTemplate = stringResource(R.string.msg_slot_deleted, "%d")
-    val msgSlotAddedTemplate = stringResource(R.string.msg_slot_added, "%d")
-    val msgSlotsResizedTemplate = stringResource(R.string.msg_slots_resized, "%d")
-    val msgSlotsResizeLimitedTemplate = stringResource(R.string.msg_slots_resize_limited, "%d")
+    val titleEditSlotTemplate = stringResource(R.string.title_edit_slot)
+    val msgSlotDeletedTemplate = stringResource(R.string.msg_slot_deleted)
+    val msgSlotAddedTemplate = stringResource(R.string.msg_slot_added)
+    val msgSlotsResizedTemplate = stringResource(R.string.msg_slots_resized)
+    val msgSlotsResizeLimitedTemplate = stringResource(R.string.msg_slots_resize_limited)
 
     deletingEntry?.let { toDelete ->
         DeleteEntryDialog(

@@ -3,10 +3,18 @@ package com.example.timetable.widget
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.Job
+
+private const val WIDGET_PROVIDER_PENDING_RESULT_TIMEOUT_MS = 8_000L
+private const val TAG = "TimetableWidgetProvider"
 
 abstract class TimetableWidgetProvider : AppWidgetProvider() {
     override fun onEnabled(context: Context) {
-        TimetableWidgetUpdater.refreshAllFromStorage(context)
+        refreshWidgetsFromStorage(context)
     }
 
     override fun onUpdate(
@@ -14,10 +22,50 @@ abstract class TimetableWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray,
     ) {
-        TimetableWidgetUpdater.refreshAllFromStorage(context)
+        refreshWidgetsFromStorage(context)
+    }
+
+    private fun refreshWidgetsFromStorage(context: Context) {
+        val pendingResult = goAsync()
+        val finishOnce = OneTimeAction()
+        val handler = Handler(Looper.getMainLooper())
+        var refreshJob: Job? = null
+        val timeoutRunnable = Runnable {
+            refreshJob?.cancel()
+            finishOnce.run {
+                pendingResult.finish()
+            }
+        }
+
+        handler.postDelayed(timeoutRunnable, WIDGET_PROVIDER_PENDING_RESULT_TIMEOUT_MS)
+
+        try {
+            refreshJob = TimetableWidgetUpdater.refreshAllFromStorage(context) {
+                handler.removeCallbacks(timeoutRunnable)
+                finishOnce.run {
+                    pendingResult.finish()
+                }
+            }
+        } catch (error: Exception) {
+            handler.removeCallbacks(timeoutRunnable)
+            finishOnce.run {
+                pendingResult.finish()
+            }
+            Log.e(TAG, "Widget refresh broadcast failed.", error)
+        }
     }
 }
 
 class TodayScheduleWidgetProvider : TimetableWidgetProvider()
 
 class NextCourseWidgetProvider : TimetableWidgetProvider()
+
+private class OneTimeAction {
+    private val fired = AtomicBoolean(false)
+
+    fun run(action: () -> Unit) {
+        if (fired.compareAndSet(false, true)) {
+            action()
+        }
+    }
+}

@@ -1,6 +1,9 @@
 package com.example.timetable.widget
 
 import android.content.Context
+import android.view.View
+import android.widget.TextView
+import com.example.timetable.R
 import com.example.timetable.data.TimetableEntry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -163,6 +166,45 @@ class TimetableWidgetUpdaterTest {
         val state = buildNextCourseWidgetState(entries, today = today, nowMinutes = 18 * 60, context = context)
 
         assertEquals(today, state.targetDate)
+    }
+
+    @Test
+    fun buildTodayScheduleRemoteViewsBindsRowsAndHidesUnusedSlots() {
+        val today = LocalDate.of(2026, 4, 23)
+        val state = TodayScheduleWidgetState(
+            dateLabel = "4/23 Thu",
+            courseItems = listOf(CourseItem(title = "Math", time = "08:00-09:00")),
+            emptyText = null,
+            targetDate = today,
+        )
+
+        val root = buildTodayScheduleRemoteViews(context, appWidgetId = 42, state = state).apply(context, null)
+
+        assertEquals("4/23 Thu", root.findViewById<TextView>(R.id.widget_today_date).text.toString())
+        assertEquals(View.VISIBLE, root.findViewById<View>(R.id.widget_course_list).visibility)
+        assertEquals(View.GONE, root.findViewById<View>(R.id.widget_empty_state).visibility)
+        assertEquals("Math", root.findViewById<TextView>(R.id.widget_course_title_1).text.toString())
+        assertEquals("08:00-09:00", root.findViewById<TextView>(R.id.widget_course_time_1).text.toString())
+        assertEquals(View.GONE, root.findViewById<View>(R.id.widget_course_item_2).visibility)
+    }
+
+    @Test
+    fun buildNextCourseRemoteViewsBindsTextFields() {
+        val today = LocalDate.of(2026, 4, 23)
+        val state = NextCourseWidgetState(
+            statusText = "Next",
+            title = "Physics",
+            timeLabel = "Today 10:00 - 11:00",
+            locationText = "B-202",
+            targetDate = today,
+        )
+
+        val root = buildNextCourseRemoteViews(context, appWidgetId = 7, state = state).apply(context, null)
+
+        assertEquals("Next", root.findViewById<TextView>(R.id.widget_next_status).text.toString())
+        assertEquals("Physics", root.findViewById<TextView>(R.id.widget_next_title).text.toString())
+        assertEquals("Today 10:00 - 11:00", root.findViewById<TextView>(R.id.widget_next_time).text.toString())
+        assertEquals("B-202", root.findViewById<TextView>(R.id.widget_next_location).text.toString())
     }
 
     private fun entry(

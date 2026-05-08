@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.ContentResolver
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.timetable.R
@@ -17,8 +18,6 @@ import com.example.timetable.data.RecurrenceType
 import com.example.timetable.data.TimetableEntry
 import com.example.timetable.data.TimetableRepository
 import com.example.timetable.data.WeekRule
-import com.example.timetable.data.countConflictPairs
-import com.example.timetable.data.countConflictPairsBetween
 import com.example.timetable.data.findConflictForEntry
 import com.example.timetable.data.formatMinutes
 import com.example.timetable.data.normalizeWeekListText
@@ -31,23 +30,22 @@ import com.example.timetable.data.suggestAdjustedEntryAfterConflicts
 import com.example.timetable.notify.CourseReminderScheduler
 import com.example.timetable.notify.ReminderFallbackWorker
 import com.example.timetable.widget.TimetableWidgetUpdater
-import java.io.ByteArrayOutputStream
 import java.io.IOException
-import java.io.InputStream
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-
-private const val MAX_ICS_IMPORT_BYTES = 1024 * 1024
+private const val TAG = "ScheduleViewModel"
 
 /**
  * 课程表视图模型。
@@ -58,15 +56,20 @@ private const val MAX_ICS_IMPORT_BYTES = 1024 * 1024
  */
 class ScheduleViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val _messages = MutableSharedFlow<String>()
+    val messages = _messages.asSharedFlow()
+
     val entries: StateFlow<List<TimetableEntry>> = TimetableRepository.getEntriesStream(application)
+        .catch { error ->
+            if (error is CancellationException) throw error
+            Log.e(TAG, "Failed to observe timetable entries.", error)
+            emit(emptyList())
+        }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList(),
         )
-
-    private val _messages = MutableSharedFlow<String>()
-    val messages = _messages.asSharedFlow()
 
     private val reminderSyncMutex = Mutex()
     private var reminderSyncGeneration = 0L
@@ -81,10 +84,22 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         ReminderFallbackWorker.ensureScheduled(application)
         AppearanceStore.ensureDefaults(application)
         viewModelScope.launch {
-            TimetableRepository.ensureMigrated(getApplication())
-            TimetableRepository.getEntriesStream(getApplication()).collect { currentEntries ->
-                syncReminders(currentEntries)
-                refreshWidgets(currentEntries)
+            try {
+                TimetableRepository.ensureMigrated(getApplication())
+                TimetableRepository.getEntriesStream(getApplication())
+                    .catch { error ->
+                        if (error is CancellationException) throw error
+                        Log.e(TAG, "Timetable entry sync stream failed.", error)
+                        emit(emptyList())
+                    }
+                    .collect { currentEntries ->
+                        syncReminders(currentEntries)
+                        refreshWidgets(currentEntries)
+                    }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Log.e(TAG, "Initial timetable sync failed.", error)
             }
         }
     }
@@ -355,15 +370,21 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         val generation = ++reminderSyncGeneration
         reminderSyncJob?.cancel()
         reminderSyncJob = viewModelScope.launch(Dispatchers.IO) {
-            reminderSyncMutex.withLock {
-                if (generation != reminderSyncGeneration) return@launch
-                val syncToken = reminderSyncToken(
-                    entries = entriesList,
-                    reminderMinutes = CourseReminderScheduler.getReminderMinutesSet(getApplication()),
-                )
-                if (!force && syncToken == lastReminderSyncToken) return@launch
-                CourseReminderScheduler.sync(getApplication(), entriesList)
-                lastReminderSyncToken = syncToken
+            try {
+                reminderSyncMutex.withLock {
+                    if (generation != reminderSyncGeneration) return@launch
+                    val syncToken = reminderSyncToken(
+                        entries = entriesList,
+                        reminderMinutes = CourseReminderScheduler.getReminderMinutesSet(getApplication()),
+                    )
+                    if (!force && syncToken == lastReminderSyncToken) return@launch
+                    CourseReminderScheduler.sync(getApplication(), entriesList)
+                    lastReminderSyncToken = syncToken
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Log.e(TAG, "Failed to sync course reminders.", error)
             }
         }
     }
@@ -372,12 +393,18 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         val generation = ++widgetRefreshGeneration
         widgetRefreshJob?.cancel()
         widgetRefreshJob = viewModelScope.launch(Dispatchers.IO) {
-            widgetRefreshMutex.withLock {
-                if (generation != widgetRefreshGeneration) return@launch
-                val refreshToken = widgetRefreshToken(entriesList)
-                if (refreshToken == lastWidgetRefreshToken) return@launch
-                TimetableWidgetUpdater.refreshAll(getApplication(), entriesList)
-                lastWidgetRefreshToken = refreshToken
+            try {
+                widgetRefreshMutex.withLock {
+                    if (generation != widgetRefreshGeneration) return@launch
+                    val refreshToken = widgetRefreshToken(entriesList)
+                    if (refreshToken == lastWidgetRefreshToken) return@launch
+                    TimetableWidgetUpdater.refreshAll(getApplication(), entriesList)
+                    lastWidgetRefreshToken = refreshToken
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Log.e(TAG, "Failed to refresh timetable widgets.", error)
             }
         }
     }
@@ -388,124 +415,3 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         }
     }
 }
-
-internal fun countImportConflicts(
-    validEntries: List<TimetableEntry>,
-    existingEntries: List<TimetableEntry>,
-): Int {
-    if (validEntries.isEmpty()) return 0
-
-    val internalConflicts = countConflictPairs(validEntries)
-    val existingConflicts = countConflictPairsBetween(validEntries, existingEntries)
-    return internalConflicts + existingConflicts
-}
-
-internal fun readLimitedUtf8Text(inputStream: InputStream, maxBytes: Int): String {
-    require(maxBytes > 0)
-
-    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-    val output = ByteArrayOutputStream(minOf(maxBytes, DEFAULT_BUFFER_SIZE))
-    var totalRead = 0
-
-    while (true) {
-        val read = inputStream.read(buffer)
-        if (read < 0) break
-        if (read == 0) continue
-
-        totalRead += read
-        if (totalRead > maxBytes) {
-            throw IOException(importSizeLimitMessage(maxBytes))
-        }
-        output.write(buffer, 0, read)
-    }
-
-    return output.toString(Charsets.UTF_8.name()).removePrefix("\uFEFF")
-}
-
-internal fun importSizeLimitMessage(maxBytes: Int = MAX_ICS_IMPORT_BYTES): String {
-    return "ICS file exceeds the import limit of ${formatImportSize(maxBytes)}."
-}
-
-private fun formatImportSize(maxBytes: Int): String {
-    val kibibyte = 1024
-    val mebibyte = kibibyte * kibibyte
-    return when {
-        maxBytes >= mebibyte && maxBytes % mebibyte == 0 -> "${maxBytes / mebibyte} MB"
-        maxBytes >= kibibyte && maxBytes % kibibyte == 0 -> "${maxBytes / kibibyte} KB"
-        else -> "$maxBytes bytes"
-    }
-}
-
-internal fun reminderSyncToken(
-    entries: List<TimetableEntry>,
-    reminderMinutes: List<Int>,
-): String {
-    val normalizedReminderMinutes = CourseReminderScheduler.normalizeReminderMinutes(reminderMinutes)
-    return buildToken {
-        appendListHeader("reminders", normalizedReminderMinutes.size)
-        normalizedReminderMinutes.forEach { appendInt(it) }
-        appendEntries(entries)
-    }
-}
-
-internal fun widgetRefreshToken(entries: List<TimetableEntry>): String {
-    return buildToken {
-        appendEntries(entries)
-    }
-}
-
-private fun buildToken(block: StringBuilder.() -> Unit): String {
-    return buildString(block)
-}
-
-private fun StringBuilder.appendEntries(entries: List<TimetableEntry>) {
-    appendListHeader("entries", entries.size)
-    entries.forEach { entry ->
-        appendField(entry.id)
-        appendField(entry.title)
-        appendField(entry.date)
-        appendInt(entry.dayOfWeek)
-        appendInt(entry.startMinutes)
-        appendInt(entry.endMinutes)
-        appendField(entry.location)
-        appendField(entry.note)
-        appendField(entry.recurrenceType)
-        appendField(entry.semesterStartDate)
-        appendField(entry.weekRule)
-        appendField(entry.customWeekList)
-        appendField(entry.skipWeekList)
-    }
-}
-
-private fun StringBuilder.appendListHeader(name: String, size: Int) {
-    append(name)
-    append('#')
-    append(size)
-    append(';')
-}
-
-private fun StringBuilder.appendInt(value: Int) {
-    append(value)
-    append(';')
-}
-
-private fun StringBuilder.appendField(value: String) {
-    append(value.length)
-    append(':')
-    append(value)
-    append(';')
-}
-
-/**
- * Import preview: parsed import results that have not yet been written to the database.
- *
- * When conflicts are detected, the ViewModel sends this to the UI via [ScheduleViewModel.importPreview],
- * and writes to the database only after the user confirms via [ScheduleViewModel.confirmImport].
- */
-data class ImportPreview(
-    val validEntries: List<TimetableEntry>,
-    val invalidCount: Int,
-    val conflictCount: Int,
-    val totalParsed: Int,
-    val truncated: Boolean = false,
-)

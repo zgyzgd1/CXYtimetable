@@ -49,18 +49,21 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "timetable_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(*MIGRATIONS)
                     .build()
                 INSTANCE = instance
                 instance
             }
         }
 
+        internal val MIGRATIONS: Array<Migration>
+            get() = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+
         /**
          * v1 -> v2: Added weekly recurrence fields.
          * Introduced April 2026 with Room migration.
          */
-        private val MIGRATION_1_2 = object : Migration(1, 2) {
+        internal val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE timetable_entries ADD COLUMN recurrenceType TEXT NOT NULL DEFAULT 'NONE'")
                 db.execSQL("ALTER TABLE timetable_entries ADD COLUMN semesterStartDate TEXT NOT NULL DEFAULT ''")
@@ -75,7 +78,7 @@ abstract class AppDatabase : RoomDatabase() {
          * Adds composite index on date+startMinutes and single-field index on dayOfWeek
          * to optimize high-frequency queries such as `ORDER BY date ASC, startMinutes ASC`.
          */
-        private val MIGRATION_2_3 = object : Migration(2, 3) {
+        internal val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_timetable_entries_date_startMinutes ON timetable_entries(date, startMinutes)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_timetable_entries_dayOfWeek ON timetable_entries(dayOfWeek)")

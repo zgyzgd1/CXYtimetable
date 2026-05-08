@@ -125,7 +125,8 @@ fun BackgroundImageAdjustDialog(
                     )
                 }
 
-                if (customBackground != null) {
+                val previewBackground = customBackground
+                if (previewBackground != null) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.CenterHorizontally)
@@ -135,7 +136,7 @@ fun BackgroundImageAdjustDialog(
                             .background(MaterialTheme.colorScheme.surfaceVariant.overlayHover()),
                     ) {
                         CustomBackgroundImage(
-                            bitmap = customBackground!!,
+                            bitmap = previewBackground,
                             imageTransform = previewTransform,
                             modifier = Modifier.fillMaxSize(),
                         )

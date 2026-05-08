@@ -5,6 +5,7 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.core.net.toUri
 import android.view.View
 import android.widget.RemoteViews
@@ -20,21 +21,32 @@ import com.example.timetable.data.formatMinutes
 import com.example.timetable.ui.AppDestination
 import java.time.LocalDate
 import java.time.LocalTime
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 object TimetableWidgetUpdater {
+    private const val TAG = "TimetableWidgetUpdater"
     private val refreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    fun refreshAllFromStorage(context: Context) {
+    fun refreshAllFromStorage(context: Context, onComplete: (() -> Unit)? = null): Job {
         val appContext = context.applicationContext
-        val appWidgetManager = AppWidgetManager.getInstance(appContext)
-        if (!hasAnyActiveWidgets(appContext, appWidgetManager)) return
-        refreshScope.launch {
-            val entries = TimetableRepository.getEntriesNow(appContext)
-            refreshAll(appContext, entries, appWidgetManager = appWidgetManager)
+        return refreshScope.launch {
+            try {
+                val appWidgetManager = AppWidgetManager.getInstance(appContext)
+                if (!hasAnyActiveWidgets(appContext, appWidgetManager)) return@launch
+                val entries = TimetableRepository.getEntriesNow(appContext)
+                refreshAll(appContext, entries, appWidgetManager = appWidgetManager)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Log.w(TAG, "Failed to refresh timetable widgets.", error)
+            } finally {
+                onComplete?.invoke()
+            }
         }
     }
 
@@ -210,7 +222,7 @@ private val COURSE_DOT_IDS = intArrayOf(
 /** Maximum number of course items displayed in the today schedule widget. Must match the layout. */
 internal const val MAX_VISIBLE_COURSES = 4
 
-private fun buildTodayScheduleRemoteViews(
+internal fun buildTodayScheduleRemoteViews(
     context: Context,
     appWidgetId: Int,
     state: TodayScheduleWidgetState,
@@ -281,7 +293,7 @@ private fun buildTodayScheduleRemoteViews(
     }
 }
 
-private fun buildNextCourseRemoteViews(
+internal fun buildNextCourseRemoteViews(
     context: Context,
     appWidgetId: Int,
     state: NextCourseWidgetState,

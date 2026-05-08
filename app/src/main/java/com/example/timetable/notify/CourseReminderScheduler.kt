@@ -12,6 +12,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import androidx.annotation.ChecksSdkIntAtLeast
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
@@ -22,6 +23,7 @@ import com.example.timetable.data.TimetableEntry
 import com.example.timetable.data.nextOccurrenceDate
 import com.example.timetable.data.parseEntryDate
 import com.example.timetable.data.resolveRecurrenceType
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -70,6 +72,7 @@ object CourseReminderScheduler {
     private const val MIN_REMINDER_MINUTES = 1
     private const val MAX_REMINDER_MINUTES = 180
     private const val MAX_REMINDER_SELECTION_COUNT = 5
+    private const val TAG = "CourseReminderScheduler"
     private val reminderOptions = listOf(5, 10, 20, 30)
     private val resyncScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val syncMutex = Mutex()
@@ -447,6 +450,10 @@ object CourseReminderScheduler {
             try {
                 val entries = com.example.timetable.data.TimetableRepository.getEntriesNow(appContext)
                 sync(appContext, entries)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Log.e(TAG, "Failed to resync reminders from storage.", error)
             } finally {
                 onComplete?.invoke()
             }

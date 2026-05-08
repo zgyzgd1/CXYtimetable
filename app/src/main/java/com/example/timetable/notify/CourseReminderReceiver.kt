@@ -4,6 +4,9 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.timetable.MainActivity
@@ -11,6 +14,9 @@ import com.example.timetable.R
 import com.example.timetable.data.formatMinutes
 import com.example.timetable.ui.AppDestination
 import java.util.concurrent.atomic.AtomicBoolean
+
+private const val COURSE_REMINDER_PENDING_RESULT_TIMEOUT_MS = 8_000L
+private const val TAG = "CourseReminderReceiver"
 
 internal class OneTimeAction {
     private val fired = AtomicBoolean(false)
@@ -29,13 +35,13 @@ class CourseReminderReceiver : BroadcastReceiver() {
         val finishOnce = OneTimeAction()
 
         // Timeout protection: goAsync() has a 10s limit; set 8s timeout to ensure pendingResult.finish() is called
-        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        val handler = Handler(Looper.getMainLooper())
         val timeoutRunnable = Runnable {
             finishOnce.run {
                 pendingResult.finish()
             }
         }
-        handler.postDelayed(timeoutRunnable, 8_000L)
+        handler.postDelayed(timeoutRunnable, COURSE_REMINDER_PENDING_RESULT_TIMEOUT_MS)
 
         try {
             if (CourseReminderScheduler.notificationsEnabled(context)) {
@@ -96,12 +102,12 @@ class CourseReminderReceiver : BroadcastReceiver() {
                     pendingResult.finish()
                 }
             }
-        } catch (throwable: Throwable) {
+        } catch (error: Exception) {
             handler.removeCallbacks(timeoutRunnable)
             finishOnce.run {
                 pendingResult.finish()
             }
-            throw throwable
+            Log.e(TAG, "Course reminder broadcast failed.", error)
         }
     }
 }

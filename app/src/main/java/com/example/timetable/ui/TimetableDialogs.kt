@@ -224,43 +224,52 @@ fun EntryEditorDialog(
                     when {
                         error != null -> errorText = validationErrorMessages[error]
                         else -> {
-                            // Persist the semester start date to global config
-                            if (recurrenceType == RecurrenceType.WEEKLY && parsedSemesterStart != null) {
-                                SemesterStore.setSemesterStartDate(context, parsedSemesterStart)
+                            val safeParsedDate = parsedDate
+                            val safeParsedStart = parsedStart
+                            val safeParsedEnd = parsedEnd
+                            when {
+                                safeParsedDate == null -> errorText = validationErrorMessages[EntryValidationError.InvalidDate]
+                                safeParsedStart == null || safeParsedEnd == null -> errorText = validationErrorMessages[EntryValidationError.InvalidTime]
+                                else -> {
+                                    // Persist the semester start date to global config
+                                    if (recurrenceType == RecurrenceType.WEEKLY && parsedSemesterStart != null) {
+                                        SemesterStore.setSemesterStartDate(context, parsedSemesterStart)
+                                    }
+                                    onSave(
+                                        TimetableEntry.create(
+                                            id = initial.id,
+                                            title = title.trim(),
+                                            date = safeParsedDate.toString(),
+                                            dayOfWeek = safeParsedDate.dayOfWeek.value,
+                                            startMinutes = safeParsedStart,
+                                            endMinutes = safeParsedEnd,
+                                            location = location.trim(),
+                                            note = note.trim(),
+                                            recurrenceType = if (recurrenceType == RecurrenceType.WEEKLY) recurrenceType.name else RecurrenceType.NONE.name,
+                                            semesterStartDate = if (recurrenceType == RecurrenceType.WEEKLY) {
+                                                parsedSemesterStart?.toString().orEmpty()
+                                            } else {
+                                                ""
+                                            },
+                                            weekRule = if (recurrenceType == RecurrenceType.WEEKLY) {
+                                                weekRule.name
+                                            } else {
+                                                WeekRule.ALL.name
+                                            },
+                                            customWeekList = if (recurrenceType == RecurrenceType.WEEKLY) {
+                                                normalizedCustomWeekList
+                                            } else {
+                                                ""
+                                            },
+                                            skipWeekList = if (recurrenceType == RecurrenceType.WEEKLY) {
+                                                normalizedSkipWeekList
+                                            } else {
+                                                ""
+                                            },
+                                        ),
+                                    )
+                                }
                             }
-                            onSave(
-                                TimetableEntry.create(
-                                    id = initial.id,
-                                    title = title.trim(),
-                                    date = parsedDate!!.toString(),
-                                    dayOfWeek = parsedDate!!.dayOfWeek.value,
-                                    startMinutes = parsedStart!!,
-                                    endMinutes = parsedEnd!!,
-                                    location = location.trim(),
-                                    note = note.trim(),
-                                    recurrenceType = if (recurrenceType == RecurrenceType.WEEKLY) recurrenceType.name else RecurrenceType.NONE.name,
-                                    semesterStartDate = if (recurrenceType == RecurrenceType.WEEKLY) {
-                                        parsedSemesterStart.toString()
-                                    } else {
-                                        ""
-                                    },
-                                    weekRule = if (recurrenceType == RecurrenceType.WEEKLY) {
-                                        weekRule.name
-                                    } else {
-                                        WeekRule.ALL.name
-                                    },
-                                    customWeekList = if (recurrenceType == RecurrenceType.WEEKLY) {
-                                        normalizedCustomWeekList
-                                    } else {
-                                        ""
-                                    },
-                                    skipWeekList = if (recurrenceType == RecurrenceType.WEEKLY) {
-                                        normalizedSkipWeekList
-                                    } else {
-                                        ""
-                                    },
-                                ),
-                            )
                         }
                     }
                 },

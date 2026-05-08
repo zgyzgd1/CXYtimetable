@@ -29,7 +29,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.timetable.R
 import com.example.timetable.data.AppearanceStore
 import com.example.timetable.data.BackgroundAppearance
-import com.example.timetable.data.BackgroundImageManager
 import com.example.timetable.data.NextCourseSnapshot
 import com.example.timetable.data.TimetableEntry
 import com.example.timetable.data.WeekTimeSlot
@@ -50,104 +49,6 @@ private val appDestinationNameStateSaver = Saver<String, Any>(
         AppDestination.fromSavedStateValue(savedValue).name
     },
 )
-
-/**
- * 文件操作启动器集合。
- *
- * 封装课程表应用中导入、导出和背景图片三个文件操作启动器，
- * 以便从 [ScheduleApp] 中提取出样板式的 launcher 注册逻辑。
- *
- * @param import ICS 文件导入启动器
- * @param export ICS 文件导出启动器
- * @param backgroundImage 背景图片选择启动器
- */
-internal data class ScheduleLaunchers(
-    val import: androidx.activity.result.ActivityResultLauncher<Array<String>>,
-    val export: androidx.activity.result.ActivityResultLauncher<String>,
-    val backgroundImage: androidx.activity.result.ActivityResultLauncher<String>,
-)
-
-/**
- * 创建并记住课程表应用所需的文件操作启动器。
- *
- * 包含三个启动器：
- * - **import**: 通过 `OpenDocument` 选择 `.ics` 文件并触发导入
- * - **export**: 通过 `CreateDocument` 创建 `.ics` 文件并写入导出内容
- * - **backgroundImage**: 通过 `GetContent` 选择图片并设置自定义背景
- *
- * @param viewModel 课程表视图模型
- * @param snackbarHostState 用于显示操作结果的 Snackbar 状态
- * @param onBackgroundAppearanceChange 背景外观变更回调
- * @param onShowBackgroundAdjustDialogChange 显示背景调整对话框回调
- */
-@Composable
-private fun rememberScheduleLaunchers(
-    viewModel: ScheduleViewModel,
-    snackbarHostState: SnackbarHostState,
-    onBackgroundAppearanceChange: (com.example.timetable.data.BackgroundAppearance) -> Unit,
-    onShowBackgroundAdjustDialogChange: (Boolean) -> Unit,
-): ScheduleLaunchers {
-    val scope = rememberCoroutineScope()
-    val context = LocalContext.current
-
-    // Pre-read string resources for use in launcher callbacks
-    val msgExportSuccess = stringResource(R.string.msg_export_success)
-    val msgExportFailedTemplate = stringResource(R.string.msg_export_failed, "%s")
-    val msgUnknownError = stringResource(R.string.msg_unknown_error)
-    val msgBackgroundUpdated = stringResource(R.string.msg_background_updated)
-    val msgBackgroundFailedTemplate = stringResource(R.string.msg_background_failed, "%s")
-
-    val importLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
-    ) { uri ->
-        if (uri != null) {
-            viewModel.importFromIcs(context.contentResolver, uri)
-        }
-    }
-
-    val exportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("text/calendar"),
-    ) { uri ->
-        if (uri != null) {
-            scope.launch {
-                try {
-                    val text = viewModel.exportIcs()
-                    context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { writer ->
-                        writer.write(text)
-                    }
-                    snackbarHostState.showSnackbar(msgExportSuccess)
-                } catch (error: Exception) {
-                    snackbarHostState.showSnackbar(msgExportFailedTemplate.format(error.message ?: msgUnknownError))
-                }
-            }
-        }
-    }
-
-    val backgroundImageLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent(),
-    ) { uri ->
-        if (uri != null) {
-            scope.launch {
-                try {
-                    BackgroundImageManager.saveCustomBackground(context, context.contentResolver, uri)
-                    onBackgroundAppearanceChange(AppearanceStore.getBackgroundAppearance(context))
-                    onShowBackgroundAdjustDialogChange(true)
-                    snackbarHostState.showSnackbar(msgBackgroundUpdated)
-                } catch (error: Exception) {
-                    snackbarHostState.showSnackbar(
-                        msgBackgroundFailedTemplate.format(error.message ?: msgUnknownError),
-                    )
-                }
-            }
-        }
-    }
-
-    return ScheduleLaunchers(
-        import = importLauncher,
-        export = exportLauncher,
-        backgroundImage = backgroundImageLauncher,
-    )
-}
 
 /**
  * 课程表应用状态持有者。
