@@ -1,8 +1,11 @@
 package com.example.timetable.ui
 
 import com.example.timetable.data.TimetableEntry
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ScheduleViewModelSyncTokenTest {
@@ -68,6 +71,47 @@ class ScheduleViewModelSyncTokenTest {
         val secondToken = reminderSyncToken(second, listOf(20))
 
         assertNotEquals(firstToken, secondToken)
+    }
+
+    @Test
+    fun runReminderSyncIfNeededSkipsMatchingTokenWithoutForce() = runBlocking {
+        val entries = listOf(sampleEntry())
+        val reminderMinutes = listOf(20)
+        val existingToken = reminderSyncToken(entries, reminderMinutes)
+        var syncCalled = false
+
+        val updatedToken = runReminderSyncIfNeeded(
+            entries = entries,
+            reminderMinutes = reminderMinutes,
+            lastSyncToken = existingToken,
+            force = false,
+        ) { _, _ ->
+            syncCalled = true
+        }
+
+        assertFalse(syncCalled)
+        assertEquals(existingToken, updatedToken)
+    }
+
+    @Test
+    fun runReminderSyncIfNeededPassesForceToSchedulerWhenRequested() = runBlocking {
+        val entries = listOf(sampleEntry())
+        val reminderMinutes = listOf(20)
+        val existingToken = reminderSyncToken(entries, reminderMinutes)
+        var capturedForce: Boolean? = null
+
+        val updatedToken = runReminderSyncIfNeeded(
+            entries = entries,
+            reminderMinutes = reminderMinutes,
+            lastSyncToken = existingToken,
+            force = true,
+        ) { syncedEntries, forceReschedule ->
+            assertEquals(entries, syncedEntries)
+            capturedForce = forceReschedule
+        }
+
+        assertTrue(capturedForce == true)
+        assertEquals(existingToken, updatedToken)
     }
 
     @Test

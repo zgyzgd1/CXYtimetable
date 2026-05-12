@@ -2,8 +2,6 @@ package com.example.timetable.ui
 
 import android.Manifest
 import android.app.Activity
-import android.content.pm.PackageManager
-import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -29,6 +27,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,7 +47,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import com.example.timetable.R
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.timetable.data.AppBackgroundMode
@@ -96,6 +97,21 @@ internal fun resolveBackgroundModeSelection(
     }
 }
 
+internal data class ReminderPermissionRefreshState(
+    val notificationPermissionRefreshToken: Int,
+    val exactAlarmEnabled: Boolean,
+)
+
+internal fun refreshReminderPermissionState(
+    currentNotificationPermissionRefreshToken: Int,
+    canScheduleExactAlarms: () -> Boolean,
+): ReminderPermissionRefreshState {
+    return ReminderPermissionRefreshState(
+        notificationPermissionRefreshToken = currentNotificationPermissionRefreshToken + 1,
+        exactAlarmEnabled = canScheduleExactAlarms(),
+    )
+}
+
 private val appDestinationNameStateSaver = Saver<String, Any>(
     save = { it },
     restore = { savedValue ->
@@ -126,6 +142,7 @@ fun ScheduleApp(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val resources = LocalResources.current
 
     var backgroundAppearance by remember(context) { mutableStateOf(AppearanceStore.getBackgroundAppearance(context)) }
@@ -203,8 +220,23 @@ fun ScheduleApp(
     var deletingEntry by remember { mutableStateOf<TimetableEntry?>(null) }
     var importPreviewState by remember { mutableStateOf<ImportPreview?>(null) }
     val notificationGranted = remember(context, notificationPermissionRefreshToken) {
-        !CourseReminderScheduler.notificationPermissionRequired() ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        CourseReminderScheduler.notificationsEnabled(context)
+    }
+    DisposableEffect(lifecycleOwner, context) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val refreshed = refreshReminderPermissionState(
+                    currentNotificationPermissionRefreshToken = notificationPermissionRefreshToken,
+                    canScheduleExactAlarms = { CourseReminderScheduler.canScheduleExactAlarms(context) },
+                )
+                notificationPermissionRefreshToken = refreshed.notificationPermissionRefreshToken
+                exactAlarmEnabled = refreshed.exactAlarmEnabled
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     val launchers = rememberScheduleLaunchers(

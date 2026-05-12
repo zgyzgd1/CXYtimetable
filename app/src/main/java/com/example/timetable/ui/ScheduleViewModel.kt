@@ -467,13 +467,18 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         reminderSyncJob = viewModelScope.launch(Dispatchers.IO) {
             reminderSyncMutex.withLock {
                 if (generation != reminderSyncGeneration) return@launch
-                val syncToken = reminderSyncToken(
+                lastReminderSyncToken = runReminderSyncIfNeeded(
                     entries = entriesList,
                     reminderMinutes = CourseReminderScheduler.getReminderMinutesSet(getApplication()),
-                )
-                if (!force && syncToken == lastReminderSyncToken) return@launch
-                CourseReminderScheduler.sync(getApplication(), entriesList)
-                lastReminderSyncToken = syncToken
+                    lastSyncToken = lastReminderSyncToken,
+                    force = force,
+                ) { entries, forceReschedule ->
+                    CourseReminderScheduler.sync(
+                        context = getApplication(),
+                        entries = entries,
+                        forceReschedule = forceReschedule,
+                    )
+                }
             }
         }
     }
@@ -571,6 +576,19 @@ internal fun reminderSyncToken(
         .put("reminderMinutes", JSONArray(normalizedReminderMinutes))
         .put("entries", JSONArray(entries.map(::entryTokenJson)))
         .toString()
+}
+
+internal suspend fun runReminderSyncIfNeeded(
+    entries: List<TimetableEntry>,
+    reminderMinutes: List<Int>,
+    lastSyncToken: String?,
+    force: Boolean,
+    syncAction: suspend (List<TimetableEntry>, Boolean) -> Unit,
+): String? {
+    val syncToken = reminderSyncToken(entries, reminderMinutes)
+    if (!force && syncToken == lastSyncToken) return lastSyncToken
+    syncAction(entries, force)
+    return syncToken
 }
 
 internal fun widgetRefreshToken(entries: List<TimetableEntry>): String {
