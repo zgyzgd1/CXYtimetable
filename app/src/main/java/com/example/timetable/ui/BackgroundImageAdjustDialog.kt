@@ -133,7 +133,7 @@ fun BackgroundImageAdjustDialog(
                             .width(156.dp)
                             .aspectRatio(previewAspectRatio)
                             .clip(AppShape.DialogContent)
-                            .background(MaterialTheme.colorScheme.surfaceVariant.overlayHover()),
+                            .background(MaterialTheme.colorScheme.surfaceVariant.overlayMedium()),
                     ) {
                         CustomBackgroundImage(
                             bitmap = previewBackground,
@@ -148,7 +148,7 @@ fun BackgroundImageAdjustDialog(
                             verticalArrangement = Arrangement.SpaceBetween,
                         ) {
                             Surface(
-                                color = Color.White.overlayActive(),
+                                color = Color.White.overlayMedium(),
                                 shape = AppShape.CardSmall,
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -157,7 +157,7 @@ fun BackgroundImageAdjustDialog(
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 repeat(3) {
                                     Surface(
-                                        color = Color.White.overlayHover(),
+                                        color = Color.White.overlayMedium(),
                                         shape = AppShape.CardExtraSmall,
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -169,7 +169,7 @@ fun BackgroundImageAdjustDialog(
                     }
                 } else {
                     Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.overlayMediumHigher(),
+                        color = MaterialTheme.colorScheme.surfaceVariant.disabledContent(),
                         shape = AppShape.CalendarDay,
                         modifier = Modifier.fillMaxWidth(),
                     ) {

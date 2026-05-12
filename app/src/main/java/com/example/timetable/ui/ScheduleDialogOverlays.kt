@@ -7,11 +7,16 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.timetable.R
@@ -19,6 +24,7 @@ import com.example.timetable.data.AppearanceStore
 import com.example.timetable.data.BackgroundAppearance
 import com.example.timetable.data.BackgroundImageTransform
 import com.example.timetable.data.TimetableEntry
+import com.example.timetable.data.TimetableGroup
 import com.example.timetable.data.WeekTimeSlot
 import com.example.timetable.data.areWeekTimeSlotsNonOverlapping
 import com.example.timetable.data.formatMinutes
@@ -41,6 +47,7 @@ fun ScheduleDialogOverlays(
     showBackgroundAdjustDialog: Boolean,
     deletingEntry: TimetableEntry?,
     importPreviewState: ImportPreview?,
+    activeGroup: TimetableGroup,
     backgroundAppearance: BackgroundAppearance,
     onEditingEntryChange: (TimetableEntry?) -> Unit,
     onPendingConflictChange: (PendingEntryConflict?) -> Unit,
@@ -55,19 +62,8 @@ fun ScheduleDialogOverlays(
     onWeekTimeSlotsChange: (List<WeekTimeSlot>) -> Unit,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
-
-    // Pre-read string resources for use in callbacks
-    val msgBackgroundRangeUpdated = stringResource(R.string.msg_background_range_updated)
-    val msgWeekSlotsUpdated = stringResource(R.string.msg_week_slots_updated)
-    val msgNoDeferrableSlot = stringResource(R.string.msg_no_deferrable_slot)
-    val msgSlotTimeOverlap = stringResource(R.string.msg_slot_time_overlap)
-    val titleAddSlot = stringResource(R.string.title_add_slot)
-    val titleEditSlotTemplate = stringResource(R.string.title_edit_slot)
-    val msgSlotDeletedTemplate = stringResource(R.string.msg_slot_deleted)
-    val msgSlotAddedTemplate = stringResource(R.string.msg_slot_added)
-    val msgSlotsResizedTemplate = stringResource(R.string.msg_slots_resized)
-    val msgSlotsResizeLimitedTemplate = stringResource(R.string.msg_slots_resize_limited)
 
     deletingEntry?.let { toDelete ->
         DeleteEntryDialog(
@@ -81,10 +77,15 @@ fun ScheduleDialogOverlays(
     }
 
     importPreviewState?.let { preview ->
-        ImportConflictDialog(
+        ImportTargetDialog(
             preview = preview,
-            onConfirm = {
-                viewModel.confirmImport(preview)
+            activeGroup = activeGroup,
+            onOverwriteCurrent = {
+                viewModel.confirmImport(preview, ImportTarget.OverwriteCurrent)
+                onImportPreviewStateChange(null)
+            },
+            onCreateGroup = { name ->
+                viewModel.confirmImport(preview, ImportTarget.CreateGroup(name))
                 onImportPreviewStateChange(null)
             },
             onDismiss = {
@@ -102,7 +103,7 @@ fun ScheduleDialogOverlays(
                 AppearanceStore.setBackgroundImageTransform(context, transform)
                 onBackgroundAppearanceChange(AppearanceStore.getBackgroundAppearance(context))
                 onShowBackgroundAdjustDialogChange(false)
-                scope.launch { snackbarHostState.showSnackbar(msgBackgroundRangeUpdated) }
+                scope.launch { snackbarHostState.showSnackbar(resources.getString(R.string.msg_background_range_updated)) }
             },
         )
     }
@@ -115,7 +116,7 @@ fun ScheduleDialogOverlays(
             onSave = { updatedSlots ->
                 onWeekTimeSlotsChange(AppearanceStore.setWeekTimeSlots(context, updatedSlots))
                 onEditingFixedWeekScheduleChange(false)
-                scope.launch { snackbarHostState.showSnackbar(msgWeekSlotsUpdated) }
+                scope.launch { snackbarHostState.showSnackbar(resources.getString(R.string.msg_week_slots_updated)) }
             },
         )
     }
@@ -166,7 +167,7 @@ fun ScheduleDialogOverlays(
                     val adjusted = viewModel.suggestResolvedEntry(state.updatedEntry)
                     if (adjusted == null) {
                         scope.launch {
-                            snackbarHostState.showSnackbar(msgNoDeferrableSlot)
+                            snackbarHostState.showSnackbar(resources.getString(R.string.msg_no_deferrable_slot))
                         }
                     } else {
                         applyEntrySave(adjusted, false)
@@ -180,7 +181,7 @@ fun ScheduleDialogOverlays(
     editingWeekSlotIndex?.let { index ->
         val currentSlot = weekTimeSlots.getOrNull(index) ?: return@let
         WeekSlotEditorDialog(
-            title = titleEditSlotTemplate.format(index + 1),
+            title = resources.getString(R.string.title_edit_slot, index + 1),
             initial = currentSlot,
             onDismiss = { onEditingWeekSlotIndexChange(null) },
             onSave = { updatedSlot ->
@@ -188,7 +189,7 @@ fun ScheduleDialogOverlays(
                     this[index] = updatedSlot
                 }.sortedBy { it.startMinutes }
                 if (!areWeekTimeSlotsNonOverlapping(updatedSlots)) {
-                    scope.launch { snackbarHostState.showSnackbar(msgSlotTimeOverlap) }
+                    scope.launch { snackbarHostState.showSnackbar(resources.getString(R.string.msg_slot_time_overlap)) }
                     return@WeekSlotEditorDialog
                 }
                 onWeekTimeSlotsChange(AppearanceStore.setWeekTimeSlots(context, updatedSlots))
@@ -199,7 +200,7 @@ fun ScheduleDialogOverlays(
                     val updatedSlots = weekTimeSlots.toMutableList().apply { removeAt(index) }
                     onWeekTimeSlotsChange(AppearanceStore.setWeekTimeSlots(context, updatedSlots))
                     onEditingWeekSlotIndexChange(null)
-                    scope.launch { snackbarHostState.showSnackbar(msgSlotDeletedTemplate.format(index + 1)) }
+                    scope.launch { snackbarHostState.showSnackbar(resources.getString(R.string.msg_slot_deleted, index + 1)) }
                 }
             } else {
                 null
@@ -209,18 +210,18 @@ fun ScheduleDialogOverlays(
 
     addingWeekSlotInitial?.let { initialSlot ->
         WeekSlotEditorDialog(
-            title = titleAddSlot,
+            title = resources.getString(R.string.title_add_slot),
             initial = initialSlot,
             onDismiss = { onAddingWeekSlotInitialChange(null) },
             onSave = { newSlot ->
                 val updatedSlots = (weekTimeSlots + newSlot).sortedBy { it.startMinutes }
                 if (!areWeekTimeSlotsNonOverlapping(updatedSlots)) {
-                    scope.launch { snackbarHostState.showSnackbar(msgSlotTimeOverlap) }
+                    scope.launch { snackbarHostState.showSnackbar(resources.getString(R.string.msg_slot_time_overlap)) }
                     return@WeekSlotEditorDialog
                 }
                 onWeekTimeSlotsChange(AppearanceStore.setWeekTimeSlots(context, updatedSlots))
                 onAddingWeekSlotInitialChange(null)
-                scope.launch { snackbarHostState.showSnackbar(msgSlotAddedTemplate.format(updatedSlots.indexOf(newSlot) + 1)) }
+                scope.launch { snackbarHostState.showSnackbar(resources.getString(R.string.msg_slot_added, updatedSlots.indexOf(newSlot) + 1)) }
             },
         )
     }
@@ -235,9 +236,9 @@ fun ScheduleDialogOverlays(
                 onEditingWeekSlotCountChange(false)
                 scope.launch {
                     val message = if (updatedSlots.size == count) {
-                        msgSlotsResizedTemplate.format(count)
+                        resources.getString(R.string.msg_slots_resized, count)
                     } else {
-                        msgSlotsResizeLimitedTemplate.format(updatedSlots.size)
+                        resources.getString(R.string.msg_slots_resize_limited, updatedSlots.size)
                     }
                     snackbarHostState.showSnackbar(message)
                 }
@@ -273,31 +274,54 @@ fun DeleteEntryDialog(
 }
 
 @Composable
-fun ImportConflictDialog(
+fun ImportTargetDialog(
     preview: ImportPreview,
-    onConfirm: () -> Unit,
+    activeGroup: TimetableGroup,
+    onOverwriteCurrent: () -> Unit,
+    onCreateGroup: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var groupName by androidx.compose.runtime.remember(preview.suggestedGroupName) {
+        mutableStateOf(preview.suggestedGroupName.ifBlank { activeGroup.name })
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.title_import_conflict)) },
+        title = { Text(stringResource(R.string.title_import_target)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.msg_import_parsed, preview.totalParsed, preview.validEntries.size))
                 if (preview.invalidCount > 0) {
                     Text(stringResource(R.string.msg_import_skipped, preview.invalidCount))
                 }
-                Text(
-                    stringResource(R.string.msg_import_conflicts, preview.conflictCount),
-                    color = MaterialTheme.colorScheme.error,
+                if (preview.existingConflictCount > 0) {
+                    Text(
+                        stringResource(R.string.msg_import_existing_conflicts, preview.existingConflictCount),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                if (preview.internalConflictCount > 0) {
+                    Text(
+                        stringResource(R.string.msg_import_internal_conflicts, preview.internalConflictCount),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                Text(stringResource(R.string.hint_import_target, activeGroup.name), style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(
+                    value = groupName,
+                    onValueChange = { groupName = it.take(40) },
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.label_new_timetable_group_name)) },
                 )
             }
         },
         confirmButton = {
-            Button(onClick = onConfirm) { Text(stringResource(R.string.action_confirm_import)) }
+            Button(onClick = { onCreateGroup(groupName) }) { Text(stringResource(R.string.action_import_create_group)) }
         },
         dismissButton = {
-            OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onOverwriteCurrent) { Text(stringResource(R.string.action_import_overwrite_current)) }
+                OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+            }
         },
     )
 }

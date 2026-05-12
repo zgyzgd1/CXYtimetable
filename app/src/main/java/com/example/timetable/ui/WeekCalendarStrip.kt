@@ -39,6 +39,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.timetable.R
+import com.example.timetable.data.AppConstants
 import com.kizitonwose.calendar.compose.WeekCalendar
 import com.kizitonwose.calendar.compose.weekcalendar.rememberWeekCalendarState
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -52,8 +53,8 @@ fun WeekCalendarStrip(
     onDateSelected: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val startDate = remember { LocalDate.of(2020, 1, 1) }
-    val endDate = remember { LocalDate.of(2035, 12, 31) }
+    val startDate = remember { AppConstants.MIN_DATE }
+    val endDate = remember { AppConstants.MAX_DATE }
     val selectedDayIndex = remember(selectedDate) { selectedDate.dayOfWeek.value - 1 }
     val latestSelectedDate by rememberUpdatedState(selectedDate)
     val state = rememberWeekCalendarState(
@@ -130,7 +131,7 @@ private fun WeekCalendarDayCell(
     val containerColor = when {
         selected -> MaterialTheme.colorScheme.primary
         today -> MaterialTheme.colorScheme.primaryContainer
-        else -> MaterialTheme.colorScheme.surfaceVariant.overlaySelected()
+        else -> MaterialTheme.colorScheme.surfaceVariant.overlayHeavy()
     }
     val contentColor = when {
         selected -> MaterialTheme.colorScheme.onPrimary
@@ -170,7 +171,7 @@ private fun WeekCalendarDayCell(
             Text(
                 text = weekdayLabel(date.dayOfWeek, LocalContext.current),
                 style = MaterialTheme.typography.labelSmall,
-                color = contentColor.overlaySecondary(),
+                color = contentColor.secondaryContent(),
                 textAlign = TextAlign.Center,
                 maxLines = 1,
             )

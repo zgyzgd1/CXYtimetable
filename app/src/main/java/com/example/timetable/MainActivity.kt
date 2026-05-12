@@ -14,13 +14,15 @@ import com.example.timetable.ui.AppDestination
 import com.example.timetable.ui.AppLaunchTarget
 import com.example.timetable.ui.ScheduleApp
 import com.example.timetable.ui.TimetableTheme
+import com.example.timetable.widget.EXTRA_WIDGET_ADD_COURSE
 
 class MainActivity : ComponentActivity() {
     private var launchTarget by mutableStateOf(AppLaunchTarget())
+    private var launchRequestCounter = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        launchTarget = parseLaunchTarget(intent)
+        launchTarget = nextLaunchTarget(intent)
         setContent {
             TimetableTheme {
                 Surface {
@@ -33,7 +35,12 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        launchTarget = parseLaunchTarget(intent)
+        launchTarget = nextLaunchTarget(intent)
+    }
+
+    private fun nextLaunchTarget(intent: Intent?): AppLaunchTarget {
+        launchRequestCounter += 1
+        return parseLaunchTarget(intent).copy(launchRequestId = launchRequestCounter)
     }
 
     companion object {
@@ -58,12 +65,14 @@ class MainActivity : ComponentActivity() {
             return resolveLaunchTarget(
                 selectedDate = intent?.getStringExtra(EXTRA_SELECTED_DATE),
                 destination = intent?.getStringExtra(EXTRA_DESTINATION),
+                openAddCourse = intent?.getBooleanExtra(EXTRA_WIDGET_ADD_COURSE, false) == true,
             )
         }
 
         fun resolveLaunchTarget(
             selectedDate: String?,
             destination: String?,
+            openAddCourse: Boolean = false,
         ): AppLaunchTarget {
             val normalizedDate = selectedDate?.trim()?.takeIf { value ->
                 value.isNotBlank() && parseEntryDate(value) != null
@@ -71,6 +80,7 @@ class MainActivity : ComponentActivity() {
             return AppLaunchTarget(
                 selectedDate = normalizedDate,
                 destination = AppDestination.fromSavedName(destination),
+                openAddCourse = openAddCourse,
             )
         }
     }

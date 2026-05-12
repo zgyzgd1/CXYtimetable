@@ -27,6 +27,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.timetable.R
+import com.example.timetable.data.AppConstants
 import com.example.timetable.data.AppearanceStore
 import com.example.timetable.data.BackgroundAppearance
 import com.example.timetable.data.NextCourseSnapshot
@@ -196,8 +197,8 @@ internal fun rememberScheduleAppState(
     val entries by viewModel.entries.collectAsStateWithLifecycle()
 
     // ── 日期边界 ──
-    val minDate = LocalDate.of(1970, 1, 1)
-    val maxDate = LocalDate.of(2100, 12, 31)
+    val minDate = AppConstants.MIN_DATE
+    val maxDate = AppConstants.MAX_DATE
     @Suppress("MagicNumber") // Fallback date for initial state
     val initialDate = parseEntryDate(launchTarget.selectedDate.orEmpty())
         ?.takeIf { it in minDate..maxDate }

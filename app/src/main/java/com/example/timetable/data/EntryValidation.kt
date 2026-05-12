@@ -21,7 +21,7 @@ object EntryConstants {
  *
  * 每个错误关联一个字符串资源 ID，用于显示错误提示。
  */
-enum class EntryValidationError(@StringRes val messageResId: Int) {
+enum class EntryValidationError(@param:StringRes val messageResId: Int) {
     EmptyTitle(R.string.error_empty_course_name),
     TitleTooLong(R.string.error_title_too_long),
     InvalidDate(R.string.error_invalid_date),

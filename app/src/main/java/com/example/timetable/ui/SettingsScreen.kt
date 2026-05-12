@@ -86,7 +86,7 @@ fun SettingsScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface.overlayHint(),
+                containerColor = MaterialTheme.colorScheme.surface.secondaryContent(),
             ),
         ) {
             Column(
@@ -142,7 +142,7 @@ fun SettingsScreen(
                 .fillMaxWidth()
                 .animateContentSize(),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface.overlayHint(),
+                containerColor = MaterialTheme.colorScheme.surface.secondaryContent(),
             ),
         ) {
             Column(
@@ -171,7 +171,7 @@ fun SettingsScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface.overlayHint(),
+                containerColor = MaterialTheme.colorScheme.surface.secondaryContent(),
             ),
         ) {
             Column(
@@ -205,7 +205,7 @@ fun SettingsScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface.overlayHint(),
+                containerColor = MaterialTheme.colorScheme.surface.secondaryContent(),
             ),
         ) {
             Column(
@@ -295,7 +295,7 @@ fun SettingsScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface.overlayHint(),
+                containerColor = MaterialTheme.colorScheme.surface.secondaryContent(),
             ),
         ) {
             Column(
@@ -358,7 +358,7 @@ fun SettingsScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface.overlayHint(),
+                containerColor = MaterialTheme.colorScheme.surface.secondaryContent(),
             ),
         ) {
             Column(

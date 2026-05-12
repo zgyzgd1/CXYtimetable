@@ -95,7 +95,7 @@ ksp {
 }
 
 dependencies {
-    implementation(platform("androidx.compose:compose-bom:2026.05.00"))
+    implementation(platform("androidx.compose:compose-bom:2026.03.00"))
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.core:core-ktx:1.18.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
@@ -116,10 +116,10 @@ dependencies {
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion")
-    implementation("androidx.work:work-runtime-ktx:2.11.2")
-    testImplementation(platform("androidx.compose:compose-bom:2026.05.00"))
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
+    testImplementation(platform("androidx.compose:compose-bom:2026.03.00"))
     testImplementation("androidx.compose.ui:ui-test-junit4")
     testImplementation("org.robolectric:robolectric:4.11.1")
-    testImplementation("androidx.test.ext:junit:1.3.0")
+    testImplementation("androidx.test.ext:junit:1.1.5")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }

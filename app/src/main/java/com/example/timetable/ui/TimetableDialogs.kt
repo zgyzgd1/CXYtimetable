@@ -231,43 +231,47 @@ fun EntryEditorDialog(
                                 safeParsedDate == null -> errorText = validationErrorMessages[EntryValidationError.InvalidDate]
                                 safeParsedStart == null || safeParsedEnd == null -> errorText = validationErrorMessages[EntryValidationError.InvalidTime]
                                 else -> {
-                                    // Persist the semester start date to global config
-                                    if (recurrenceType == RecurrenceType.WEEKLY && parsedSemesterStart != null) {
-                                        SemesterStore.setSemesterStartDate(context, parsedSemesterStart)
-                                    }
-                                    onSave(
-                                        TimetableEntry.create(
-                                            id = initial.id,
-                                            title = title.trim(),
-                                            date = safeParsedDate.toString(),
-                                            dayOfWeek = safeParsedDate.dayOfWeek.value,
-                                            startMinutes = safeParsedStart,
-                                            endMinutes = safeParsedEnd,
-                                            location = location.trim(),
-                                            note = note.trim(),
-                                            recurrenceType = if (recurrenceType == RecurrenceType.WEEKLY) recurrenceType.name else RecurrenceType.NONE.name,
-                                            semesterStartDate = if (recurrenceType == RecurrenceType.WEEKLY) {
-                                                parsedSemesterStart?.toString().orEmpty()
-                                            } else {
-                                                ""
-                                            },
-                                            weekRule = if (recurrenceType == RecurrenceType.WEEKLY) {
-                                                weekRule.name
-                                            } else {
-                                                WeekRule.ALL.name
-                                            },
-                                            customWeekList = if (recurrenceType == RecurrenceType.WEEKLY) {
-                                                normalizedCustomWeekList
-                                            } else {
-                                                ""
-                                            },
-                                            skipWeekList = if (recurrenceType == RecurrenceType.WEEKLY) {
-                                                normalizedSkipWeekList
-                                            } else {
-                                                ""
-                                            },
-                                        ),
+                                    val updatedEntry = TimetableEntry.create(
+                                        id = initial.id,
+                                        title = title.trim(),
+                                        date = safeParsedDate.toString(),
+                                        dayOfWeek = safeParsedDate.dayOfWeek.value,
+                                        startMinutes = safeParsedStart,
+                                        endMinutes = safeParsedEnd,
+                                        location = location.trim(),
+                                        note = note.trim(),
+                                        recurrenceType = if (recurrenceType == RecurrenceType.WEEKLY) recurrenceType.name else RecurrenceType.NONE.name,
+                                        semesterStartDate = if (recurrenceType == RecurrenceType.WEEKLY) {
+                                            parsedSemesterStart?.toString().orEmpty()
+                                        } else {
+                                            ""
+                                        },
+                                        weekRule = if (recurrenceType == RecurrenceType.WEEKLY) {
+                                            weekRule.name
+                                        } else {
+                                            WeekRule.ALL.name
+                                        },
+                                        customWeekList = if (recurrenceType == RecurrenceType.WEEKLY) {
+                                            normalizedCustomWeekList
+                                        } else {
+                                            ""
+                                        },
+                                        skipWeekList = if (recurrenceType == RecurrenceType.WEEKLY) {
+                                            normalizedSkipWeekList
+                                        } else {
+                                            ""
+                                        },
                                     )
+                                    val finalError = EntryValidator.validate(updatedEntry)
+                                    if (finalError != null) {
+                                        errorText = validationErrorMessages[finalError]
+                                    } else {
+                                        // Persist only after the final entry validation passes.
+                                        if (recurrenceType == RecurrenceType.WEEKLY && parsedSemesterStart != null) {
+                                            SemesterStore.setSemesterStartDate(context, parsedSemesterStart)
+                                        }
+                                        onSave(updatedEntry)
+                                    }
                                 }
                             }
                         }

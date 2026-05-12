@@ -1,6 +1,7 @@
 package com.example.timetable.ui
 
 import com.example.timetable.data.RecurrenceType
+import com.example.timetable.data.AppBackgroundMode
 import com.example.timetable.data.TimetableEntry
 import com.example.timetable.data.WeekRule
 import com.example.timetable.data.WeekTimeSlot
@@ -165,9 +166,10 @@ class ScheduleScreenTest {
     fun createQuickEntryTemplateUsesDefaultWhenDayIsEmpty() {
         val date = LocalDate.of(2026, 4, 22)
 
-        val template = createQuickEntryTemplate(date, existingEntries = emptyList())
+        val template = createQuickEntryTemplate(date, existingEntries = emptyList(), groupId = "group-a")
 
         assertEquals(date.toString(), template.date)
+        assertEquals("group-a", template.groupId)
         assertEquals(8 * 60, template.startMinutes)
         assertEquals(9 * 60, template.endMinutes)
     }
@@ -227,7 +229,30 @@ class ScheduleScreenTest {
         assertEquals(source.weekRule, duplicated.weekRule)
         assertEquals(source.customWeekList, duplicated.customWeekList)
         assertEquals(source.skipWeekList, duplicated.skipWeekList)
+        assertEquals(source.groupId, duplicated.groupId)
         assertTrue(source.id != duplicated.id)
+    }
+
+    @Test
+    fun backgroundModeSelectionRequestsImageWhenCustomImageIsMissing() {
+        assertEquals(
+            BackgroundModeSelection.REQUEST_CUSTOM_IMAGE,
+            resolveBackgroundModeSelection(
+                mode = AppBackgroundMode.CUSTOM_IMAGE,
+                hasCustomBackground = false,
+            ),
+        )
+    }
+
+    @Test
+    fun backgroundModeSelectionAppliesCustomModeWhenImageExists() {
+        assertEquals(
+            BackgroundModeSelection.APPLY_MODE,
+            resolveBackgroundModeSelection(
+                mode = AppBackgroundMode.CUSTOM_IMAGE,
+                hasCustomBackground = true,
+            ),
+        )
     }
 
     private fun timetableEntry(

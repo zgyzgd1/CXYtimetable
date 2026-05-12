@@ -105,7 +105,7 @@ fun WeekScheduleBoard(
                 .background(MaterialTheme.colorScheme.surface.weekBoard())
                 .border(
                     width = 1.dp,
-                    color = MaterialTheme.colorScheme.outline.overlayActive(),
+                    color = MaterialTheme.colorScheme.outline.overlayMedium(),
                     shape = AppShape.CardLarge,
                 ),
         ) {
@@ -194,7 +194,7 @@ private fun TimeColumnHeader(
         Surface(
             onClick = onAddSlot,
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceVariant.overlaySelected(),
+            color = MaterialTheme.colorScheme.surfaceVariant.overlayHeavy(),
             contentColor = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.size(36.dp),
         ) {
@@ -248,7 +248,7 @@ private fun DayHeaderCell(
             .height(height)
             .padding(horizontal = 2.dp),
         shape = AppShape.CardSmall,
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer.overlaySelected() else Color.Transparent,
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer.overlayHeavy() else Color.Transparent,
         shadowElevation = if (selected) 2.dp else 0.dp,
     ) {
         Column(
@@ -318,7 +318,7 @@ private fun WeekDayLane(
                         .fillMaxWidth()
                         .height(slotHeight)
                         .clip(AppShape.CardSmall)
-                        .background(if (selected) MaterialTheme.colorScheme.primaryContainer.accentMedium() else MaterialTheme.colorScheme.surfaceVariant.overlayLightest()),
+                        .background(if (selected) MaterialTheme.colorScheme.primaryContainer.accentMedium() else MaterialTheme.colorScheme.surfaceVariant.overlayLight()),
                 )
             }
         }
@@ -349,7 +349,7 @@ private fun WeekDayLane(
                 Text(
                     text = stringResource(R.string.week_empty_day),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.overlayVeryFaint(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.disabledContent(),
                 )
             }
         }
@@ -370,7 +370,7 @@ private fun TimeSlotCell(
             .width(width)
             .height(height)
             .clip(AppShape.Chip)
-            .background(MaterialTheme.colorScheme.surfaceVariant.overlayHover())
+            .background(MaterialTheme.colorScheme.surfaceVariant.overlayMedium())
             .semantics {
                 role = Role.Button
                 contentDescription = buildTimeSlotContentDescription(slotContext, index, slot)
@@ -436,7 +436,7 @@ private fun WeekEntryBlock(
             .clip(AppShape.CardSmall)
             .border(
                 width = 1.dp,
-                color = Color.White.overlayActiveLight(),
+                color = Color.White.overlayMedium(),
                 shape = AppShape.CardSmall,
             )
             .background(color)

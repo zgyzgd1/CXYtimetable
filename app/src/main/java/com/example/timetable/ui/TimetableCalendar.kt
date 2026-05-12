@@ -183,7 +183,7 @@ fun PerpetualCalendar(
                                 label = "calendarContainerColor",
                             ).value
                         } else {
-                            MaterialTheme.colorScheme.surfaceVariant.overlayDecorative()
+                            MaterialTheme.colorScheme.surfaceVariant.hintContent()
                         }
                         val textColor = if (isSelected || isToday) {
                             animateColorAsState(
@@ -231,7 +231,7 @@ fun PerpetualCalendar(
                             Text(
                                 text = weekdayLabel(date.dayOfWeek, LocalContext.current),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = textColor.overlaySecondary(),
+                                color = textColor.secondaryContent(),
                                 textAlign = TextAlign.Center,
                             )
                             Text(

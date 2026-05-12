@@ -108,4 +108,12 @@ class TimetableRepositoryTest {
 
         assertTrue(shouldSeed)
     }
+
+    @Test
+    fun scopeImportedEntryIdPrefixesGroupIdOnce() {
+        val scoped = TimetableRepository.scopeImportedEntryId("group-a", "entry-1")
+
+        assertEquals("group-a|entry-1", scoped)
+        assertEquals(scoped, TimetableRepository.scopeImportedEntryId("group-a", scoped))
+    }
 }

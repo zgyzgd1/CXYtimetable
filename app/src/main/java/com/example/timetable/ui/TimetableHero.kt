@@ -2,6 +2,8 @@ package com.example.timetable.ui
 
 import android.content.Context
 import com.example.timetable.R
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -63,15 +65,19 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.timetable.data.AppBackgroundMode
+import com.example.timetable.data.TimetableGroup
 import com.example.timetable.notify.CourseReminderScheduler
 
 data class HeroSectionConfig(
     val courseCount: Int,
+    val timetableGroups: List<TimetableGroup>,
+    val activeGroup: TimetableGroup,
+    val onSelectTimetableGroup: (String) -> Unit,
+    val onCreateTimetableGroup: (String) -> Unit,
     val onImport: () -> Unit,
+    val onAcademicImport: () -> Unit,
     val onExport: () -> Unit,
     val onEnableNotifications: () -> Unit,
-    val notificationPermissionRequired: Boolean,
-    val notificationGranted: Boolean,
     val exactAlarmPermissionRequired: Boolean,
     val exactAlarmEnabled: Boolean,
     val onOpenExactAlarmSettings: () -> Unit,
@@ -97,13 +103,15 @@ fun HeroSection(
 ) {
     var showReminderSheet by remember { mutableStateOf(false) }
     var showAppearanceDialog by remember { mutableStateOf(false) }
+    var showImportDialog by remember { mutableStateOf(false) }
+    var showGroupDialog by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = AppShape.CardLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.surfaceCardLighter()),
         border = BorderStroke(1.dp, Color.White.borderCard()),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(
             modifier = Modifier
@@ -111,8 +119,8 @@ fun HeroSection(
                 .background(
                     Brush.linearGradient(
                         colors = listOf(
-                            MaterialTheme.colorScheme.primary.overlayPrimaryHigh(),
-                            MaterialTheme.colorScheme.tertiary.overlayHint(),
+                            MaterialTheme.colorScheme.primary.primaryContent(),
+                            MaterialTheme.colorScheme.tertiary.secondaryContent(),
                         ),
                     ),
                 )
@@ -128,8 +136,45 @@ fun HeroSection(
                 Text(
                     text = stringResource(R.string.hero_subtitle, config.courseCount),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimary.overlaySecondary(),
+                    color = MaterialTheme.colorScheme.onPrimary.secondaryContent(),
                 )
+            }
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(AppShape.CardExtraSmall)
+                    .clickable { showGroupDialog = true },
+                color = MaterialTheme.colorScheme.onPrimary.overlayMedium(),
+                shape = AppShape.CardExtraSmall,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DateRange,
+                        contentDescription = stringResource(R.string.title_timetable_group_selector),
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(
+                        text = stringResource(R.string.label_current_timetable_group, config.activeGroup.name),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                    )
+                }
             }
 
             Row(
@@ -139,7 +184,7 @@ fun HeroSection(
                 HeroActionChip(
                     icon = Icons.Default.Download,
                     label = stringResource(R.string.hero_import),
-                    onClick = config.onImport,
+                    onClick = { showImportDialog = true },
                     modifier = Modifier.weight(1f),
                 )
                 HeroActionChip(
@@ -168,8 +213,6 @@ fun HeroSection(
         ReminderPickerDialog(
             reminderMinutes = config.reminderMinutes,
             reminderOptions = config.reminderOptions,
-            notificationPermissionRequired = config.notificationPermissionRequired,
-            notificationGranted = config.notificationGranted,
             exactAlarmPermissionRequired = config.exactAlarmPermissionRequired,
             exactAlarmEnabled = config.exactAlarmEnabled,
             onDismiss = { showReminderSheet = false },
@@ -204,6 +247,132 @@ fun HeroSection(
             onWeekCardHueChange = config.onWeekCardHueChange,
         )
     }
+
+    if (showImportDialog) {
+        ImportMethodDialog(
+            onDismiss = { showImportDialog = false },
+            onIcsImport = {
+                showImportDialog = false
+                config.onImport()
+            },
+            onAcademicImport = {
+                showImportDialog = false
+                config.onAcademicImport()
+            },
+        )
+    }
+
+    if (showGroupDialog) {
+        TimetableGroupDialog(
+            groups = config.timetableGroups,
+            activeGroupId = config.activeGroup.id,
+            onDismiss = { showGroupDialog = false },
+            onSelect = {
+                config.onSelectTimetableGroup(it)
+                showGroupDialog = false
+            },
+            onCreate = {
+                config.onCreateTimetableGroup(it)
+                showGroupDialog = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun TimetableGroupDialog(
+    groups: List<TimetableGroup>,
+    activeGroupId: String,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit,
+    onCreate: (String) -> Unit,
+) {
+    var newGroupName by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.title_timetable_group_selector), style = MaterialTheme.typography.titleMedium) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = stringResource(R.string.hint_timetable_group_selector),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                groups.forEach { group ->
+                    val selected = group.id == activeGroupId
+                    if (selected) {
+                        Button(
+                            onClick = { onSelect(group.id) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(group.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = { onSelect(group.id) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(group.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = newGroupName,
+                    onValueChange = { newGroupName = it.take(40) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.label_new_timetable_group_name)) },
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onCreate(newGroupName) }) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Text(stringResource(R.string.action_create_timetable_group))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        },
+        shape = AppShape.CardMedium,
+    )
+}
+
+@Composable
+private fun ImportMethodDialog(
+    onDismiss: () -> Unit,
+    onIcsImport: () -> Unit,
+    onAcademicImport: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.title_import_method), style = MaterialTheme.typography.titleMedium) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = onIcsImport,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.action_import_ics_file))
+                }
+                OutlinedButton(
+                    onClick = onAcademicImport,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.action_import_academic_system))
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        },
+        shape = AppShape.CardMedium,
+    )
 }
 
 @Composable
@@ -222,7 +391,7 @@ private fun HeroActionChip(
                 contentDescription = buildHeroActionContentDescription(context, label)
             }
             .clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.onPrimary.overlayActive(),
+        color = MaterialTheme.colorScheme.onPrimary.overlayMedium(),
         shape = AppShape.CardExtraSmall,
     ) {
         Column(
@@ -291,7 +460,7 @@ private fun AppearanceDialog(
                     Text(
                         text = stringResource(R.string.bg_custom_hint),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.overlayPrimaryMedium(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.primaryContent(),
                     )
                     Button(
                         onClick = {
@@ -359,8 +528,7 @@ private fun AppearanceDialog(
                     Slider(
                         value = weekCardHue,
                         onValueChange = onWeekCardHueChange,
-                        valueRange = -180f..180f,
-                        steps = 36,
+                        valueRange = 0f..360f,
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -417,8 +585,6 @@ private fun AppearanceDialog(
 private fun ReminderPickerDialog(
     reminderMinutes: List<Int>,
     reminderOptions: List<Int>,
-    notificationPermissionRequired: Boolean,
-    notificationGranted: Boolean,
     exactAlarmPermissionRequired: Boolean,
     exactAlarmEnabled: Boolean,
     onDismiss: () -> Unit,
@@ -595,9 +761,7 @@ private fun ReminderPickerDialog(
         },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (notificationPermissionRequired && !notificationGranted) {
-                    TextButton(onClick = onEnableNotifications) { Text(stringResource(R.string.action_enable_permission)) }
-                }
+                TextButton(onClick = onEnableNotifications) { Text(stringResource(R.string.action_enable_permission)) }
                 TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
             }
         },

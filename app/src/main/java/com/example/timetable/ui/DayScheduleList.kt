@@ -14,7 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.dp
 import com.example.timetable.data.AppBackgroundMode
 import com.example.timetable.data.AppearanceStore
@@ -22,6 +22,7 @@ import com.example.timetable.data.BackgroundImageManager
 import com.example.timetable.data.DateRangeEntriesCache
 import com.example.timetable.data.NextCourseSnapshot
 import com.example.timetable.data.TimetableEntry
+import com.example.timetable.data.TimetableGroup
 import com.example.timetable.data.formatDateLabel
 import com.example.timetable.notify.CourseReminderScheduler
 import com.example.timetable.R
@@ -32,6 +33,8 @@ internal fun DayScheduleList(
     listState: LazyListState,
     snackbarHostState: SnackbarHostState,
     entries: List<TimetableEntry>,
+    timetableGroups: List<TimetableGroup>,
+    activeGroup: TimetableGroup,
     selectedDate: String,
     selectedLocalDate: java.time.LocalDate,
     selectedDayEntries: List<TimetableEntry>,
@@ -39,20 +42,16 @@ internal fun DayScheduleList(
     nextCourseSnapshot: NextCourseSnapshot?,
     importLauncher: ActivityResultLauncher<Array<String>>,
     exportLauncher: ActivityResultLauncher<String>,
+    onAcademicImport: () -> Unit,
+    onSelectTimetableGroup: (String) -> Unit,
+    onCreateTimetableGroup: (String) -> Unit,
     reminderConfig: ReminderConfig,
     appearanceConfig: AppearanceConfig,
     callbacks: DayListCallbacks,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
-
-    // Pre-read string resources for use in callbacks
-    val exportFilename = stringResource(R.string.export_filename)
-    val msgSwitchedDefaultBg = stringResource(R.string.msg_switched_default_background)
-    val msgDisabledImageBg = stringResource(R.string.msg_disabled_image_background)
-    val msgClearedCustomBg = stringResource(R.string.msg_cleared_custom_background)
-    val labelUnnamedCourse = stringResource(R.string.label_unnamed_course)
-
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
@@ -63,6 +62,10 @@ internal fun DayScheduleList(
             HeroSection(
                 config = HeroSectionConfig(
                     courseCount = entries.size,
+                    timetableGroups = timetableGroups,
+                    activeGroup = activeGroup,
+                    onSelectTimetableGroup = onSelectTimetableGroup,
+                    onCreateTimetableGroup = onCreateTimetableGroup,
                     onImport = {
                         importLauncher.launch(
                             arrayOf(
@@ -75,10 +78,9 @@ internal fun DayScheduleList(
                             ),
                         )
                     },
-                    onExport = { exportLauncher.launch(exportFilename) },
+                    onAcademicImport = onAcademicImport,
+                    onExport = { exportLauncher.launch(resources.getString(R.string.export_filename)) },
                     onEnableNotifications = reminderConfig.onEnableNotifications,
-                    notificationPermissionRequired = reminderConfig.notificationPermissionRequired,
-                    notificationGranted = reminderConfig.notificationGranted,
                     exactAlarmPermissionRequired = CourseReminderScheduler.exactAlarmPermissionRequired(),
                     exactAlarmEnabled = reminderConfig.exactAlarmEnabled,
                     onOpenExactAlarmSettings = reminderConfig.onOpenExactAlarmSettings,
@@ -91,12 +93,12 @@ internal fun DayScheduleList(
                     onUseBundledBackground = {
                         AppearanceStore.setBackgroundMode(context, AppBackgroundMode.BUNDLED_IMAGE)
                         appearanceConfig.onBackgroundAppearanceChange(AppearanceStore.getBackgroundAppearance(context))
-                        scope.launch { snackbarHostState.showSnackbar(msgSwitchedDefaultBg) }
+                        scope.launch { snackbarHostState.showSnackbar(resources.getString(R.string.msg_switched_default_background)) }
                     },
                     onUseGradientBackground = {
                         AppearanceStore.setBackgroundMode(context, AppBackgroundMode.GRADIENT)
                         appearanceConfig.onBackgroundAppearanceChange(AppearanceStore.getBackgroundAppearance(context))
-                        scope.launch { snackbarHostState.showSnackbar(msgDisabledImageBg) }
+                        scope.launch { snackbarHostState.showSnackbar(resources.getString(R.string.msg_disabled_image_background)) }
                     },
                     onAdjustCustomBackground = appearanceConfig.onAdjustCustomBackground,
                     onClearCustomBackground = {
@@ -106,7 +108,7 @@ internal fun DayScheduleList(
                                 AppearanceStore.setBackgroundMode(context, AppBackgroundMode.BUNDLED_IMAGE)
                             }
                             appearanceConfig.onBackgroundAppearanceChange(AppearanceStore.getBackgroundAppearance(context))
-                            snackbarHostState.showSnackbar(msgClearedCustomBg)
+                            snackbarHostState.showSnackbar(resources.getString(R.string.msg_cleared_custom_background))
                         }
                     },
                     weekCardAlpha = appearanceConfig.weekCardAlpha,
@@ -119,7 +121,7 @@ internal fun DayScheduleList(
         nextCourseSnapshot?.let { upcoming ->
             item {
                 NextCourseCard(
-                    state = upcoming.toCardState(unnamedLabel = labelUnnamedCourse),
+                    state = upcoming.toCardState(unnamedLabel = resources.getString(R.string.label_unnamed_course)),
                     onViewDay = { callbacks.onDateChanged(upcoming.occurrenceDate.toString()) },
                 )
             }
@@ -133,7 +135,7 @@ internal fun DayScheduleList(
             )
         }
         item {
-            SectionHeader(title = formatDateLabel(selectedDate, context))
+            SectionHeader(title = formatDateLabel(selectedDate))
         }
         if (selectedDayEntries.isEmpty()) {
             item {

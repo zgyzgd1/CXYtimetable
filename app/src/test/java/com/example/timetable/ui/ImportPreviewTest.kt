@@ -24,12 +24,18 @@ class ImportPreviewTest {
             invalidCount = 2,
             conflictCount = 1,
             totalParsed = 3,
+            sourceName = "教务导入",
+            suggestedGroupName = "教务导入 2026-05-09",
+            internalConflictCount = 1,
+            existingConflictCount = 0,
         )
 
         assertEquals(1, preview.validEntries.size)
         assertEquals(2, preview.invalidCount)
         assertEquals(1, preview.conflictCount)
         assertEquals(3, preview.totalParsed)
+        assertEquals("教务导入", preview.sourceName)
+        assertEquals("教务导入 2026-05-09", preview.suggestedGroupName)
     }
 
     @Test

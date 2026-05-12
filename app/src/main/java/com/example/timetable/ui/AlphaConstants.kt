@@ -111,38 +111,3 @@ fun Color.overlaySubtle(): Color = this.copy(alpha = OverlayAlpha.subtle)
 fun Color.accentHighest(): Color = this.copy(alpha = AccentAlpha.highest)
 fun Color.accentHigh(): Color = this.copy(alpha = AccentAlpha.high)
 fun Color.accentMedium(): Color = this.copy(alpha = AccentAlpha.medium)
-
-// ═══════════════════════════════════════════════════════════════════
-// 向后兼容别名（指向新的语义值）
-// 旧代码无需修改即可编译通过，但透明度值会使用新的精简层级。
-// ═══════════════════════════════════════════════════════════════════
-
-// primaryHigh(0.98f) / primaryMedium(0.88f) → primaryContent (0.92f)
-fun Color.overlayPrimaryHigh(): Color = this.primaryContent()
-fun Color.overlayPrimaryMedium(): Color = this.primaryContent()
-
-// secondary(0.82f) / hint(0.78f) → secondaryContent (0.78f)
-fun Color.overlaySecondary(): Color = this.secondaryContent()
-fun Color.overlayHint(): Color = this.secondaryContent()
-
-// decorative(0.72f) / disabled(0.70f) / faint(0.60f) → hintContent (0.60f)
-fun Color.overlayDecorative(): Color = this.hintContent()
-fun Color.overlayDisabled(): Color = this.hintContent()
-fun Color.overlayFaint(): Color = this.hintContent()
-
-// veryFaint(0.50f) / mediumHigher(0.65f) / mediumHigh(0.56f) → disabledContent (0.38f)
-fun Color.overlayVeryFaint(): Color = this.disabledContent()
-fun Color.overlayMediumHigher(): Color = this.disabledContent()
-fun Color.overlayMediumHigh(): Color = this.disabledContent()
-
-// backgroundOverlay(0.34f) / selected(0.30f) → overlayHeavy (0.30f)
-fun Color.overlayBackgroundOverlay(): Color = this.overlayHeavy()
-fun Color.overlaySelected(): Color = this.overlayHeavy()
-
-// hover(0.25f) / active(0.18f) / activeLight(0.16f) → overlayMedium (0.20f)
-fun Color.overlayHover(): Color = this.overlayMedium()
-fun Color.overlayActive(): Color = this.overlayMedium()
-fun Color.overlayActiveLight(): Color = this.overlayMedium()
-
-// selectedLight(0.14f) / lightest(0.10f) → overlayLight (0.10f)
-fun Color.overlayLightest(): Color = this.overlayLight()

@@ -3,7 +3,8 @@ package com.example.timetable.ui
 enum class AppDestination {
     DAY,
     WEEK,
-    SETTINGS;
+    SETTINGS,
+    JW_IMPORT;
 
     companion object {
         fun fromSavedName(name: String?): AppDestination {

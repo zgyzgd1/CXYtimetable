@@ -20,7 +20,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -76,7 +76,7 @@ internal fun WeekViewContent(
     onEditFixedWeekSchedule: () -> Unit,
     contentPadding: PaddingValues = PaddingValues(),
 ) {
-    val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     val isWeekMode = true
 
@@ -170,7 +170,7 @@ internal fun WeekViewContent(
                     val nextSlot = defaultNewWeekSlot(weekTimeSlots)
                     if (nextSlot == null) {
                         scope.launch {
-                            snackbarHostState.showSnackbar(context.getString(R.string.msg_no_more_slots))
+                            snackbarHostState.showSnackbar(resources.getString(R.string.msg_no_more_slots))
                         }
                     } else {
                         onAddWeekSlot(nextSlot)

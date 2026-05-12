@@ -168,7 +168,7 @@ fun EntryCard(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         Surface(
-                            color = MaterialTheme.colorScheme.surfaceVariant.overlayDecorative(),
+                            color = MaterialTheme.colorScheme.surfaceVariant.hintContent(),
                             shape = AppShape.Pill,
                         ) {
                             Row(

@@ -1,9 +1,9 @@
 package com.example.timetable.data
 
 import android.content.Context
-import androidx.core.content.edit
 import androidx.room.withTransaction
 import com.example.timetable.data.room.AppDatabase
+import com.example.timetable.data.room.TimetableDao
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -23,6 +23,7 @@ object TimetableRepository {
     private const val STORAGE_FILE_NAME = "timetable_entries.json"
     private const val PREFS_NAME = "timetable_repository_prefs"
     private const val KEY_SAMPLE_ENTRIES_SEEDED = "sample_entries_seeded"
+    private const val KEY_ACTIVE_GROUP_ID = "active_group_id"
     private val bootstrapMutex = Mutex()
 
     internal data class LegacyLoadResult(
@@ -44,7 +45,7 @@ object TimetableRepository {
     }
 
     private fun markSampleEntriesSeeded(context: Context) {
-        getPreferences(context).edit { putBoolean(KEY_SAMPLE_ENTRIES_SEEDED, true) }
+        getPreferences(context).edit().putBoolean(KEY_SAMPLE_ENTRIES_SEEDED, true).apply()
     }
 
     internal fun shouldSeedSampleEntries(hasEntries: Boolean, hasSeededSampleEntries: Boolean): Boolean {
@@ -74,12 +75,18 @@ object TimetableRepository {
         )
     }
 
-    private suspend fun seedSampleEntriesIfNeeded(context: Context, dao: com.example.timetable.data.room.TimetableDao) {
-        val currentEntries = dao.getAllEntries()
+    private suspend fun seedSampleEntriesIfNeeded(context: Context, dao: TimetableDao) {
+        val currentEntries = dao.getEntries(TimetableGroup.DEFAULT_ID)
         if (shouldSeedSampleEntries(currentEntries.isNotEmpty(), hasSeededSampleEntries(context))) {
             dao.upsertEntries(sampleEntries())
         }
         markSampleEntriesSeeded(context)
+    }
+
+    private suspend fun ensureDefaultGroup(dao: TimetableDao) {
+        if (dao.getGroups().none { it.id == TimetableGroup.DEFAULT_ID }) {
+            dao.upsertGroup(TimetableGroup.default())
+        }
     }
 
     private suspend fun ensureRoomBackedStorageReady(context: Context) {
@@ -90,6 +97,7 @@ object TimetableRepository {
             var shouldDeleteLegacyFile = false
             db.withTransaction {
                 val dao = db.timetableDao()
+                ensureDefaultGroup(dao)
                 val migratedEntries = legacyMigration?.entries.orEmpty()
                 val migrated = migratedEntries.isNotEmpty()
                 if (migrated) {
@@ -118,15 +126,42 @@ object TimetableRepository {
         ensureRoomBackedStorageReady(context)
     }
 
-    fun getEntriesStream(context: Context): Flow<List<TimetableEntry>> {
-        return AppDatabase.getDatabase(context).timetableDao().getAllEntriesStream()
+    fun getGroupsStream(context: Context): Flow<List<TimetableGroup>> {
+        return AppDatabase.getDatabase(context).timetableDao().getGroupsStream()
+    }
+
+    fun getActiveGroupId(context: Context): String {
+        return getPreferences(context).getString(KEY_ACTIVE_GROUP_ID, TimetableGroup.DEFAULT_ID)
+            ?: TimetableGroup.DEFAULT_ID
+    }
+
+    suspend fun resolveActiveGroupId(context: Context): String = withContext(Dispatchers.IO) {
+        ensureRoomBackedStorageReady(context)
+        val appContext = context.applicationContext
+        val dao = AppDatabase.getDatabase(appContext).timetableDao()
+        val groups = dao.getGroups()
+        val activeGroupId = getActiveGroupId(appContext)
+        if (groups.any { it.id == activeGroupId }) {
+            activeGroupId
+        } else {
+            setActiveGroupId(appContext, TimetableGroup.DEFAULT_ID)
+            TimetableGroup.DEFAULT_ID
+        }
+    }
+
+    fun setActiveGroupId(context: Context, groupId: String) {
+        getPreferences(context).edit().putString(KEY_ACTIVE_GROUP_ID, groupId.ifBlank { TimetableGroup.DEFAULT_ID }).apply()
+    }
+
+    fun getEntriesStream(context: Context, groupId: String = TimetableGroup.DEFAULT_ID): Flow<List<TimetableEntry>> {
+        return AppDatabase.getDatabase(context).timetableDao().getEntriesStream(groupId.ifBlank { TimetableGroup.DEFAULT_ID })
     }
 
     suspend fun getEntriesNow(context: Context): List<TimetableEntry> {
         return withContext(Dispatchers.IO) {
             ensureRoomBackedStorageReady(context)
             val dao = AppDatabase.getDatabase(context).timetableDao()
-            dao.getAllEntries()
+            dao.getEntries(resolveActiveGroupId(context))
         }
     }
 
@@ -139,11 +174,17 @@ object TimetableRepository {
     }
 
     suspend fun replaceAllEntries(context: Context, entries: List<TimetableEntry>) = withContext(Dispatchers.IO) {
+        replaceEntriesInGroup(context, resolveActiveGroupId(context), entries)
+    }
+
+    suspend fun replaceEntriesInGroup(context: Context, groupId: String, entries: List<TimetableEntry>) = withContext(Dispatchers.IO) {
+        val safeGroupId = groupId.ifBlank { TimetableGroup.DEFAULT_ID }
         val db = AppDatabase.getDatabase(context)
         db.withTransaction {
             val dao = db.timetableDao()
-            dao.deleteAll()
-            dao.upsertEntries(entries)
+            ensureDefaultGroup(dao)
+            dao.deleteEntriesInGroup(safeGroupId)
+            dao.upsertEntries(entries.asImportedEntriesForGroup(safeGroupId))
         }
     }
 
@@ -152,9 +193,57 @@ object TimetableRepository {
      * Unlike [replaceAllEntries], this method does not delete any existing data.
      */
     suspend fun mergeEntries(context: Context, entries: List<TimetableEntry>) = withContext(Dispatchers.IO) {
+        mergeEntries(context, resolveActiveGroupId(context), entries)
+    }
+
+    suspend fun mergeEntries(context: Context, groupId: String, entries: List<TimetableEntry>) = withContext(Dispatchers.IO) {
+        val safeGroupId = groupId.ifBlank { TimetableGroup.DEFAULT_ID }
         val db = AppDatabase.getDatabase(context)
         db.withTransaction {
-            db.timetableDao().upsertEntries(entries)
+            val dao = db.timetableDao()
+            ensureDefaultGroup(dao)
+            dao.upsertEntries(entries.asImportedEntriesForGroup(safeGroupId))
+        }
+    }
+
+    suspend fun createGroup(context: Context, name: String): TimetableGroup = withContext(Dispatchers.IO) {
+        val db = AppDatabase.getDatabase(context)
+        val group = TimetableGroup.create(name)
+        db.withTransaction {
+            val dao = db.timetableDao()
+            ensureDefaultGroup(dao)
+            dao.upsertGroup(group)
+        }
+        group
+    }
+
+    suspend fun createGroupWithEntries(context: Context, name: String, entries: List<TimetableEntry>): TimetableGroup = withContext(Dispatchers.IO) {
+        val db = AppDatabase.getDatabase(context)
+        val group = TimetableGroup.create(name)
+        db.withTransaction {
+            val dao = db.timetableDao()
+            ensureDefaultGroup(dao)
+            dao.upsertGroup(group)
+            dao.upsertEntries(entries.asImportedEntriesForGroup(group.id))
+        }
+        setActiveGroupId(context, group.id)
+        group
+    }
+
+    internal fun scopeImportedEntryId(groupId: String, entryId: String): String {
+        val safeGroupId = groupId.ifBlank { TimetableGroup.DEFAULT_ID }
+        val safeEntryId = entryId.ifBlank { java.util.UUID.randomUUID().toString() }
+        val prefix = "$safeGroupId|"
+        return if (safeEntryId.startsWith(prefix)) safeEntryId else "$prefix$safeEntryId"
+    }
+
+    private fun List<TimetableEntry>.asImportedEntriesForGroup(groupId: String): List<TimetableEntry> {
+        val safeGroupId = groupId.ifBlank { TimetableGroup.DEFAULT_ID }
+        return map { entry ->
+            entry.copy(
+                id = scopeImportedEntryId(safeGroupId, entry.id),
+                groupId = safeGroupId,
+            )
         }
     }
 

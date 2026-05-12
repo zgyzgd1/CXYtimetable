@@ -1,6 +1,7 @@
 package com.example.timetable.data
 
 import android.content.Context
+import com.example.timetable.R
 import java.time.LocalDate
 import java.time.DayOfWeek
 import java.time.format.DateTimeFormatter
@@ -10,7 +11,6 @@ import java.util.UUID
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import com.example.timetable.R
 
 /**
  * 表示单个课程表条目（课程或事件）。
@@ -29,10 +29,13 @@ import com.example.timetable.R
     indices = [
         Index(value = ["date", "startMinutes"]),
         Index(value = ["dayOfWeek"]),
+        Index(value = ["groupId", "date", "startMinutes"]),
+        Index(value = ["groupId", "dayOfWeek"]),
     ],
 )
 data class TimetableEntry(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val groupId: String = TimetableGroup.DEFAULT_ID,
     val title: String,
     val date: String,
     val dayOfWeek: Int,
@@ -54,6 +57,7 @@ data class TimetableEntry(
          */
         fun create(
             id: String = UUID.randomUUID().toString(),
+            groupId: String = TimetableGroup.DEFAULT_ID,
             title: String,
             date: String,
             dayOfWeek: Int,
@@ -81,6 +85,7 @@ data class TimetableEntry(
             require(parseWeekList(skipWeekList) != null) { "跳过周次格式错误: $skipWeekList" }
             return TimetableEntry(
                 id = id,
+                groupId = groupId.ifBlank { TimetableGroup.DEFAULT_ID },
                 title = title,
                 date = date,
                 dayOfWeek = dayOfWeek,
@@ -94,6 +99,44 @@ data class TimetableEntry(
                 customWeekList = customWeekList,
                 skipWeekList = skipWeekList,
             )
+        }
+    }
+}
+
+@Entity(
+    tableName = "timetable_groups",
+    indices = [Index(value = ["updatedAt"])],
+)
+data class TimetableGroup(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    val createdAt: Long,
+    val updatedAt: Long,
+) {
+    companion object {
+        const val DEFAULT_ID = "default"
+        const val DEFAULT_NAME = "默认课表"
+
+        fun default(now: Long = System.currentTimeMillis()): TimetableGroup {
+            return TimetableGroup(
+                id = DEFAULT_ID,
+                name = DEFAULT_NAME,
+                createdAt = now,
+                updatedAt = now,
+            )
+        }
+
+        fun create(name: String, now: Long = System.currentTimeMillis()): TimetableGroup {
+            return TimetableGroup(
+                id = UUID.randomUUID().toString(),
+                name = normalizeName(name),
+                createdAt = now,
+                updatedAt = now,
+            )
+        }
+
+        fun normalizeName(name: String): String {
+            return name.trim().ifBlank { DEFAULT_NAME }.take(40)
         }
     }
 }
@@ -190,33 +233,26 @@ fun parseMinutes(text: String): Int? {
 }
 
 /**
- * 返回给定星期数字的本地化完整星期标签。
+ * 返回给定星期数字的完整星期标签。
  *
  * @param dayOfWeek 星期数字 (1-7)
- * @param context Android Context，用于获取本地化字符串资源
- * @return 完整标签，例如 "星期一"，如果未找到则返回空字符串
- */
-fun dayLabel(dayOfWeek: Int, context: Context): String {
-    return when (dayOfWeek) {
-        1 -> context.getString(R.string.weekday_name_mon)
-        2 -> context.getString(R.string.weekday_name_tue)
-        3 -> context.getString(R.string.weekday_name_wed)
-        4 -> context.getString(R.string.weekday_name_thu)
-        5 -> context.getString(R.string.weekday_name_fri)
-        6 -> context.getString(R.string.weekday_name_sat)
-        7 -> context.getString(R.string.weekday_name_sun)
-        else -> ""
-    }
-}
-
-/**
- * 返回给定星期数字的完整星期标签（无 Context 回退版本，使用英文）。
- *
- * @param dayOfWeek 星期数字 (1-7)
- * @return 完整标签，如果未找到则返回空字符串
+ * @return 完整标签，例如 "Monday"，如果未找到则返回空字符串
  */
 fun dayLabel(dayOfWeek: Int): String {
     return WeekdayOptions.firstOrNull { it.value == dayOfWeek }?.label ?: ""
+}
+
+fun dayLabel(dayOfWeek: Int, context: Context): String {
+    return when (dayOfWeek) {
+        1 -> context.getString(R.string.weekday_mon)
+        2 -> context.getString(R.string.weekday_tue)
+        3 -> context.getString(R.string.weekday_wed)
+        4 -> context.getString(R.string.weekday_thu)
+        5 -> context.getString(R.string.weekday_fri)
+        6 -> context.getString(R.string.weekday_sat)
+        7 -> context.getString(R.string.weekday_sun)
+        else -> ""
+    }
 }
 
 /**
@@ -230,8 +266,8 @@ fun dayShortLabel(dayOfWeek: Int): String {
 }
 
 private val entryDateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
-private val minSupportedDate = LocalDate.of(1970, 1, 1)
-private val maxSupportedDate = LocalDate.of(2100, 12, 31)
+private val minSupportedDate = AppConstants.MIN_DATE
+private val maxSupportedDate = AppConstants.MAX_DATE
 
 internal const val MAX_WEEK_LIST_WEEK = 7000
 
@@ -253,12 +289,11 @@ fun parseEntryDate(text: String): LocalDate? {
  * 格式化日期标签。
  *
  * @param date 日期字符串
- * @param context Android Context，用于获取本地化星期标签
- * @return 格式化的日期标签，例如 "2026-09-01 星期一"
+ * @return 格式化的日期标签，例如 "2026-09-01 Monday"
  */
-fun formatDateLabel(date: String, context: Context): String {
+fun formatDateLabel(date: String): String {
     val parsed = parseEntryDate(date) ?: return date
-    return "%d-%02d-%02d %s".format(parsed.year, parsed.monthValue, parsed.dayOfMonth, dayLabel(parsed.dayOfWeek.value, context))
+    return "%d-%02d-%02d %s".format(parsed.year, parsed.monthValue, parsed.dayOfMonth, dayLabel(parsed.dayOfWeek.value))
 }
 
 /**

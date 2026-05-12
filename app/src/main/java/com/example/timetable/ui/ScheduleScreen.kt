@@ -1,20 +1,16 @@
 package com.example.timetable.ui
 
 import android.Manifest
+import android.app.Activity
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -33,33 +29,50 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import com.example.timetable.R
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.timetable.data.AppBackgroundMode
 import com.example.timetable.data.AppCacheManager
+import com.example.timetable.data.AppConstants
 import com.example.timetable.data.AppearanceStore
+import com.example.timetable.data.BackgroundImageManager
 import com.example.timetable.data.DateRangeEntriesCache
 import com.example.timetable.data.NextCourseSnapshot
 import com.example.timetable.data.TimetableEntry
+import com.example.timetable.data.TimetableGroup
 import com.example.timetable.data.WeekTimeSlot
+import com.example.timetable.data.findNextCourseSnapshot
 import com.example.timetable.data.formatMinutes
+import com.example.timetable.data.parseEntryDate
+import com.example.timetable.jw.JwImportScreen
 import com.example.timetable.notify.CourseReminderScheduler
+import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalTime
+import java.time.temporal.TemporalAdjusters
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -67,11 +80,33 @@ private const val DEFAULT_WEEK_SLOT_START_MINUTES = 8 * 60
 private const val DEFAULT_WEEK_SLOT_DURATION_MINUTES = 40
 private const val DEFAULT_WEEK_SLOT_GAP_MINUTES = 5
 
+internal enum class BackgroundModeSelection {
+    APPLY_MODE,
+    REQUEST_CUSTOM_IMAGE,
+}
+
+internal fun resolveBackgroundModeSelection(
+    mode: AppBackgroundMode,
+    hasCustomBackground: Boolean,
+): BackgroundModeSelection {
+    return if (mode == AppBackgroundMode.CUSTOM_IMAGE && !hasCustomBackground) {
+        BackgroundModeSelection.REQUEST_CUSTOM_IMAGE
+    } else {
+        BackgroundModeSelection.APPLY_MODE
+    }
+}
+
+private val appDestinationNameStateSaver = Saver<String, Any>(
+    save = { it },
+    restore = { savedValue ->
+        AppDestination.fromSavedStateValue(savedValue).name
+    },
+)
+
 /**
  * 课程表应用主组件。
  *
- * 应用的主入口点。内部委托 [rememberScheduleAppState] 管理所有状态，
- * 再由 [ScheduleAppContent] 渲染 UI，保持此函数简洁。
+ * 应用的主入口点，包含日视图、周视图和设置页面的切换逻辑。
  *
  * @param launchTarget 启动目标，包含初始日期和目标页面
  * @param viewModel 课程表视图模型
@@ -80,75 +115,192 @@ private const val DEFAULT_WEEK_SLOT_GAP_MINUTES = 5
 @Composable
 fun ScheduleApp(
     launchTarget: AppLaunchTarget = AppLaunchTarget(),
-    viewModel: ScheduleViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
+    viewModel: ScheduleViewModel = viewModel(),
 ) {
-    val state = rememberScheduleAppState(viewModel = viewModel, launchTarget = launchTarget)
-    ScheduleAppContent(state = state)
-}
-
-/**
- * 课程表应用 UI 内容。
- *
- * 从 [ScheduleApp] 提取的纯 UI 组合函数，所有状态均通过 [state] 参数读写。
- * 仅在 composable 作用域内预读 stringResource，然后传递给子组件。
- *
- * @param state 应用状态持有者
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ScheduleAppContent(state: ScheduleAppState) {
+    val entries by viewModel.entries.collectAsStateWithLifecycle()
+    val timetableGroups by viewModel.timetableGroups.collectAsStateWithLifecycle()
+    val activeGroupId by viewModel.activeGroupId.collectAsStateWithLifecycle()
+    val activeGroup = remember(timetableGroups, activeGroupId) {
+        timetableGroups.firstOrNull { it.id == activeGroupId } ?: TimetableGroup.default()
+    }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
+    val resources = LocalResources.current
 
-    // ── 缓存的派生值 ──
-    val dateRangeEntriesCache = remember(state.entries) { DateRangeEntriesCache(state.entries) }
-    val dayEntriesByDate = remember(dateRangeEntriesCache, state.selectedLocalDate) {
-        dateRangeEntriesCache.resolve(state.selectedLocalDate, state.selectedLocalDate)
+    var backgroundAppearance by remember(context) { mutableStateOf(AppearanceStore.getBackgroundAppearance(context)) }
+    var weekCardAlpha by remember(context) { mutableStateOf(AppearanceStore.getWeekCardAlpha(context)) }
+    var weekCardHue by remember(context) { mutableStateOf(AppearanceStore.getWeekCardHue(context)) }
+    var weekTimeSlots by remember(context) { mutableStateOf(AppearanceStore.getWeekTimeSlots(context)) }
+
+    val minDate = AppConstants.MIN_DATE
+    val maxDate = AppConstants.MAX_DATE
+    @Suppress("MagicNumber") // Fallback date for initial state
+    val initialDate = parseEntryDate(launchTarget.selectedDate.orEmpty())
+        ?.takeIf { it in minDate..maxDate }
+        ?: LocalDate.now().takeIf { it in minDate..maxDate }
+        ?: LocalDate.of(2026, 1, 1)
+    var selectedDate by rememberSaveable { mutableStateOf(initialDate.toString()) }
+    var currentDestinationName by rememberSaveable(stateSaver = appDestinationNameStateSaver) {
+        mutableStateOf(launchTarget.destination.name)
     }
-    val selectedDayEntries = remember(dayEntriesByDate, state.selectedLocalDate) {
-        dayEntriesByDate[state.selectedLocalDate].orEmpty()
+    val currentDestination = remember(currentDestinationName) {
+        AppDestination.fromSavedName(currentDestinationName)
+    }
+    LaunchedEffect(currentDestinationName) {
+        val normalizedDestinationName = currentDestination.name
+        if (normalizedDestinationName != currentDestinationName) {
+            currentDestinationName = normalizedDestinationName
+        }
+    }
+    LaunchedEffect(launchTarget.selectedDate, launchTarget.destination) {
+        val targetDate = parseEntryDate(launchTarget.selectedDate.orEmpty())?.takeIf { it in minDate..maxDate }
+        if (targetDate != null && targetDate.toString() != selectedDate) {
+            selectedDate = targetDate.toString()
+        }
+        if (currentDestinationName != launchTarget.destination.name) {
+            currentDestinationName = launchTarget.destination.name
+        }
+    }
+    val isWeekMode = currentDestination == AppDestination.WEEK
+    val isSettingsPage = currentDestination == AppDestination.SETTINGS
+    val isJwImportPage = currentDestination == AppDestination.JW_IMPORT
+
+    val selectedLocalDate = parseEntryDate(selectedDate) ?: minDate
+    val selectedWeekStart = remember(selectedLocalDate) {
+        selectedLocalDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+    }
+    val selectedWeekEnd = remember(selectedWeekStart) { selectedWeekStart.plusDays(6) }
+    val nextCourseSnapshot by produceState<NextCourseSnapshot?>(
+        initialValue = null,
+        key1 = entries,
+    ) {
+        while (true) {
+            val nowDate = LocalDate.now()
+            val nowMinutes = LocalTime.now().let { it.hour * 60 + it.minute }
+            value = findNextCourseSnapshot(
+                entries = entries,
+                nowDate = nowDate,
+                nowMinutes = nowMinutes,
+                context = context,
+            )
+            delay(30_000L) // Refresh next-course snapshot every 30 seconds
+        }
     }
 
-    // ── 预读 stringResource（用于回调）──
-    val msgEntryDuplicated = stringResource(R.string.msg_entry_duplicated)
-    val msgCacheClearedTemplate = stringResource(R.string.msg_cache_cleared, "%s")
-    val msgCacheEmpty = stringResource(R.string.msg_cache_empty)
-    val msgCacheClearFailedTemplate = stringResource(R.string.msg_cache_clear_failed, "%s")
-    val msgUnknownError = stringResource(R.string.msg_unknown_error)
-    val msgNotificationsEnabled = stringResource(R.string.msg_notifications_enabled)
-    val exportFilename = stringResource(R.string.export_filename)
-    val notificationPermissionRequired = CourseReminderScheduler.notificationPermissionRequired()
-    val notificationGranted = remember(state.notificationPermissionRefreshToken) {
-        CourseReminderScheduler.notificationsEnabled(context)
+    var editingEntry by remember { mutableStateOf<TimetableEntry?>(null) }
+    var pendingConflict by remember { mutableStateOf<PendingEntryConflict?>(null) }
+    var editingWeekSlotIndex by remember { mutableStateOf<Int?>(null) }
+    var addingWeekSlotInitial by remember { mutableStateOf<WeekTimeSlot?>(null) }
+    var editingWeekSlotCount by remember { mutableStateOf(false) }
+    var editingFixedWeekSchedule by remember { mutableStateOf(false) }
+    var showBackgroundAdjustDialog by remember { mutableStateOf(false) }
+    var clearingCache by remember { mutableStateOf(false) }
+    var reminderMinutes by remember { mutableStateOf(CourseReminderScheduler.getReminderMinutesSet(context)) }
+    var exactAlarmEnabled by remember { mutableStateOf(CourseReminderScheduler.canScheduleExactAlarms(context)) }
+    var notificationPermissionRefreshToken by remember { mutableStateOf(0) }
+    val reminderOptions = remember { CourseReminderScheduler.reminderMinuteOptions() }
+    var deletingEntry by remember { mutableStateOf<TimetableEntry?>(null) }
+    var importPreviewState by remember { mutableStateOf<ImportPreview?>(null) }
+    val notificationGranted = remember(context, notificationPermissionRefreshToken) {
+        !CourseReminderScheduler.notificationPermissionRequired() ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
     }
-    DisposableEffect(lifecycleOwner, state) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                state.notificationPermissionRefreshToken++
+
+    val launchers = rememberScheduleLaunchers(
+        viewModel = viewModel,
+        snackbarHostState = snackbarHostState,
+        onBackgroundAppearanceChange = { backgroundAppearance = it },
+        onShowBackgroundAdjustDialogChange = { showBackgroundAdjustDialog = it },
+    )
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        notificationPermissionRefreshToken++
+        scope.launch {
+            snackbarHostState.showSnackbar(
+                if (granted) resources.getString(R.string.msg_notifications_enabled) else resources.getString(R.string.msg_notifications_disabled_warning),
+            )
+        }
+    }
+    val exactAlarmSettingsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        val enabled = CourseReminderScheduler.canScheduleExactAlarms(context)
+        exactAlarmEnabled = enabled
+        scope.launch {
+            if (enabled) {
+                viewModel.resyncReminderSchedule()
+                snackbarHostState.showSnackbar(resources.getString(R.string.msg_exact_alarm_enabled))
+            } else if (result.resultCode == Activity.RESULT_CANCELED) {
+                snackbarHostState.showSnackbar(resources.getString(R.string.msg_exact_alarm_disabled_warning))
+            } else {
+                snackbarHostState.showSnackbar(resources.getString(R.string.msg_exact_alarm_still_disabled))
             }
         }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
+    }
+
+    fun requestNotificationPermissionOrReportNotRequired() {
+        if (CourseReminderScheduler.notificationPermissionRequired()) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            scope.launch {
+                snackbarHostState.showSnackbar(resources.getString(R.string.msg_notifications_not_required))
+            }
         }
     }
 
-    // ── UI 树 ──
+    LaunchedEffect(Unit) {
+        viewModel.messages.collect(snackbarHostState::showSnackbar)
+    }
+
+    val dateRangeEntriesCache = remember(entries) {
+        DateRangeEntriesCache(entries)
+    }
+    val dayEntriesByDate = remember(dateRangeEntriesCache, selectedLocalDate) {
+        dateRangeEntriesCache.resolve(selectedLocalDate, selectedLocalDate)
+    }
+    val selectedDayEntries = remember(dayEntriesByDate, selectedLocalDate) {
+        dayEntriesByDate[selectedLocalDate].orEmpty()
+    }
+
+    LaunchedEffect(launchTarget.launchRequestId, launchTarget.openAddCourse, activeGroup.id) {
+        if (!launchTarget.openAddCourse) return@LaunchedEffect
+        val targetDate = parseEntryDate(launchTarget.selectedDate.orEmpty())
+            ?.takeIf { it in minDate..maxDate }
+            ?: selectedLocalDate
+        selectedDate = targetDate.toString()
+        currentDestinationName = AppDestination.DAY.name
+        val targetEntries = dateRangeEntriesCache.resolve(targetDate, targetDate)[targetDate].orEmpty()
+        editingEntry = createQuickEntryTemplate(
+            date = targetDate,
+            existingEntries = targetEntries,
+            groupId = activeGroup.id,
+        )
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.importPreview.collect { preview ->
+            importPreviewState = preview
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
-        AppBackgroundLayer(backgroundAppearance = state.backgroundAppearance)
+        AppBackgroundLayer(backgroundAppearance = backgroundAppearance)
 
         Scaffold(
             modifier = Modifier.safeDrawingPadding(),
             containerColor = Color.Transparent,
-            snackbarHost = { SnackbarHost(hostState = state.snackbarHostState) },
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             topBar = {
-                when (state.currentDestination) {
+                when (currentDestination) {
                     AppDestination.DAY,
                     AppDestination.SETTINGS -> {
                         LargeTopAppBar(
                             title = {
                                 Text(
-                                    text = if (state.currentDestination == AppDestination.DAY) stringResource(R.string.title_my_schedule) else stringResource(R.string.title_settings),
+                                    text = if (currentDestination == AppDestination.DAY) stringResource(R.string.title_my_schedule) else stringResource(R.string.title_settings),
                                     style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                                 )
                             },
@@ -159,24 +311,24 @@ private fun ScheduleAppContent(state: ScheduleAppState) {
                             ),
                         )
                     }
-                    AppDestination.WEEK -> Unit
+                    AppDestination.WEEK,
+                    AppDestination.JW_IMPORT -> Unit
                 }
             },
             floatingActionButton = {
                 AnimatedVisibility(
-                    visible = !state.isSettingsPage,
-                    enter = slideInVertically(tween(300)) { it / 2 } + scaleIn(tween(300)) + fadeIn(tween(300)),
-                    exit = scaleOut(tween(200)) + fadeOut(tween(200)),
+                    visible = !isSettingsPage && !isJwImportPage,
+                    enter = scaleIn() + fadeIn(),
+                    exit = scaleOut() + fadeOut(),
                 ) {
-                    val haptic = LocalHapticFeedback.current
                     FloatingActionButton(
                         containerColor = MaterialTheme.colorScheme.surface.stickyHeader(),
                         contentColor = MaterialTheme.colorScheme.onSurface,
                         onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            state.editingEntry = createQuickEntryTemplate(
-                                date = state.selectedLocalDate,
+                            editingEntry = createQuickEntryTemplate(
+                                date = selectedLocalDate,
                                 existingEntries = selectedDayEntries,
+                                groupId = activeGroup.id,
                             )
                         },
                     ) {
@@ -185,219 +337,223 @@ private fun ScheduleAppContent(state: ScheduleAppState) {
                 }
             },
             bottomBar = {
-                ViewModeSwitcher(
-                    currentDestination = state.currentDestination,
-                    onDestinationChange = { destination -> state.currentDestinationName = destination.name },
-                )
+                if (!isJwImportPage) {
+                    ViewModeSwitcher(
+                        currentDestination = currentDestination,
+                        onDestinationChange = { destination -> currentDestinationName = destination.name },
+                    )
+                }
             },
         ) { padding ->
-            AnimatedContent(
-                targetState = state.currentDestination,
-                transitionSpec = {
-                    val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
-                    (slideInHorizontally(tween(300)) { width -> direction * width / 4 } + fadeIn(tween(300)))
-                        .togetherWith(
-                            slideOutHorizontally(tween(300)) { width -> -direction * width / 4 } + fadeOut(tween(300))
-                        )
-                        .using(SizeTransform(clip = false))
-                },
-                label = "pageTransition",
-            ) { destination ->
-                when (destination) {
-                    AppDestination.WEEK -> {
-                        WeekViewContent(
-                            selectedDate = state.selectedDate,
-                            selectedLocalDate = state.selectedLocalDate,
-                            selectedWeekStart = state.selectedWeekStart,
-                            selectedWeekEnd = state.selectedWeekEnd,
-                            minDate = state.minDate,
-                            maxDate = state.maxDate,
-                            entries = state.entries,
-                            dateRangeEntriesCache = dateRangeEntriesCache,
-                            weekTimeSlots = state.weekTimeSlots,
-                            weekCardAlpha = state.weekCardAlpha,
-                            weekCardHue = state.weekCardHue,
-                            snackbarHostState = state.snackbarHostState,
-                            onDateChanged = { state.selectedDate = it },
-                            onEditEntry = { state.editingEntry = it },
-                            onEditWeekSlot = { state.editingWeekSlotIndex = it },
-                            onAddWeekSlot = { state.addingWeekSlotInitial = it },
-                            onEditFixedWeekSchedule = { state.editingFixedWeekSchedule = true },
-                            contentPadding = padding,
-                        )
-                    }
-                    AppDestination.DAY -> {
-                        DayViewContent(
-                            padding = padding,
-                            selectedDate = state.selectedDate,
-                            selectedLocalDate = state.selectedLocalDate,
-                            minDate = state.minDate,
-                            maxDate = state.maxDate,
-                            entries = state.entries,
-                            selectedDayEntries = selectedDayEntries,
-                            dateRangeEntriesCache = dateRangeEntriesCache,
-                            nextCourseSnapshot = state.nextCourseSnapshot,
-                            snackbarHostState = state.snackbarHostState,
-                            importLauncher = state.launchers.import,
-                            exportLauncher = state.launchers.export,
-                            reminderConfig = ReminderConfig(
-                                minutes = state.reminderMinutes,
-                                options = state.reminderOptions,
-                                exactAlarmEnabled = state.exactAlarmEnabled,
-                                notificationPermissionRequired = notificationPermissionRequired,
-                                notificationGranted = notificationGranted,
-                                onMinutesChange = { minutes ->
-                                    state.reminderMinutes = minutes
-                                    state.viewModel.updateReminderMinutes(minutes)
-                                },
-                                onEnableNotifications = {
-                                    requestNotificationPermissionIfNeeded(
-                                        state = state,
-                                        notificationsAlreadyEnabledMessage = msgNotificationsEnabled,
-                                    )
-                                },
-                                onOpenExactAlarmSettings = {
-                                    val intent = CourseReminderScheduler.buildExactAlarmSettingsIntent(context)
-                                    if (intent != null) state.exactAlarmSettingsLauncher.launch(intent)
-                                },
-                            ),
-                            appearanceConfig = AppearanceConfig(
-                                backgroundAppearance = state.backgroundAppearance,
-                                onSelectBackgroundImage = { state.launchers.backgroundImage.launch("image/*") },
-                                onAdjustCustomBackground = { state.showBackgroundAdjustDialog = true },
-                                onBackgroundAppearanceChange = { state.backgroundAppearance = it },
-                                weekCardAlpha = state.weekCardAlpha,
-                                onWeekCardAlphaChange = { alpha ->
-                                    state.weekCardAlpha = alpha
-                                    AppearanceStore.setWeekCardAlpha(context, alpha)
-                                },
-                                weekCardHue = state.weekCardHue,
-                                onWeekCardHueChange = { hue ->
-                                    state.weekCardHue = hue
-                                    AppearanceStore.setWeekCardHue(context, hue)
-                                },
-                            ),
-                            callbacks = DayListCallbacks(
-                                onDateChanged = { state.selectedDate = it },
-                                onEditEntry = { state.editingEntry = it },
-                                onDuplicateEntry = { entry ->
-                                    state.editingEntry = duplicateEntryTemplate(entry)
-                                    state.scope.launch {
-                                        state.snackbarHostState.showSnackbar(msgEntryDuplicated)
-                                    }
-                                },
-                                onDeleteEntry = { state.deletingEntry = it },
-                                onCreateEntry = { date, existing ->
-                                    state.editingEntry = createQuickEntryTemplate(date, existing)
-                                },
-                            ),
-                        )
-                    }
-                    AppDestination.SETTINGS -> {
-                        SettingsScreen(
-                            clearingCache = state.clearingCache,
-                            onClearCache = {
-                                if (state.clearingCache) return@SettingsScreen
-                                state.scope.launch {
-                                    state.clearingCache = true
-                                    try {
-                                        val result = withContext(Dispatchers.IO) {
-                                            AppCacheManager.clearAppCaches(context)
-                                        }
-                                        val message = if (result.bytesCleared > 0L) {
-                                            msgCacheClearedTemplate.format(AppCacheManager.formatBytes(result.bytesCleared))
-                                        } else {
-                                            msgCacheEmpty
-                                        }
-                                        state.snackbarHostState.showSnackbar(message)
-                                    } catch (cancelled: CancellationException) {
-                                        throw cancelled
-                                    } catch (error: Exception) {
-                                        state.snackbarHostState.showSnackbar(
-                                            msgCacheClearFailedTemplate.format(error.message ?: msgUnknownError),
-                                        )
-                                    } finally {
-                                        state.clearingCache = false
-                                    }
-                                }
+            when (currentDestination) {
+                AppDestination.WEEK -> {
+                    WeekViewContent(
+                        selectedDate = selectedDate,
+                        selectedLocalDate = selectedLocalDate,
+                        selectedWeekStart = selectedWeekStart,
+                        selectedWeekEnd = selectedWeekEnd,
+                        minDate = minDate,
+                        maxDate = maxDate,
+                        entries = entries,
+                        dateRangeEntriesCache = dateRangeEntriesCache,
+                        weekTimeSlots = weekTimeSlots,
+                        weekCardAlpha = weekCardAlpha,
+                        weekCardHue = weekCardHue,
+                        snackbarHostState = snackbarHostState,
+                        onDateChanged = { selectedDate = it },
+                        onEditEntry = { editingEntry = it },
+                        onEditWeekSlot = { editingWeekSlotIndex = it },
+                        onAddWeekSlot = { addingWeekSlotInitial = it },
+                        onEditFixedWeekSchedule = { editingFixedWeekSchedule = true },
+                        contentPadding = padding,
+                    )
+                }
+                AppDestination.DAY -> {
+                    DayViewContent(
+                        padding = padding,
+                        selectedDate = selectedDate,
+                        selectedLocalDate = selectedLocalDate,
+                        minDate = minDate,
+                        maxDate = maxDate,
+                        entries = entries,
+                        timetableGroups = timetableGroups,
+                        activeGroup = activeGroup,
+                        selectedDayEntries = selectedDayEntries,
+                        dateRangeEntriesCache = dateRangeEntriesCache,
+                        nextCourseSnapshot = nextCourseSnapshot,
+                        snackbarHostState = snackbarHostState,
+                        importLauncher = launchers.import,
+                        exportLauncher = launchers.export,
+                        onAcademicImport = { currentDestinationName = AppDestination.JW_IMPORT.name },
+                        onSelectTimetableGroup = viewModel::selectTimetableGroup,
+                        onCreateTimetableGroup = viewModel::createTimetableGroup,
+                        reminderConfig = ReminderConfig(
+                            minutes = reminderMinutes,
+                            options = reminderOptions,
+                            exactAlarmEnabled = exactAlarmEnabled,
+                            onMinutesChange = { minutes ->
+                                reminderMinutes = minutes
+                                viewModel.updateReminderMinutes(minutes)
                             },
-                            backgroundAppearance = state.backgroundAppearance,
-                            onBackgroundModeChange = { mode ->
-                                AppearanceStore.setBackgroundMode(context, mode)
-                                state.backgroundAppearance = AppearanceStore.getBackgroundAppearance(context)
-                            },
-                            onSelectBackgroundImage = { state.launchers.backgroundImage.launch("image/*") },
-                            weekCardAlpha = state.weekCardAlpha,
-                            onWeekCardAlphaChange = { alpha ->
-                                state.weekCardAlpha = alpha
-                                AppearanceStore.setWeekCardAlpha(context, alpha)
-                            },
-                            weekCardHue = state.weekCardHue,
-                            onWeekCardHueChange = { hue ->
-                                state.weekCardHue = hue
-                                AppearanceStore.setWeekCardHue(context, hue)
-                            },
-                            notificationGranted = notificationGranted,
-                            exactAlarmEnabled = state.exactAlarmEnabled,
-                            onEnableNotifications = {
-                                requestNotificationPermissionIfNeeded(
-                                    state = state,
-                                    notificationsAlreadyEnabledMessage = msgNotificationsEnabled,
-                                )
-                            },
+                            onEnableNotifications = ::requestNotificationPermissionOrReportNotRequired,
                             onOpenExactAlarmSettings = {
                                 val intent = CourseReminderScheduler.buildExactAlarmSettingsIntent(context)
-                                if (intent != null) state.exactAlarmSettingsLauncher.launch(intent)
+                                if (intent != null) exactAlarmSettingsLauncher.launch(intent)
                             },
-                            onImportIcs = {
-                                state.launchers.import.launch(
-                                    arrayOf(
-                                        "text/calendar",
-                                        "text/plain",
-                                        "application/ics",
-                                        "application/x-ical",
-                                        "application/octet-stream",
-                                        "*/*",
-                                    ),
+                        ),
+                        appearanceConfig = AppearanceConfig(
+                            backgroundAppearance = backgroundAppearance,
+                            onSelectBackgroundImage = { launchers.backgroundImage.launch("image/*") },
+                            onAdjustCustomBackground = { showBackgroundAdjustDialog = true },
+                            onBackgroundAppearanceChange = { backgroundAppearance = it },
+                            weekCardAlpha = weekCardAlpha,
+                            onWeekCardAlphaChange = { alpha ->
+                                weekCardAlpha = alpha
+                                AppearanceStore.setWeekCardAlpha(context, alpha)
+                            },
+                            weekCardHue = weekCardHue,
+                            onWeekCardHueChange = { hue ->
+                                weekCardHue = hue
+                                AppearanceStore.setWeekCardHue(context, hue)
+                            },
+                        ),
+                        callbacks = DayListCallbacks(
+                            onDateChanged = { selectedDate = it },
+                            onEditEntry = { editingEntry = it },
+                            onDuplicateEntry = { entry ->
+                                editingEntry = duplicateEntryTemplate(entry)
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(resources.getString(R.string.msg_entry_duplicated))
+                                }
+                            },
+                            onDeleteEntry = { deletingEntry = it },
+                            onCreateEntry = { date, existing ->
+                                editingEntry = createQuickEntryTemplate(date, existing, activeGroup.id)
+                            },
+                        ),
+                    )
+                }
+                AppDestination.SETTINGS -> {
+                    SettingsScreen(
+                        clearingCache = clearingCache,
+                        onClearCache = {
+                            if (clearingCache) return@SettingsScreen
+                            scope.launch {
+                                clearingCache = true
+                                try {
+                                    val result = withContext(Dispatchers.IO) {
+                                        AppCacheManager.clearAppCaches(context)
+                                    }
+                                    val message = if (result.bytesCleared > 0L) {
+                                        resources.getString(R.string.msg_cache_cleared, AppCacheManager.formatBytes(result.bytesCleared))
+                                    } else {
+                                        resources.getString(R.string.msg_cache_empty)
+                                    }
+                                    snackbarHostState.showSnackbar(message)
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
+                                } catch (error: Exception) {
+                                    snackbarHostState.showSnackbar(
+                                        resources.getString(R.string.msg_cache_clear_failed, error.message ?: resources.getString(R.string.msg_unknown_error)),
+                                    )
+                                } finally {
+                                    clearingCache = false
+                                }
+                            }
+                        },
+                        backgroundAppearance = backgroundAppearance,
+                        onBackgroundModeChange = { mode ->
+                            when (
+                                resolveBackgroundModeSelection(
+                                    mode = mode,
+                                    hasCustomBackground = BackgroundImageManager.hasCustomBackground(context),
                                 )
-                            },
-                            onExportIcs = {
-                                state.launchers.export.launch(exportFilename)
-                            },
-                            modifier = Modifier.padding(padding),
-                        )
-                    }
+                            ) {
+                                BackgroundModeSelection.REQUEST_CUSTOM_IMAGE -> {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(resources.getString(R.string.msg_select_background_image))
+                                    }
+                                    launchers.backgroundImage.launch("image/*")
+                                }
+                                BackgroundModeSelection.APPLY_MODE -> {
+                                    AppearanceStore.setBackgroundMode(context, mode)
+                                    backgroundAppearance = AppearanceStore.getBackgroundAppearance(context)
+                                }
+                            }
+                        },
+                        onSelectBackgroundImage = { launchers.backgroundImage.launch("image/*") },
+                        weekCardAlpha = weekCardAlpha,
+                        onWeekCardAlphaChange = { alpha ->
+                            weekCardAlpha = alpha
+                            AppearanceStore.setWeekCardAlpha(context, alpha)
+                        },
+                        weekCardHue = weekCardHue,
+                        onWeekCardHueChange = { hue ->
+                            weekCardHue = hue
+                            AppearanceStore.setWeekCardHue(context, hue)
+                        },
+                        notificationGranted = notificationGranted,
+                        exactAlarmEnabled = exactAlarmEnabled,
+                        onEnableNotifications = ::requestNotificationPermissionOrReportNotRequired,
+                        onOpenExactAlarmSettings = {
+                            val intent = CourseReminderScheduler.buildExactAlarmSettingsIntent(context)
+                            if (intent != null) exactAlarmSettingsLauncher.launch(intent)
+                        },
+                        onImportIcs = {
+                            launchers.import.launch(
+                                arrayOf(
+                                    "text/calendar",
+                                    "text/plain",
+                                    "application/ics",
+                                    "application/x-ical",
+                                    "application/octet-stream",
+                                    "*/*",
+                                ),
+                            )
+                        },
+                        onExportIcs = { launchers.export.launch(resources.getString(R.string.export_filename)) },
+                        modifier = Modifier.padding(padding),
+                    )
+                }
+                AppDestination.JW_IMPORT -> {
+                    JwImportScreen(
+                        viewModel = viewModel,
+                        onBack = { currentDestinationName = AppDestination.DAY.name },
+                        onImportSubmitted = { currentDestinationName = AppDestination.DAY.name },
+                        modifier = Modifier.padding(padding),
+                    )
                 }
             }
         }
     }
 
     ScheduleDialogOverlays(
-        viewModel = state.viewModel,
-        entries = state.entries,
-        weekTimeSlots = state.weekTimeSlots,
-        snackbarHostState = state.snackbarHostState,
-        editingEntry = state.editingEntry,
-        pendingConflict = state.pendingConflict,
-        editingWeekSlotIndex = state.editingWeekSlotIndex,
-        addingWeekSlotInitial = state.addingWeekSlotInitial,
-        editingWeekSlotCount = state.editingWeekSlotCount,
-        editingFixedWeekSchedule = state.editingFixedWeekSchedule,
-        showBackgroundAdjustDialog = state.showBackgroundAdjustDialog,
-        deletingEntry = state.deletingEntry,
-        importPreviewState = state.importPreviewState,
-        backgroundAppearance = state.backgroundAppearance,
-        onEditingEntryChange = { state.editingEntry = it },
-        onPendingConflictChange = { state.pendingConflict = it },
-        onEditingWeekSlotIndexChange = { state.editingWeekSlotIndex = it },
-        onAddingWeekSlotInitialChange = { state.addingWeekSlotInitial = it },
-        onEditingWeekSlotCountChange = { state.editingWeekSlotCount = it },
-        onEditingFixedWeekScheduleChange = { state.editingFixedWeekSchedule = it },
-        onShowBackgroundAdjustDialogChange = { state.showBackgroundAdjustDialog = it },
-        onDeletingEntryChange = { state.deletingEntry = it },
-        onImportPreviewStateChange = { state.importPreviewState = it },
-        onBackgroundAppearanceChange = { state.backgroundAppearance = it },
-        onWeekTimeSlotsChange = { state.weekTimeSlots = it },
+        viewModel = viewModel,
+        entries = entries,
+        weekTimeSlots = weekTimeSlots,
+        snackbarHostState = snackbarHostState,
+        editingEntry = editingEntry,
+        pendingConflict = pendingConflict,
+        editingWeekSlotIndex = editingWeekSlotIndex,
+        addingWeekSlotInitial = addingWeekSlotInitial,
+        editingWeekSlotCount = editingWeekSlotCount,
+        editingFixedWeekSchedule = editingFixedWeekSchedule,
+        showBackgroundAdjustDialog = showBackgroundAdjustDialog,
+        deletingEntry = deletingEntry,
+        importPreviewState = importPreviewState,
+        activeGroup = activeGroup,
+        backgroundAppearance = backgroundAppearance,
+        onEditingEntryChange = { editingEntry = it },
+        onPendingConflictChange = { pendingConflict = it },
+        onEditingWeekSlotIndexChange = { editingWeekSlotIndex = it },
+        onAddingWeekSlotInitialChange = { addingWeekSlotInitial = it },
+        onEditingWeekSlotCountChange = { editingWeekSlotCount = it },
+        onEditingFixedWeekScheduleChange = { editingFixedWeekSchedule = it },
+        onShowBackgroundAdjustDialogChange = { showBackgroundAdjustDialog = it },
+        onDeletingEntryChange = { deletingEntry = it },
+        onImportPreviewStateChange = { importPreviewState = it },
+        onBackgroundAppearanceChange = { backgroundAppearance = it },
+        onWeekTimeSlotsChange = { weekTimeSlots = it },
     )
 }
 
@@ -418,6 +574,7 @@ private fun ScheduleAppContent(state: ScheduleAppState) {
  * @param snackbarHostState  Snackbar 主机状态
  * @param importLauncher 导入启动器
  * @param exportLauncher 导出启动器
+ * @param onAcademicImport 教务系统导入入口
  * @param reminderConfig 提醒设置与权限入口
  * @param appearanceConfig 背景和周卡片外观设置
  * @param callbacks 日视图交互回调
@@ -430,12 +587,17 @@ private fun DayViewContent(
     minDate: LocalDate,
     maxDate: LocalDate,
     entries: List<TimetableEntry>,
+    timetableGroups: List<TimetableGroup>,
+    activeGroup: TimetableGroup,
     selectedDayEntries: List<TimetableEntry>,
     dateRangeEntriesCache: DateRangeEntriesCache,
     nextCourseSnapshot: NextCourseSnapshot?,
     snackbarHostState: SnackbarHostState,
     importLauncher: androidx.activity.result.ActivityResultLauncher<Array<String>>,
     exportLauncher: androidx.activity.result.ActivityResultLauncher<String>,
+    onAcademicImport: () -> Unit,
+    onSelectTimetableGroup: (String) -> Unit,
+    onCreateTimetableGroup: (String) -> Unit,
     reminderConfig: ReminderConfig,
     appearanceConfig: AppearanceConfig,
     callbacks: DayListCallbacks,
@@ -472,6 +634,8 @@ private fun DayViewContent(
             listState = listState,
             snackbarHostState = snackbarHostState,
             entries = entries,
+            timetableGroups = timetableGroups,
+            activeGroup = activeGroup,
             selectedDate = selectedDate,
             selectedLocalDate = selectedLocalDate,
             selectedDayEntries = selectedDayEntries,
@@ -479,6 +643,9 @@ private fun DayViewContent(
             nextCourseSnapshot = nextCourseSnapshot,
             importLauncher = importLauncher,
             exportLauncher = exportLauncher,
+            onAcademicImport = onAcademicImport,
+            onSelectTimetableGroup = onSelectTimetableGroup,
+            onCreateTimetableGroup = onCreateTimetableGroup,
             reminderConfig = reminderConfig,
             appearanceConfig = appearanceConfig,
             callbacks = callbacks,
@@ -564,26 +731,10 @@ data class PendingEntryConflict(
     val conflictEntry: TimetableEntry,
 )
 
-private fun requestNotificationPermissionIfNeeded(
-    state: ScheduleAppState,
-    notificationsAlreadyEnabledMessage: String,
-) {
-    if (CourseReminderScheduler.notificationPermissionRequired()) {
-        state.notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-    } else {
-        state.notificationPermissionRefreshToken++
-        state.scope.launch {
-            state.snackbarHostState.showSnackbar(notificationsAlreadyEnabledMessage)
-        }
-    }
-}
-
 data class ReminderConfig(
     val minutes: List<Int>,
     val options: List<Int>,
     val exactAlarmEnabled: Boolean,
-    val notificationPermissionRequired: Boolean,
-    val notificationGranted: Boolean,
     val onMinutesChange: (List<Int>) -> Unit,
     val onEnableNotifications: () -> Unit,
     val onOpenExactAlarmSettings: () -> Unit,
@@ -628,6 +779,7 @@ internal fun NextCourseSnapshot.toCardState(unnamedLabel: String = ""): NextCour
 internal fun createQuickEntryTemplate(
     date: LocalDate,
     existingEntries: List<TimetableEntry>,
+    groupId: String = TimetableGroup.DEFAULT_ID,
 ): TimetableEntry {
     val fallbackStart = 8 * 60
     val fallbackEnd = 9 * 60
@@ -651,6 +803,7 @@ internal fun createQuickEntryTemplate(
     }
 
     return TimetableEntry.create(
+        groupId = groupId,
         title = "",
         date = date.toString(),
         dayOfWeek = date.dayOfWeek.value,
@@ -669,6 +822,7 @@ internal fun createQuickEntryTemplate(
  */
 internal fun duplicateEntryTemplate(source: TimetableEntry): TimetableEntry {
     return TimetableEntry.create(
+        groupId = source.groupId,
         title = source.title,
         date = source.date,
         dayOfWeek = source.dayOfWeek,

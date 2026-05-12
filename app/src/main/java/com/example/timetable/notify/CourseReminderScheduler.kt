@@ -116,7 +116,11 @@ object CourseReminderScheduler {
      * @param context 应用上下文
      * @param entries 课程表条目列表
      */
-    suspend fun sync(context: Context, entries: List<TimetableEntry>) = syncMutex.withLock {
+    suspend fun sync(
+        context: Context,
+        entries: List<TimetableEntry>,
+        forceReschedule: Boolean = false,
+    ) = syncMutex.withLock {
         val appContext = context.applicationContext
         ensureNotificationChannel(appContext)
         val reminderMinutes = getReminderMinutesSet(appContext)
@@ -124,10 +128,14 @@ object CourseReminderScheduler {
         val alarmManager = appContext.getSystemService(AlarmManager::class.java) ?: return@withLock
         val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val oldCodes = prefs.getStringSet(KEY_CODES, emptySet()).orEmpty().mapNotNull { it.toIntOrNull() }.toSet()
-        val oldSignatures = prefs.getStringSet(KEY_SCHEDULE_SIGNATURES, emptySet())
-            .orEmpty()
-            .mapNotNull(::decodeScheduledSignature)
-            .toMap()
+        val oldSignatures = if (forceReschedule) {
+            emptyMap()
+        } else {
+            prefs.getStringSet(KEY_SCHEDULE_SIGNATURES, emptySet())
+                .orEmpty()
+                .mapNotNull(::decodeScheduledSignature)
+                .toMap()
+        }
 
         val plan = buildSchedulePlan(
             entries = entries,
@@ -444,12 +452,16 @@ object CourseReminderScheduler {
      * @param context 应用上下文
      * @param onComplete 完成回调
      */
-    fun resyncFromStorage(context: Context, onComplete: (() -> Unit)? = null) {
+    fun resyncFromStorage(
+        context: Context,
+        forceReschedule: Boolean = false,
+        onComplete: (() -> Unit)? = null,
+    ) {
         val appContext = context.applicationContext
         resyncScope.launch {
             try {
                 val entries = com.example.timetable.data.TimetableRepository.getEntriesNow(appContext)
-                sync(appContext, entries)
+                sync(appContext, entries, forceReschedule = forceReschedule)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {

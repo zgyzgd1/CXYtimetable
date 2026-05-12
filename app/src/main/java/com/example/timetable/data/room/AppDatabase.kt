@@ -7,6 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.timetable.data.TimetableEntry
+import com.example.timetable.data.TimetableGroup
 
 /**
  * Room database definition.
@@ -34,7 +35,7 @@ import com.example.timetable.data.TimetableEntry
  *    ```
  *    Then add `.addMigrations(MIGRATION_1_2, MIGRATION_2_3)` in `getDatabase()`.
  */
-@Database(entities = [TimetableEntry::class], version = 3, exportSchema = true)
+@Database(entities = [TimetableEntry::class, TimetableGroup::class], version = 4, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun timetableDao(): TimetableDao
 
@@ -56,14 +57,11 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        internal val MIGRATIONS: Array<Migration>
-            get() = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
-
         /**
          * v1 -> v2: Added weekly recurrence fields.
          * Introduced April 2026 with Room migration.
          */
-        internal val MIGRATION_1_2 = object : Migration(1, 2) {
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE timetable_entries ADD COLUMN recurrenceType TEXT NOT NULL DEFAULT 'NONE'")
                 db.execSQL("ALTER TABLE timetable_entries ADD COLUMN semesterStartDate TEXT NOT NULL DEFAULT ''")
@@ -78,11 +76,45 @@ abstract class AppDatabase : RoomDatabase() {
          * Adds composite index on date+startMinutes and single-field index on dayOfWeek
          * to optimize high-frequency queries such as `ORDER BY date ASC, startMinutes ASC`.
          */
-        internal val MIGRATION_2_3 = object : Migration(2, 3) {
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_timetable_entries_date_startMinutes ON timetable_entries(date, startMinutes)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_timetable_entries_dayOfWeek ON timetable_entries(dayOfWeek)")
             }
         }
+
+        /**
+         * v3 -> v4: Added timetable groups.
+         * Existing entries are assigned to the default group.
+         */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val now = System.currentTimeMillis()
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS timetable_groups (
+                        id TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        PRIMARY KEY(id)
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "INSERT OR IGNORE INTO timetable_groups(id, name, createdAt, updatedAt) VALUES('default', '默认课表', $now, $now)",
+                )
+                db.execSQL("ALTER TABLE timetable_entries ADD COLUMN groupId TEXT NOT NULL DEFAULT 'default'")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_timetable_groups_updatedAt ON timetable_groups(updatedAt)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_timetable_entries_groupId_date_startMinutes ON timetable_entries(groupId, date, startMinutes)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_timetable_entries_groupId_dayOfWeek ON timetable_entries(groupId, dayOfWeek)")
+            }
+        }
+
+        internal val MIGRATIONS: Array<Migration> = arrayOf(
+            MIGRATION_1_2,
+            MIGRATION_2_3,
+            MIGRATION_3_4,
+        )
     }
 }

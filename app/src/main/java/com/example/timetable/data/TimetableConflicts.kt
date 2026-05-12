@@ -7,7 +7,7 @@ import java.time.temporal.TemporalAdjusters
 
 private const val MIN_RECURRING_CONFLICT_SEARCH_WEEKS = 2
 private const val RECURRING_CONFLICT_SEARCH_PADDING_WEEKS = 6
-private val MAX_RECURRING_CONFLICT_SEARCH_DATE = LocalDate.of(2100, 12, 31)
+private val MAX_RECURRING_CONFLICT_SEARCH_DATE = AppConstants.MAX_DATE
 
 fun findConflictForEntry(
     target: TimetableEntry,

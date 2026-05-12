@@ -41,7 +41,7 @@ class CourseReminderRescheduleReceiver : BroadcastReceiver() {
         try {
             ReminderFallbackWorker.ensureScheduled(context)
             TimetableWidgetUpdater.refreshAllFromStorage(context)
-            CourseReminderScheduler.resyncFromStorage(context) {
+            CourseReminderScheduler.resyncFromStorage(context, forceReschedule = true) {
                 handler.removeCallbacks(timeoutRunnable)
                 finishOnce.run {
                     pendingResult.finish()

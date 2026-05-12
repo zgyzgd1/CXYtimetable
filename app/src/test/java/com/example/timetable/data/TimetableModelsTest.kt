@@ -106,4 +106,10 @@ class TimetableModelsTest {
         assertNull(parseWeekList("${MAX_WEEK_LIST_WEEK + 1}"))
         assertNull(parseWeekList("${MAX_WEEK_LIST_WEEK - 1}-${MAX_WEEK_LIST_WEEK + 1}"))
     }
+
+    @Test
+    fun timetableGroupNormalizesBlankAndLongNames() {
+        assertEquals(TimetableGroup.DEFAULT_NAME, TimetableGroup.normalizeName("   "))
+        assertEquals(40, TimetableGroup.normalizeName("课".repeat(60)).length)
+    }
 }

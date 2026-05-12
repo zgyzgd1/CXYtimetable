@@ -88,9 +88,9 @@ fun BackgroundTintOverlays(modifier: Modifier = Modifier) {
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color.White.overlayLightest(),
+                        Color.White.overlayLight(),
                         Color.Transparent,
-                        Color.Black.overlayLightest(),
+                        Color.Black.overlayLight(),
                     ),
                 ),
             ),
@@ -101,8 +101,8 @@ fun BackgroundTintOverlays(modifier: Modifier = Modifier) {
             .background(
                 Brush.horizontalGradient(
                     colors = listOf(
-                        MaterialTheme.colorScheme.background.overlayHover(),
-                        MaterialTheme.colorScheme.background.overlayLightest(),
+                        MaterialTheme.colorScheme.background.overlayMedium(),
+                        MaterialTheme.colorScheme.background.overlayLight(),
                         Color.Transparent,
                     ),
                 ),
@@ -114,9 +114,9 @@ fun BackgroundTintOverlays(modifier: Modifier = Modifier) {
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        MaterialTheme.colorScheme.background.overlayActiveLight(),
-                        MaterialTheme.colorScheme.background.overlayBackgroundOverlay(),
-                        MaterialTheme.colorScheme.surfaceVariant.overlayMediumHigh(),
+                        MaterialTheme.colorScheme.background.overlayMedium(),
+                        MaterialTheme.colorScheme.background.overlayHeavy(),
+                        MaterialTheme.colorScheme.surfaceVariant.disabledContent(),
                     ),
                 ),
             ),

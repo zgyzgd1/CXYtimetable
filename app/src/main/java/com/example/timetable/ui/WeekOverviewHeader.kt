@@ -68,7 +68,7 @@ fun WeekOverviewHeader(
                         stringResource(R.string.label_week_course_count, weekEntries.size, selectedDayEntries.size)
                     },
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.overlayDisabled(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.hintContent(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -138,7 +138,7 @@ internal fun GlassActionChip(
 ) {
     Surface(
         onClick = onClick,
-        color = MaterialTheme.colorScheme.surfaceVariant.overlaySelected(),
+        color = MaterialTheme.colorScheme.surfaceVariant.overlayHeavy(),
         contentColor = MaterialTheme.colorScheme.onSurface,
         shape = AppShape.Chip,
         shadowElevation = 0.dp,
