@@ -8,6 +8,7 @@ local.properties
 .lingma/
 .vscode/
 *.iml
+*.apk
 .DS_Store
 apk-archive-repo/
 .gradle-user-home/
