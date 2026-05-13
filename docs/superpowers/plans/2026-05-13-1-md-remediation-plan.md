@@ -2,7 +2,7 @@
 
 > **For:** 1.md review findings
 > **Created:** 2026-05-13
-> **Status:** planned, not implemented in this pass
+> **Status:** implemented and verified
 
 ## Verification Summary
 
@@ -25,65 +25,65 @@ Most functional, UI, test-hardening, script, and resource findings in `1.md` are
 
 ## Phase 1 - Low-Risk Hygiene
 
-- [ ] Save `gradle.properties` and `app/src/main/AndroidManifest.xml` as UTF-8 without BOM.
-- [ ] Add the XML declaration to `app/src/main/AndroidManifest.xml`.
-- [ ] Remove explicit `buildToolsVersion = "37.0.0"` from `app/build.gradle.kts` unless a concrete release artifact requires it.
-- [ ] Replace hardcoded hex text colors in `app/src/main/res/layout/widget_next_course.xml` with named colors in `app/src/main/res/values/colors.xml`.
-- [ ] Refactor duplicated `OneTimeAction` into one package-visible utility used by notification and widget receivers.
-- [ ] Verification: `./gradlew.bat testDebugUnitTest --no-daemon`, `./gradlew.bat lintDebug --no-daemon`, `git diff --check`.
+- [x] Save `gradle.properties` and `app/src/main/AndroidManifest.xml` as UTF-8 without BOM.
+- [x] Add the XML declaration to `app/src/main/AndroidManifest.xml`.
+- [x] Remove explicit `buildToolsVersion = "37.0.0"` from `app/build.gradle.kts` unless a concrete release artifact requires it.
+- [x] Replace hardcoded hex text colors in `app/src/main/res/layout/widget_next_course.xml` with named colors in `app/src/main/res/values/colors.xml`.
+- [x] Refactor duplicated `OneTimeAction` into one package-visible utility used by notification and widget receivers.
+- [x] Verification: `./gradlew.bat testDebugUnitTest --no-daemon`, `./gradlew.bat lintDebug --no-daemon`, `git diff --check`.
 
 ## Phase 2 - Safety and Lifecycle Fixes
 
-- [ ] Update `scripts/publish-release.ps1` to derive owner/repository from git remote config or explicit parameters instead of hardcoding `zgyzgd1/CXYtimetable`.
-- [ ] Rewrite or retire `refactor_ui.py`: require an explicit file argument, make a timestamped backup, and avoid hardcoded line slicing plus global string replacement.
-- [ ] In `JwWebView.kt`, destroy the main WebView when the Compose AndroidView leaves composition. Keep popup teardown behavior intact.
-- [ ] Reconsider mobile WebView settings in `JwWebView.kt`; keep `useWideViewPort` and `loadWithOverviewMode` enabled if the HEBAU mobile pages require viewport scaling.
-- [ ] Add EXIF orientation handling to `BackgroundImageManager.kt` before scaling/cropping decoded images.
-- [ ] Verification: targeted unit tests where available, then full unit/lint commands.
+- [x] Update `scripts/publish-release.ps1` to derive owner/repository from git remote config or explicit parameters instead of hardcoding `zgyzgd1/CXYtimetable`.
+- [x] Rewrite or retire `refactor_ui.py`: require an explicit file argument, make a timestamped backup, and avoid hardcoded line slicing plus global string replacement.
+- [x] In `JwWebView.kt`, destroy the main WebView when the Compose AndroidView leaves composition. Keep popup teardown behavior intact.
+- [x] Reconsider mobile WebView settings in `JwWebView.kt`; keep `useWideViewPort` and `loadWithOverviewMode` enabled if the HEBAU mobile pages require viewport scaling.
+- [x] Add EXIF orientation handling to `BackgroundImageManager.kt` before scaling/cropping decoded images.
+- [x] Verification: targeted unit tests where available, then full unit/lint commands.
 
 ## Phase 3 - Calendar Semantics
 
-- [ ] Preserve parsed ICS value type/parameters so `VALUE=DATE` all-day events can be represented as date-only events instead of becoming one-hour midnight entries.
-- [ ] Add explicit handling for unsupported RRULE constructs. Either implement the needed monthly/yearly modifiers or reject/degrade with a visible import warning instead of silently changing meaning.
-- [ ] Add export bounds for recurring events: prefer `UNTIL` or `COUNT` derived from the app's known recurring schedule/window.
-- [ ] Include `RECURRENCE-ID` or equivalent occurrence identity in ICS import deduplication so valid overridden instances are not dropped by `distinctBy { it.id }`.
-- [ ] Verification: add `IcsCalendarTest` cases for all-day import, monthly BYDAY modifiers, bounded export RRULEs, and duplicate UID recurrence overrides.
+- [x] Preserve parsed ICS value type/parameters so `VALUE=DATE` all-day events can be represented as date-only events instead of becoming one-hour midnight entries.
+- [x] Add explicit handling for unsupported RRULE constructs. Either implement the needed monthly/yearly modifiers or reject/degrade with a visible import warning instead of silently changing meaning.
+- [x] Add export bounds for recurring events: prefer `UNTIL` or `COUNT` derived from the app's known recurring schedule/window.
+- [x] Include `RECURRENCE-ID` or equivalent occurrence identity in ICS import deduplication so valid overridden instances are not dropped by `distinctBy { it.id }`.
+- [x] Verification: add `IcsCalendarTest` cases for all-day import, monthly BYDAY modifiers, bounded export RRULEs, and duplicate UID recurrence overrides.
 
 ## Phase 4 - Import and Validation Correctness
 
-- [ ] Fix HEBAU weak-key dedupe so a later weak match cannot overwrite or merge distinct valid course instances unexpectedly.
-- [ ] Hoist repeated regexes in `HebauPlainTextParser.kt` into private constants or lazily initialized values.
-- [ ] Narrow `isIgnoredCourseName` to exact labels or field-marker lines, not broad substring matches.
-- [ ] Extend teacher parsing beyond CJK-only names when the input has a teacher label or a clearly separated teacher field.
-- [ ] Align `EntryValidator.validate` and `validateDraft` trimming semantics for title/location/note length checks.
-- [ ] Verification: targeted HEBAU parser tests plus expanded `EntryValidatorTest`.
+- [x] Fix HEBAU weak-key dedupe so a later weak match cannot overwrite or merge distinct valid course instances unexpectedly.
+- [x] Hoist repeated regexes in `HebauPlainTextParser.kt` into private constants or lazily initialized values.
+- [x] Narrow `isIgnoredCourseName` to exact labels or field-marker lines, not broad substring matches.
+- [x] Extend teacher parsing beyond CJK-only names when the input has a teacher label or a clearly separated teacher field.
+- [x] Align `EntryValidator.validate` and `validateDraft` trimming semantics for title/location/note length checks.
+- [x] Verification: targeted HEBAU parser tests plus expanded `EntryValidatorTest`.
 
 ## Phase 5 - Reminder and State Correctness
 
-- [ ] Replace silent `runCatching { ... }.getOrNull()` in `CourseReminderScheduler.computeTriggerAtMillis` with explicit validation/logging and deterministic test coverage.
-- [ ] Avoid default notification `requestCode = 0` overwrite behavior. Missing request codes should be rejected or replaced with a stable unique fallback.
-- [ ] Add a regression test around initial active-group loading in `ScheduleViewModel`, then adjust initialization so observers do not briefly consume an empty or stale group when a migrated active group exists.
-- [ ] Verification: scheduler, receiver, repository/view-model tests.
+- [x] Replace silent `runCatching { ... }.getOrNull()` in `CourseReminderScheduler.computeTriggerAtMillis` with explicit validation/logging and deterministic test coverage.
+- [x] Avoid default notification `requestCode = 0` overwrite behavior. Missing request codes should be rejected or replaced with a stable unique fallback.
+- [x] Add a regression test around initial active-group loading in `ScheduleViewModel`, then adjust initialization so observers do not briefly consume an empty or stale group when a migrated active group exists.
+- [x] Verification: scheduler, receiver, repository/view-model tests.
 
 ## Phase 6 - Compose/UI Polish
 
-- [ ] Move the `semesterStartDateText` defaulting side effect in `EntryEditorDialog` into `LaunchedEffect` or initialization state.
-- [ ] Replace the empty `confirmButton` in `ImportMethodDialog` with a real dialog action structure, or use content-only layout without pretending it is a confirm slot.
-- [ ] Animate selected/deselected colors in `TimetableCalendar.kt` through a single `animateColorAsState` path.
-- [ ] Collapse the three fullscreen tint boxes in `BackgroundLayer.kt` into fewer overlay draws.
-- [ ] Replace hardcoded alpha literals in `WeekViewContent.kt` with named theme constants.
-- [ ] Fold conditional alpha in `WeekScheduleBoard.kt` into the existing `graphicsLayer`.
-- [ ] Verification: Compose unit tests where practical, plus manual screenshot/browser-device style checks if UI behavior changes visibly.
+- [x] Move the `semesterStartDateText` defaulting side effect in `EntryEditorDialog` into `LaunchedEffect` or initialization state.
+- [x] Replace the empty `confirmButton` in `ImportMethodDialog` with a real dialog action structure, or use content-only layout without pretending it is a confirm slot.
+- [x] Animate selected/deselected colors in `TimetableCalendar.kt` through a single `animateColorAsState` path.
+- [x] Collapse the three fullscreen tint boxes in `BackgroundLayer.kt` into fewer overlay draws.
+- [x] Replace hardcoded alpha literals in `WeekViewContent.kt` with named theme constants.
+- [x] Fold conditional alpha in `WeekScheduleBoard.kt` into the existing `graphicsLayer`.
+- [x] Verification: Compose unit tests where practical, plus manual screenshot/browser-device style checks if UI behavior changes visibly.
 
 ## Phase 7 - Test Hardening
 
-- [ ] Give Chinese text Compose tests a stable locale/encoding setup, and fix any mojibake string literals.
-- [ ] Expand `EntryValidatorTest` beyond two custom-week cases to cover title/time/location/note trimming and invalid recurrence inputs.
-- [ ] Replace raw source-string scans in `AlphaConstantsMigrationTest`, `WeekCalendarStripTest`, `JwWebViewSecurityTest`, and `WeekCardHueRangeTest` with behavior-level tests or parser-backed assertions.
-- [ ] Strengthen `CourseReminderReceiverTest` assertions to exact localized strings or controlled fake resources.
-- [ ] Strengthen `AccessibilityLabelsTest` to assert full expected labels or structured components instead of broad substring presence.
-- [ ] Extend `AppDatabaseMigrationTest` to assert the V1 `groupId` default and any other fields added after V1/V2.
-- [ ] Verification: full test suite and lint.
+- [x] Give Chinese text Compose tests a stable locale/encoding setup, and fix any mojibake string literals.
+- [x] Expand `EntryValidatorTest` beyond two custom-week cases to cover title/time/location/note trimming and invalid recurrence inputs.
+- [x] Replace raw source-string scans in `AlphaConstantsMigrationTest`, `WeekCalendarStripTest`, `JwWebViewSecurityTest`, and `WeekCardHueRangeTest` with behavior-level tests or parser-backed assertions.
+- [x] Strengthen `CourseReminderReceiverTest` assertions to exact localized strings or controlled fake resources.
+- [x] Strengthen `AccessibilityLabelsTest` to assert full expected labels or structured components instead of broad substring presence.
+- [x] Extend `AppDatabaseMigrationTest` to assert the V1 `groupId` default and any other fields added after V1/V2.
+- [x] Verification: full test suite and lint.
 
 ## Suggested Execution Order
 
