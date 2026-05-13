@@ -19,21 +19,39 @@ object HebauSectionTimes {
     )
 
     fun resolve(sectionTimes: List<HebauSectionTime>): Map<Int, SectionMinutes> {
-        val base = default.associate { time ->
-            time.section to SectionMinutes(
-                startMinutes = parseMinutes(time.start) ?: 0,
-                endMinutes = parseMinutes(time.end) ?: 0,
-            )
+        return resolve(defaultSectionTimes = default, sectionTimes = sectionTimes)
+    }
+
+    internal fun resolve(
+        defaultSectionTimes: List<HebauSectionTime>,
+        sectionTimes: List<HebauSectionTime>,
+    ): Map<Int, SectionMinutes> {
+        val base = defaultSectionTimes.associate { time ->
+            time.section to requireSectionMinutes(time, label = "default section ${time.section}")
         }.toMutableMap()
 
         sectionTimes.forEach { time ->
-            val start = parseMinutes(time.start)
-            val end = parseMinutes(time.end)
-            if (time.section > 0 && start != null && end != null && start < end) {
-                base[time.section] = SectionMinutes(start, end)
+            if (time.section > 0) {
+                parseSectionMinutes(time)?.let { base[time.section] = it }
             }
         }
         return base
+    }
+
+    private fun requireSectionMinutes(time: HebauSectionTime, label: String): SectionMinutes {
+        val start = parseMinutes(time.start)
+            ?: throw IllegalArgumentException("$label start time is invalid.")
+        val end = parseMinutes(time.end)
+            ?: throw IllegalArgumentException("$label end time is invalid.")
+        require(start < end) { "$label time range is invalid." }
+        return SectionMinutes(startMinutes = start, endMinutes = end)
+    }
+
+    private fun parseSectionMinutes(time: HebauSectionTime): SectionMinutes? {
+        val start = parseMinutes(time.start) ?: return null
+        val end = parseMinutes(time.end) ?: return null
+        if (start >= end) return null
+        return SectionMinutes(startMinutes = start, endMinutes = end)
     }
 }
 

@@ -13,20 +13,10 @@ import com.example.timetable.MainActivity
 import com.example.timetable.R
 import com.example.timetable.data.formatMinutes
 import com.example.timetable.ui.AppDestination
-import java.util.concurrent.atomic.AtomicBoolean
+import com.example.timetable.util.OneTimeAction
 
 private const val COURSE_REMINDER_PENDING_RESULT_TIMEOUT_MS = 8_000L
 private const val TAG = "CourseReminderReceiver"
-
-internal class OneTimeAction {
-    private val fired = AtomicBoolean(false)
-
-    fun run(action: () -> Unit) {
-        if (fired.compareAndSet(false, true)) {
-            action()
-        }
-    }
-}
 
 class CourseReminderReceiver : BroadcastReceiver() {
     @android.annotation.SuppressLint("MissingPermission")
@@ -47,7 +37,7 @@ class CourseReminderReceiver : BroadcastReceiver() {
             if (CourseReminderScheduler.notificationsEnabled(context)) {
                 CourseReminderScheduler.ensureNotificationChannel(context)
 
-                val requestCode = intent.getIntExtra(CourseReminderScheduler.EXTRA_REQUEST_CODE, 0)
+                val requestCode = reminderRequestCodeFrom(intent)
                 val title = intent.getStringExtra(CourseReminderScheduler.EXTRA_TITLE).orEmpty().ifBlank { context.getString(R.string.notify_reminder_title) }
                 val location = intent.getStringExtra(CourseReminderScheduler.EXTRA_LOCATION).orEmpty()
                 val date = intent.getStringExtra(CourseReminderScheduler.EXTRA_DATE).orEmpty()
@@ -57,41 +47,45 @@ class CourseReminderReceiver : BroadcastReceiver() {
                     CourseReminderScheduler.defaultReminderMinutes(),
                 )
 
-                val openIntent = MainActivity.createLaunchIntent(
-                    context = context,
-                    selectedDate = date.ifBlank { null },
-                    destination = AppDestination.DAY,
-                ).apply {
-                    action = Intent.ACTION_VIEW
-                }
-                val contentIntent = PendingIntent.getActivity(
-                    context,
-                    requestCode,
-                    openIntent,
-                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-                )
+                if (requestCode == null) {
+                    Log.w(TAG, "Ignoring reminder notification without request code.")
+                } else {
+                    val openIntent = MainActivity.createLaunchIntent(
+                        context = context,
+                        selectedDate = date.ifBlank { null },
+                        destination = AppDestination.DAY,
+                    ).apply {
+                        action = Intent.ACTION_VIEW
+                    }
+                    val contentIntent = PendingIntent.getActivity(
+                        context,
+                        requestCode,
+                        openIntent,
+                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                    )
 
-                val contentTitle = buildReminderNotificationTitle(title, reminderMinutes, context)
-                val contentText = buildReminderNotificationText(
-                    date = date,
-                    startMinutes = startMinutes,
-                    location = location,
-                )
+                    val contentTitle = buildReminderNotificationTitle(title, reminderMinutes, context)
+                    val contentText = buildReminderNotificationText(
+                        date = date,
+                        startMinutes = startMinutes,
+                        location = location,
+                    )
 
-                val notification = NotificationCompat.Builder(context, CourseReminderScheduler.CHANNEL_ID)
-                    .setSmallIcon(android.R.drawable.ic_dialog_info)
-                    .setContentTitle(contentTitle)
-                    .setContentText(contentText)
-                    .setStyle(NotificationCompat.BigTextStyle().bigText(contentText))
-                    .setPriority(NotificationCompat.PRIORITY_HIGH)
-                    .setAutoCancel(true)
-                    .setContentIntent(contentIntent)
-                    .build()
+                    val notification = NotificationCompat.Builder(context, CourseReminderScheduler.CHANNEL_ID)
+                        .setSmallIcon(android.R.drawable.ic_dialog_info)
+                        .setContentTitle(contentTitle)
+                        .setContentText(contentText)
+                        .setStyle(NotificationCompat.BigTextStyle().bigText(contentText))
+                        .setPriority(NotificationCompat.PRIORITY_HIGH)
+                        .setAutoCancel(true)
+                        .setContentIntent(contentIntent)
+                        .build()
 
-                runCatching {
-                    @android.annotation.SuppressLint("MissingPermission")
-                    val nm = NotificationManagerCompat.from(context)
-                    nm.notify(requestCode, notification)
+                    runCatching {
+                        @android.annotation.SuppressLint("MissingPermission")
+                        val nm = NotificationManagerCompat.from(context)
+                        nm.notify(requestCode, notification)
+                    }
                 }
             }
 
@@ -109,6 +103,14 @@ class CourseReminderReceiver : BroadcastReceiver() {
             }
             Log.e(TAG, "Course reminder broadcast failed.", error)
         }
+    }
+}
+
+internal fun reminderRequestCodeFrom(intent: Intent): Int? {
+    return if (intent.hasExtra(CourseReminderScheduler.EXTRA_REQUEST_CODE)) {
+        intent.getIntExtra(CourseReminderScheduler.EXTRA_REQUEST_CODE, 0)
+    } else {
+        null
     }
 }
 

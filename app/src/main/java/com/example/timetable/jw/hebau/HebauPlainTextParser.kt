@@ -3,6 +3,10 @@ package com.example.timetable.jw.hebau
 private const val MAX_TEXT_WEEK = 60
 private const val MAX_TEXT_SECTION = 20
 private const val MAX_TEXT_WINDOW_LINES = 8
+private val whitespaceRegex = Regex("[\\t ]+")
+private val teacherNameLineRegex = Regex(
+    "^(?:[\\u4e00-\\u9fa5路]{2,8}(?:[銆?][\\u4e00-\\u9fa5路]{2,8})*|[A-Za-z][A-Za-z .'-]{1,48}(?:[,/][A-Za-z][A-Za-z .'-]{1,48})*)$",
+)
 
 data class HebauPlainTextParseResult(
     val courses: List<HebauRawCourse>,
@@ -88,7 +92,7 @@ object HebauPlainTextParser {
 
     private fun cleanText(text: String): String {
         return text
-            .replace(Regex("[\\t ]+"), " ")
+            .replace(whitespaceRegex, " ")
             .replace(Regex("\\s*([,，、；;:：()（）\\[\\]【】])\\s*"), "$1")
             .trim()
     }
@@ -252,7 +256,7 @@ object HebauPlainTextParser {
                 !lineHasTimingOrMetadata(line) &&
                 !isLocationToken(line) &&
                 !isCourseClassToken(line) &&
-                Regex("^[\\u4e00-\\u9fa5·]{2,8}(?:[、/][\\u4e00-\\u9fa5·]{2,8})*$").matches(line)
+                isTeacherNameLine(line)
         }
     }
 
@@ -315,13 +319,17 @@ object HebauPlainTextParser {
             isCourseClassToken(line) ||
             parseLabeledValue(line, listOf("授课教师", "任课教师", "教师姓名", "主讲教师", "教师", "老师")) != null ||
             parseLabeledValue(line, listOf("教学地点", "上课地点", "地点", "教室")) != null ||
-            Regex("^[\\u4e00-\\u9fa5·]{2,8}(?:[、/][\\u4e00-\\u9fa5·]{2,8})*$").matches(line)
+            isTeacherNameLine(line)
     }
 
     private fun isIgnoredCourseName(name: String): Boolean {
         val compact = name.replace(" ", "")
         return compact in setOf("课程表", "我的课表", "个人课表", "学期课表", "课程信息", "课程名称") ||
-            Regex("星期|周次|节次|上课时间|教学地点").containsMatchIn(compact)
+            isHeaderOrNoiseLine(name)
+    }
+
+    private fun isTeacherNameLine(line: String): Boolean {
+        return teacherNameLineRegex.matches(line)
     }
 }
 

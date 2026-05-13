@@ -38,7 +38,6 @@ if (configuredReleaseSigningInputs.isNotEmpty() && !hasReleaseSigning && release
 android {
     namespace = "com.example.timetable"
     compileSdk = 36
-    buildToolsVersion = "37.0.0"
 
     defaultConfig {
         applicationId = "com.example.timetable"

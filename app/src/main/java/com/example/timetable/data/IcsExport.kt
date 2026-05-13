@@ -93,6 +93,7 @@ object IcsExport {
                 append("INTERVAL=2;")
             }
             append("BYDAY=$byDay")
+            append(";COUNT=$MAX_EXPANDED_OCCURRENCES")
         }
         return baseEvent.copy(
             rrule = rule,

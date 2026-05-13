@@ -13,4 +13,8 @@
     <!-- Widget background colors -->
     <color name="widget_card_background">#E6282828</color>
     <color name="widget_course_item_background">#33FFFFFF</color>
+    <color name="widget_next_label">#8F4F2A</color>
+    <color name="widget_next_status">#A35B32</color>
+    <color name="widget_next_title">#2E241C</color>
+    <color name="widget_next_secondary">#46362A</color>
 </resources>

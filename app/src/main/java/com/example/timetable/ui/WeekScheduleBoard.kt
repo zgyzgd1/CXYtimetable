@@ -34,7 +34,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
@@ -429,10 +428,8 @@ private fun WeekEntryBlock(
             .graphicsLayer {
                 scaleX = animScale.value
                 scaleY = animScale.value
+                alpha = animAlpha.value
             }
-            .then(
-                if (animAlpha.value < 1f) Modifier.alpha(animAlpha.value) else Modifier
-            )
             .clip(AppShape.CardSmall)
             .border(
                 width = 1.dp,

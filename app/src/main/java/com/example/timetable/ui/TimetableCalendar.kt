@@ -172,32 +172,26 @@ fun PerpetualCalendar(
                         val dayContext = LocalContext.current
                         val haptic = LocalHapticFeedback.current
 
-                        val containerColor = if (isSelected || isToday) {
-                            animateColorAsState(
-                                targetValue = when {
-                                    isSelected -> MaterialTheme.colorScheme.primary
-                                    isToday -> MaterialTheme.colorScheme.primaryContainer
-                                    else -> Color.Transparent
-                                },
-                                animationSpec = tween(durationMillis = 350, easing = EaseInOutQuad),
-                                label = "calendarContainerColor",
-                            ).value
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant.hintContent()
+                        val targetContainerColor = when {
+                            isSelected -> MaterialTheme.colorScheme.primary
+                            isToday -> MaterialTheme.colorScheme.primaryContainer
+                            else -> MaterialTheme.colorScheme.surfaceVariant.hintContent()
                         }
-                        val textColor = if (isSelected || isToday) {
-                            animateColorAsState(
-                                targetValue = when {
-                                    isSelected -> MaterialTheme.colorScheme.onPrimary
-                                    isToday -> MaterialTheme.colorScheme.onPrimaryContainer
-                                    else -> MaterialTheme.colorScheme.onSurface
-                                },
-                                animationSpec = tween(durationMillis = 350, easing = EaseInOutQuad),
-                                label = "calendarTextColor",
-                            ).value
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
+                        val targetTextColor = when {
+                            isSelected -> MaterialTheme.colorScheme.onPrimary
+                            isToday -> MaterialTheme.colorScheme.onPrimaryContainer
+                            else -> MaterialTheme.colorScheme.onSurface
                         }
+                        val containerColor by animateColorAsState(
+                            targetValue = targetContainerColor,
+                            animationSpec = tween(durationMillis = 350, easing = EaseInOutQuad),
+                            label = "calendarContainerColor",
+                        )
+                        val textColor by animateColorAsState(
+                            targetValue = targetTextColor,
+                            animationSpec = tween(durationMillis = 350, easing = EaseInOutQuad),
+                            label = "calendarTextColor",
+                        )
 
                         Card(
                             modifier = Modifier

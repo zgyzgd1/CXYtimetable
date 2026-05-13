@@ -41,6 +41,7 @@ class AppDatabaseMigrationTest {
             assertEquals("ALL", migrated.weekRule)
             assertEquals("", migrated.customWeekList)
             assertEquals("", migrated.skipWeekList)
+            assertEquals("default", migrated.groupId)
             assertCurrentIndexesExist(database)
         } finally {
             database.close()
@@ -60,6 +61,7 @@ class AppDatabaseMigrationTest {
             assertEquals("legacy-v2", migrated.id)
             assertEquals("WEEKLY", migrated.recurrenceType)
             assertEquals("ODD", migrated.weekRule)
+            assertEquals("default", migrated.groupId)
             assertCurrentIndexesExist(database)
         } finally {
             database.close()
@@ -163,6 +165,8 @@ class AppDatabaseMigrationTest {
 
         assertTrue(indexes.contains("index_timetable_entries_date_startMinutes"))
         assertTrue(indexes.contains("index_timetable_entries_dayOfWeek"))
+        assertTrue(indexes.contains("index_timetable_entries_groupId_date_startMinutes"))
+        assertTrue(indexes.contains("index_timetable_entries_groupId_dayOfWeek"))
     }
 
     private companion object {

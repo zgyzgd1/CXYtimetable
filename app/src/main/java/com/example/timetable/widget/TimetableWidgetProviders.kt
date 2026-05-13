@@ -6,7 +6,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import java.util.concurrent.atomic.AtomicBoolean
+import com.example.timetable.util.OneTimeAction
 import kotlinx.coroutines.Job
 
 private const val WIDGET_PROVIDER_PENDING_RESULT_TIMEOUT_MS = 8_000L
@@ -59,13 +59,3 @@ abstract class TimetableWidgetProvider : AppWidgetProvider() {
 class TodayScheduleWidgetProvider : TimetableWidgetProvider()
 
 class NextCourseWidgetProvider : TimetableWidgetProvider()
-
-private class OneTimeAction {
-    private val fired = AtomicBoolean(false)
-
-    fun run(action: () -> Unit) {
-        if (fired.compareAndSet(false, true)) {
-            action()
-        }
-    }
-}

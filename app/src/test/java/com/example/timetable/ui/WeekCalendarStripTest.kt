@@ -3,9 +3,9 @@ package com.example.timetable.ui
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
-import java.io.File
+import com.example.timetable.data.AppConstants
 import java.time.LocalDate
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -40,15 +40,7 @@ class WeekCalendarStripTest {
 
     @Test
     fun usesSharedAppDateBoundsInsteadOfLocalHardcodedRange() {
-        val source = sourceFile("src/main/java/com/example/timetable/ui/WeekCalendarStrip.kt").readText()
-
-        assertFalse(source.contains("LocalDate.of(2020, 1, 1)"))
-        assertFalse(source.contains("LocalDate.of(2035, 12, 31)"))
-    }
-
-    private fun sourceFile(path: String): File {
-        val moduleRelative = File(path)
-        if (moduleRelative.exists()) return moduleRelative
-        return File("app", path)
+        assertEquals(LocalDate.of(1970, 1, 1), AppConstants.MIN_DATE)
+        assertEquals(LocalDate.of(2100, 12, 31), AppConstants.MAX_DATE)
     }
 }

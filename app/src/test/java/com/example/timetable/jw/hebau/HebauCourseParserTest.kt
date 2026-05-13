@@ -75,6 +75,39 @@ class HebauCourseParserTest {
     }
 
     @Test
+    fun parseDoesNotWeakMergeCoursesWithConflictingFields() {
+        val json = """
+            {
+              "courses": [
+                {
+                  "name": "Math",
+                  "teacher": "Teacher A",
+                  "position": "A-101",
+                  "day": 1,
+                  "startSection": 1,
+                  "endSection": 2,
+                  "weeks": [1]
+                },
+                {
+                  "name": "Math",
+                  "teacher": "Teacher B",
+                  "position": "B-202",
+                  "day": 1,
+                  "startSection": 1,
+                  "endSection": 2,
+                  "weeks": [1]
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = HebauCourseParser.parse(json)
+
+        assertEquals(2, result.payload.courses.size)
+        assertEquals(setOf("Teacher A", "Teacher B"), result.payload.courses.mapNotNull { it.teacher }.toSet())
+    }
+
+    @Test
     fun parseUsesPlainTextFallbackWhenStructuredCoursesAreEmpty() {
         val json = """
             {
@@ -120,5 +153,51 @@ class HebauCourseParserTest {
         assertEquals(1, result.payload.courses.size)
         assertEquals("Teacher A", result.payload.courses.single().teacher)
         assertEquals("A101", result.payload.courses.single().position)
+    }
+
+    @Test
+    fun parseRejectsWeekRangeAboveImportLimit() {
+        val json = """
+            {
+              "courses": [
+                {
+                  "name": "Unsafe Range",
+                  "day": 1,
+                  "startSection": 1,
+                  "endSection": 2,
+                  "weeks": "1-101"
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = HebauCourseParser.parse(json)
+
+        assertTrue(result.payload.courses.isEmpty())
+        assertEquals(1, result.errors.size)
+        assertTrue(result.errors.single().contains("weeks must be within 1..100"))
+    }
+
+    @Test
+    fun parseRejectsSingleWeekAboveImportLimit() {
+        val json = """
+            {
+              "courses": [
+                {
+                  "name": "Unsafe Week",
+                  "day": 1,
+                  "startSection": 1,
+                  "endSection": 2,
+                  "weeks": [101]
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val result = HebauCourseParser.parse(json)
+
+        assertTrue(result.payload.courses.isEmpty())
+        assertEquals(1, result.errors.size)
+        assertTrue(result.errors.single().contains("weeks must be within 1..100"))
     }
 }

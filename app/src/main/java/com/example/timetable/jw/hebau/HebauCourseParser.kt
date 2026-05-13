@@ -3,6 +3,8 @@ package com.example.timetable.jw.hebau
 import org.json.JSONArray
 import org.json.JSONObject
 
+private const val MAX_IMPORT_WEEK = 100
+
 object HebauCourseParser {
     fun parse(json: String): HebauParseResult {
         val root = runCatching { JSONObject(json) }
@@ -12,7 +14,7 @@ object HebauCourseParser {
 
         val errors = mutableListOf<String>()
         val coursesByKey = linkedMapOf<String, HebauRawCourse>()
-        val weakKeys = linkedMapOf<String, String>()
+        val weakKeys = linkedMapOf<String, MutableList<String>>()
         for (index in 0 until coursesArray.length()) {
             val item = coursesArray.optJSONObject(index)
             if (item == null) {
@@ -90,12 +92,11 @@ object HebauCourseParser {
         return when (value) {
             is JSONArray -> buildList {
                 for (index in 0 until value.length()) {
-                    val week = value.optInt(index, -1)
-                    if (week > 0) add(week)
+                    add(requireValidWeek(value.optInt(index, -1)))
                 }
             }
             is String -> parseWeekText(value)
-            is Number -> listOf(value.toInt())
+            is Number -> listOf(requireValidWeek(value.toInt()))
             else -> emptyList()
         }
     }
@@ -104,19 +105,27 @@ object HebauCourseParser {
         return text.split(',')
             .flatMap { token ->
                 val trimmed = token.trim()
-                if ('-' in trimmed) {
+                if (trimmed.isEmpty()) {
+                    emptyList()
+                } else if ('-' in trimmed) {
                     val parts = trimmed.split('-', limit = 2)
                     val start = parts.getOrNull(0)?.trim()?.toIntOrNull()
                     val end = parts.getOrNull(1)?.trim()?.toIntOrNull()
-                    if (start != null && end != null && start > 0 && end >= start) {
-                        (start..end).toList()
-                    } else {
-                        emptyList()
+                    if (start == null || end == null || start > end) {
+                        throw IllegalArgumentException("weeks range '$trimmed' is invalid.")
                     }
+                    requireValidWeek(start)
+                    requireValidWeek(end)
+                    (start..end).toList()
                 } else {
-                    listOfNotNull(trimmed.toIntOrNull())
+                    listOf(requireValidWeek(trimmed.toIntOrNull() ?: -1))
                 }
             }
+    }
+
+    private fun requireValidWeek(week: Int): Int {
+        require(week in 1..MAX_IMPORT_WEEK) { "weeks must be within 1..$MAX_IMPORT_WEEK." }
+        return week
     }
 
     private fun parseSectionTimes(array: JSONArray?, errors: MutableList<String>): List<HebauSectionTime> {
@@ -165,18 +174,33 @@ object HebauCourseParser {
 
     private fun addCourse(
         coursesByKey: MutableMap<String, HebauRawCourse>,
-        weakKeys: MutableMap<String, String>,
+        weakKeys: MutableMap<String, MutableList<String>>,
         course: HebauRawCourse,
     ) {
         val key = dedupeKey(course)
         val weakKey = weakDedupeKey(course)
-        val existingKey = coursesByKey[key]?.let { key } ?: weakKeys[weakKey]
+        val existingKey = coursesByKey[key]?.let { key }
+            ?: weakKeys[weakKey]?.firstOrNull { candidateKey ->
+                canWeakMerge(coursesByKey.getValue(candidateKey), course)
+            }
         if (existingKey != null) {
             coursesByKey[existingKey] = mergeCourse(coursesByKey.getValue(existingKey), course)
             return
         }
         coursesByKey[key] = course
-        weakKeys[weakKey] = key
+        weakKeys.getOrPut(weakKey) { mutableListOf() } += key
+    }
+
+    private fun canWeakMerge(existing: HebauRawCourse, candidate: HebauRawCourse): Boolean {
+        return compatibleField(existing.teacher, candidate.teacher) &&
+            compatibleField(existing.position, candidate.position) &&
+            compatibleField(existing.courseClass, candidate.courseClass)
+    }
+
+    private fun compatibleField(existing: String?, candidate: String?): Boolean {
+        val left = existing?.trim().orEmpty()
+        val right = candidate?.trim().orEmpty()
+        return left.isBlank() || right.isBlank() || left.equals(right, ignoreCase = true)
     }
 
     private fun mergeCourse(existing: HebauRawCourse, candidate: HebauRawCourse): HebauRawCourse {

@@ -4,6 +4,8 @@ import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.media.ExifInterface
 import android.net.Uri
 import androidx.core.graphics.scale
 import java.io.File
@@ -58,6 +60,7 @@ object BackgroundImageManager {
         contentResolver: ContentResolver,
         uri: Uri,
     ): Bitmap? {
+        val orientation = readExifOrientation(contentResolver, uri)
         val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         contentResolver.openInputStream(uri)?.use { stream ->
             BitmapFactory.decodeStream(stream, null, boundsOptions)
@@ -81,16 +84,57 @@ object BackgroundImageManager {
         } ?: return null
 
         val longestEdge = max(decodedBitmap.width, decodedBitmap.height)
-        if (longestEdge <= MAX_IMAGE_DIMENSION) {
-            return decodedBitmap
+        val scaledBitmap = if (longestEdge <= MAX_IMAGE_DIMENSION) {
+            decodedBitmap
+        } else {
+            val scale = MAX_IMAGE_DIMENSION.toFloat() / longestEdge.toFloat()
+            val targetWidth = (decodedBitmap.width * scale).roundToInt().coerceAtLeast(1)
+            val targetHeight = (decodedBitmap.height * scale).roundToInt().coerceAtLeast(1)
+            decodedBitmap.scale(targetWidth, targetHeight, filter = true).also { scaled ->
+                if (scaled !== decodedBitmap) {
+                    decodedBitmap.recycle()
+                }
+            }
+        }
+        return applyExifOrientation(scaledBitmap, orientation)
+    }
+
+    private fun readExifOrientation(
+        contentResolver: ContentResolver,
+        uri: Uri,
+    ): Int {
+        return runCatching {
+            contentResolver.openInputStream(uri)?.use { stream ->
+                ExifInterface(stream).getAttributeInt(
+                    ExifInterface.TAG_ORIENTATION,
+                    ExifInterface.ORIENTATION_NORMAL,
+                )
+            } ?: ExifInterface.ORIENTATION_NORMAL
+        }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+    }
+
+    internal fun applyExifOrientation(bitmap: Bitmap, orientation: Int): Bitmap {
+        val matrix = Matrix()
+        when (orientation) {
+            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.setScale(-1f, 1f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.setRotate(180f)
+            ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.setScale(1f, -1f)
+            ExifInterface.ORIENTATION_TRANSPOSE -> {
+                matrix.setScale(-1f, 1f)
+                matrix.postRotate(90f)
+            }
+            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.setRotate(90f)
+            ExifInterface.ORIENTATION_TRANSVERSE -> {
+                matrix.setScale(-1f, 1f)
+                matrix.postRotate(270f)
+            }
+            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.setRotate(270f)
+            else -> return bitmap
         }
 
-        val scale = MAX_IMAGE_DIMENSION.toFloat() / longestEdge.toFloat()
-        val targetWidth = (decodedBitmap.width * scale).roundToInt().coerceAtLeast(1)
-        val targetHeight = (decodedBitmap.height * scale).roundToInt().coerceAtLeast(1)
-        return decodedBitmap.scale(targetWidth, targetHeight, filter = true).also { scaled ->
-            if (scaled !== decodedBitmap) {
-                decodedBitmap.recycle()
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true).also { transformed ->
+            if (transformed !== bitmap) {
+                bitmap.recycle()
             }
         }
     }

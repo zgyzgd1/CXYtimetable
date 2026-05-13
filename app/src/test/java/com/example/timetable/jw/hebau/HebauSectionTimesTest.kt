@@ -1,6 +1,8 @@
 package com.example.timetable.jw.hebau
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HebauSectionTimesTest {
@@ -28,5 +30,17 @@ class HebauSectionTimesTest {
         assertEquals(9 * 60, resolved.getValue(1).endMinutes)
         assertEquals(8 * 60 + 55, resolved.getValue(2).startMinutes)
         assertEquals(10 * 60 + 10, resolved.getValue(3).startMinutes)
+    }
+
+    @Test
+    fun resolveRejectsInvalidDefaultTimesInsteadOfFallingBackToMidnight() {
+        val error = assertThrows(IllegalArgumentException::class.java) {
+            HebauSectionTimes.resolve(
+                defaultSectionTimes = listOf(HebauSectionTime(section = 1, start = "bad", end = "08:45")),
+                sectionTimes = emptyList(),
+            )
+        }
+
+        assertTrue(error.message.orEmpty().contains("default section 1"))
     }
 }

@@ -98,6 +98,9 @@ fun JwWebView(
                 mainWebView.reload()
             }
         },
+        onRelease = { container ->
+            container.destroyWebViews()
+        },
     )
 }
 
@@ -202,12 +205,29 @@ private data class JwWebViewState(
     val requestedUrl: String,
 )
 
+internal data class JwWebSettingsPolicy(
+    val mixedContentMode: Int,
+    val useWideViewPort: Boolean,
+    val loadWithOverviewMode: Boolean,
+    val zoomEnabled: Boolean,
+)
+
+internal fun jwWebSettingsPolicy(webMode: JwWebMode): JwWebSettingsPolicy {
+    return JwWebSettingsPolicy(
+        mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW,
+        useWideViewPort = true,
+        loadWithOverviewMode = true,
+        zoomEnabled = webMode == JwWebMode.DESKTOP,
+    )
+}
+
 @Suppress("DEPRECATION")
 @SuppressLint("SetJavaScriptEnabled")
 private fun WebSettings.configureForJwImport(
     webMode: JwWebMode,
     defaultUserAgent: String,
 ) {
+    val policy = jwWebSettingsPolicy(webMode)
     javaScriptEnabled = true
     domStorageEnabled = true
     databaseEnabled = true
@@ -218,16 +238,44 @@ private fun WebSettings.configureForJwImport(
     allowContentAccess = false
     allowFileAccessFromFileURLs = false
     allowUniversalAccessFromFileURLs = false
-    mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+    mixedContentMode = policy.mixedContentMode
     safeBrowsingEnabled = true
     cacheMode = WebSettings.LOAD_DEFAULT
     textZoom = 100
     userAgentString = JwUserAgent.forMode(webMode, defaultUserAgent)
-    useWideViewPort = webMode == JwWebMode.DESKTOP
-    loadWithOverviewMode = webMode == JwWebMode.DESKTOP
-    setSupportZoom(webMode == JwWebMode.DESKTOP)
-    builtInZoomControls = webMode == JwWebMode.DESKTOP
+    useWideViewPort = policy.useWideViewPort
+    loadWithOverviewMode = policy.loadWithOverviewMode
+    setSupportZoom(policy.zoomEnabled)
+    builtInZoomControls = policy.zoomEnabled
     displayZoomControls = false
+}
+
+private fun FrameLayout.destroyWebViews() {
+    for (index in childCount - 1 downTo 0) {
+        val child = getChildAt(index)
+        removeViewAt(index)
+        if (child is WebView) {
+            child.stopLoading()
+            child.webChromeClient = null
+            child.destroy()
+        } else if (child is ViewGroup) {
+            child.destroyNestedWebViews()
+        }
+    }
+}
+
+private fun ViewGroup.destroyNestedWebViews() {
+    for (index in childCount - 1 downTo 0) {
+        val child = getChildAt(index)
+        removeViewAt(index)
+        if (child is WebView) {
+            child.stopLoading()
+            child.webChromeClient = null
+            child.destroy()
+        } else if (child is ViewGroup) {
+            child.destroyNestedWebViews()
+        }
+    }
 }
 
 private fun Uri.isWebNavigation(): Boolean {

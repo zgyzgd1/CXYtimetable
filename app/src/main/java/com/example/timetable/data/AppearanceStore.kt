@@ -4,6 +4,9 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 
+internal const val MIN_WEEK_CARD_HUE = -180f
+internal const val MAX_WEEK_CARD_HUE = 180f
+
 enum class AppBackgroundMode(val storageValue: String) {
     BUNDLED_IMAGE("bundled_image"),
     CUSTOM_IMAGE("custom_image"),
@@ -247,11 +250,11 @@ object AppearanceStore {
 
     fun getWeekCardHue(context: Context): Float {
         return prefs(context).getFloat(KEY_WEEK_CARD_HUE, DEFAULT_WEEK_CARD_HUE)
-            .coerceIn(-180f, 180f)
+            .coerceIn(MIN_WEEK_CARD_HUE, MAX_WEEK_CARD_HUE)
     }
 
     fun setWeekCardHue(context: Context, value: Float) {
-        prefs(context).edit { putFloat(KEY_WEEK_CARD_HUE, value.coerceIn(-180f, 180f)) }
+        prefs(context).edit { putFloat(KEY_WEEK_CARD_HUE, value.coerceIn(MIN_WEEK_CARD_HUE, MAX_WEEK_CARD_HUE)) }
     }
 
     fun getWeekTimeSlots(context: Context): List<WeekTimeSlot> {

@@ -65,6 +65,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.timetable.data.AppBackgroundMode
+import com.example.timetable.data.MAX_WEEK_CARD_HUE
+import com.example.timetable.data.MIN_WEEK_CARD_HUE
 import com.example.timetable.data.TimetableGroup
 import com.example.timetable.notify.CourseReminderScheduler
 
@@ -365,8 +367,7 @@ private fun ImportMethodDialog(
                 }
             }
         },
-        confirmButton = {},
-        dismissButton = {
+        confirmButton = {
             TextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.action_cancel))
             }
@@ -528,7 +529,7 @@ private fun AppearanceDialog(
                     Slider(
                         value = weekCardHue,
                         onValueChange = onWeekCardHueChange,
-                        valueRange = 0f..360f,
+                        valueRange = MIN_WEEK_CARD_HUE..MAX_WEEK_CARD_HUE,
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),

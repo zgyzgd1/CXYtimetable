@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$Version,
-    [switch]$SkipTests
+    [switch]$SkipTests,
+    [string]$RepositoryFullName
 )
 
 Set-StrictMode -Version Latest
@@ -66,11 +67,36 @@ function Get-NextVersion {
     return "$major.$minor"
 }
 
+function ConvertTo-GitHubRepositoryFullName {
+    param([Parameter(Mandatory = $true)][string]$RemoteUrl)
+
+    $normalized = $RemoteUrl.Trim() -replace '\.git$', ''
+    if ($normalized -match '^git@github\.com:(?<repo>[^/]+/[^/]+)$') {
+        return $Matches.repo
+    }
+    if ($normalized -match '^https://github\.com/(?<repo>[^/]+/[^/]+)$') {
+        return $Matches.repo
+    }
+
+    throw "Unable to infer GitHub repository from remote URL '$RemoteUrl'. Pass -RepositoryFullName owner/name."
+}
+
+function Get-DefaultRepositoryFullName {
+    $remoteUrl = git remote get-url origin
+    if ($LASTEXITCODE -ne 0 -or -not $remoteUrl) {
+        throw "Unable to read origin remote URL. Pass -RepositoryFullName owner/name."
+    }
+
+    return ConvertTo-GitHubRepositoryFullName -RemoteUrl ($remoteUrl | Select-Object -First 1)
+}
+
 function Get-GitHubToken {
+    param([Parameter(Mandatory = $true)][string]$RepositoryFullName)
+
     $credentialRequest = @"
 protocol=https
 host=github.com
-path=zgyzgd1/CXYtimetable.git
+path=$RepositoryFullName.git
 
 "@
     $credential = $credentialRequest | git credential fill
@@ -88,6 +114,13 @@ path=zgyzgd1/CXYtimetable.git
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
+
+$resolvedRepositoryFullName = if ($RepositoryFullName) {
+    $RepositoryFullName
+} else {
+    Get-DefaultRepositoryFullName
+}
+$githubApiBaseUri = "https://api.github.com/repos/$resolvedRepositoryFullName"
 
 $scriptPath = "scripts/publish-release.ps1"
 $status = git status --porcelain -- .
@@ -178,7 +211,7 @@ try {
     Invoke-Git -Args @("tag", "-a", $tag, "-m", "Release $tag")
     Invoke-Git -Args @("push", "origin", $tag)
 
-    $token = Get-GitHubToken
+    $token = Get-GitHubToken -RepositoryFullName $resolvedRepositoryFullName
     $headers = @{
         Authorization = "Bearer $token"
         Accept = "application/vnd.github+json"
@@ -187,7 +220,7 @@ try {
     }
 
     try {
-        $release = Invoke-RestMethod -Method Get -Headers $headers -Uri "https://api.github.com/repos/zgyzgd1/CXYtimetable/releases/tags/$tag"
+        $release = Invoke-RestMethod -Method Get -Headers $headers -Uri "$githubApiBaseUri/releases/tags/$tag"
     } catch {
         $body = @{
             tag_name = $tag
@@ -202,11 +235,11 @@ Asset:
             draft = $false
             prerelease = $false
         } | ConvertTo-Json
-        $release = Invoke-RestMethod -Method Post -Headers $headers -Uri "https://api.github.com/repos/zgyzgd1/CXYtimetable/releases" -Body $body -ContentType "application/json"
+        $release = Invoke-RestMethod -Method Post -Headers $headers -Uri "$githubApiBaseUri/releases" -Body $body -ContentType "application/json"
     }
 
     foreach ($existing in @($release.assets | Where-Object { $_.name -eq $assetName })) {
-        Invoke-RestMethod -Method Delete -Headers $headers -Uri "https://api.github.com/repos/zgyzgd1/CXYtimetable/releases/assets/$($existing.id)" | Out-Null
+        Invoke-RestMethod -Method Delete -Headers $headers -Uri "$githubApiBaseUri/releases/assets/$($existing.id)" | Out-Null
     }
 
     $uploadUrl = ($release.upload_url -replace '\{\?name,label\}$', '') + "?name=$assetName"
@@ -218,7 +251,7 @@ Asset:
     } -Uri $uploadUrl -InFile $releaseAssetPath -UseBasicParsing | Out-Null
 
     Write-Host "Published $tag"
-    Write-Host "Release URL: https://github.com/zgyzgd1/CXYtimetable/releases/tag/$tag"
+    Write-Host "Release URL: https://github.com/$resolvedRepositoryFullName/releases/tag/$tag"
     Write-Host "Asset: $releaseAssetPath"
 } catch {
     Set-PropertyValue -Path $propertiesPath -Name "APP_VERSION_NAME" -Value $currentVersion

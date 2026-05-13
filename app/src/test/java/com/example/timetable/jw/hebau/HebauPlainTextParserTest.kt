@@ -50,4 +50,14 @@ class HebauPlainTextParserTest {
         assertEquals(6, course.endSection)
         assertEquals((2..10).toList(), course.weeks)
     }
+
+    @Test
+    fun parseReadsEnglishTeacherFromMultilineCourseBlock() {
+        val result = HebauPlainTextParser.parse(
+            "Plant Physiology\nTeacher A\n\u661F\u671F\u56DB\n\u7B2C5-6\u8282\n\u7B2C2-10\u5468",
+        )
+
+        assertEquals(1, result.courses.size)
+        assertEquals("Teacher A", result.courses.single().teacher)
+    }
 }

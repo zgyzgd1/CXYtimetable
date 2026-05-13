@@ -33,14 +33,16 @@ object IcsImport {
                     val rawValue = line.substring(separatorIndex + 1)
                     val key = rawKey.substringBefore(';').uppercase()
                     val value = icsUnescapeText(rawValue)
+                    val params = rawKey.split(';').drop(1)
 
-                    val tzid = rawKey
-                        .split(';')
-                        .drop(1)
-                        .firstNotNullOfOrNull { token ->
+                    val tzid = params.firstNotNullOfOrNull { token ->
                             val name = token.substringBefore('=').uppercase()
                             if (name == "TZID") token.substringAfter('=', "").ifBlank { null } else null
                         }
+                    val valueType = params.firstNotNullOfOrNull { token ->
+                        val name = token.substringBefore('=').uppercase()
+                        if (name == "VALUE") token.substringAfter('=', "").ifBlank { null } else null
+                    }
 
                     current[key] = if (key in icsMultiValueKeys && current[key] != null) {
                         "${current[key]},$value"
@@ -56,6 +58,9 @@ object IcsImport {
                             tzid
                         }
                     }
+                    if (valueType != null) {
+                        current["${key}_VALUE"] = valueType
+                    }
                 }
             }
         }
@@ -65,7 +70,10 @@ object IcsImport {
 
     private fun parseEventEntries(fields: Map<String, String>): List<TimetableEntry> {
         val occurrence = parseOccurrence(fields) ?: return emptyList()
-        val uidBase = fields["UID"]?.trim().orEmpty().ifBlank { UUID.randomUUID().toString() }
+        val uid = fields["UID"]?.trim().orEmpty().ifBlank { UUID.randomUUID().toString() }
+        val uidBase = fields["RECURRENCE-ID"]?.trim()?.ifBlank { null }?.let { recurrenceId ->
+            "$uid#$recurrenceId"
+        } ?: uid
         val exDates = parseExDates(fields, fields["DTSTART_TZID"])
 
         val rrule = parseRRule(fields["RRULE"].orEmpty(), fields["DTSTART_TZID"])
@@ -220,12 +228,14 @@ object IcsImport {
         val interval = parts["INTERVAL"]?.toIntOrNull()?.coerceAtLeast(1) ?: 1
         val until = parts["UNTIL"]?.let { icsParseDateTime(it, defaultTzid) }
         val count = parts["COUNT"]?.toIntOrNull()?.coerceAtLeast(1)
-        val byDays = parts["BYDAY"]
+        val byDayTokens = parts["BYDAY"]
             ?.split(',')
-            ?.mapNotNull(::parseByDay)
-            ?.distinct()
-            ?.sortedBy { it.value }
+            ?.map { it.trim() }
+            ?.filter { it.isNotBlank() }
             .orEmpty()
+        val parsedByDays = byDayTokens.mapNotNull(::parseByDay)
+        if (parsedByDays.size != byDayTokens.size) return null
+        val byDays = parsedByDays.distinct().sortedBy { it.value }
         return IcsRecurrenceRule(freq = freq, interval = interval, until = until, count = count, byDays = byDays)
     }
 
@@ -285,7 +295,20 @@ object IcsImport {
             }
         }
 
-        return entries.distinctBy { it.id }
+        return entries.withUniqueImportedIds()
+    }
+
+    private fun List<TimetableEntry>.withUniqueImportedIds(): List<TimetableEntry> {
+        val seen = mutableMapOf<String, Int>()
+        return map { entry ->
+            val duplicateIndex = seen.getOrDefault(entry.id, 0)
+            seen[entry.id] = duplicateIndex + 1
+            if (duplicateIndex == 0) {
+                entry
+            } else {
+                entry.copy(id = "${entry.id}#$duplicateIndex")
+            }
+        }
     }
 
     private fun parseMetadataEntryGroup(fieldGroup: List<Map<String, String>>): TimetableEntry? {
@@ -375,8 +398,17 @@ object IcsImport {
 
         val startTzid = fields["DTSTART_TZID"]
         val endTzid = fields["DTEND_TZID"] ?: startTzid
+        val startIsDateOnly = fields["DTSTART_VALUE"].equals("DATE", ignoreCase = true) || startText.trim().matches(Regex("\\d{8}"))
+        val endIsDateOnly = fields["DTEND_VALUE"].equals("DATE", ignoreCase = true) || endText?.trim()?.matches(Regex("\\d{8}")) == true
         val start = icsParseDateTime(startText, startTzid) ?: return null
-        val end = icsParseDateTime(endText ?: "", endTzid) ?: start.plusHours(1)
+        val end = icsParseDateTime(endText ?: "", endTzid) ?: if (startIsDateOnly) {
+            start.plusDays(1)
+        } else {
+            start.plusHours(1)
+        }
+        if (startIsDateOnly && endIsDateOnly && !end.toLocalDate().isAfter(start.toLocalDate())) {
+            return null
+        }
         if (!end.isAfter(start)) return null
 
         return IcsParsedOccurrence(

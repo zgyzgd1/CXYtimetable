@@ -93,11 +93,7 @@ fun BackgroundTintOverlays(modifier: Modifier = Modifier) {
                         Color.Black.overlayLight(),
                     ),
                 ),
-            ),
-    )
-
-    Box(
-        modifier = modifier
+            )
             .background(
                 Brush.horizontalGradient(
                     colors = listOf(
@@ -106,11 +102,7 @@ fun BackgroundTintOverlays(modifier: Modifier = Modifier) {
                         Color.Transparent,
                     ),
                 ),
-            ),
-    )
-
-    Box(
-        modifier = modifier
+            )
             .background(
                 Brush.verticalGradient(
                     colors = listOf(

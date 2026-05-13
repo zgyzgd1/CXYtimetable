@@ -102,7 +102,7 @@ internal fun WeekViewContent(
             Surface(
                 onClick = onEditFixedWeekSchedule,
                 shape = AppShape.Chip,
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                color = MaterialTheme.colorScheme.surfaceVariant.overlayHeavy(),
                 contentColor = MaterialTheme.colorScheme.onSurface,
             ) {
                 Text(
@@ -116,7 +116,7 @@ internal fun WeekViewContent(
                 Surface(
                     onClick = { onDateChanged(today.toString()) },
                     shape = AppShape.Chip,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                    color = MaterialTheme.colorScheme.primary.accentMedium(),
                     contentColor = MaterialTheme.colorScheme.primary,
                 ) {
                     Text(

@@ -214,6 +214,68 @@ class IcsCalendarTest {
     }
 
     @Test
+    fun parseAllDayDateEventWithoutDtEndUsesFullDay() {
+        val content = """
+            BEGIN:VCALENDAR
+            VERSION:2.0
+            PRODID:-//Test//CN
+            BEGIN:VEVENT
+            UID:all-day
+            SUMMARY:Exam Day
+            DTSTART;VALUE=DATE:20260413
+            END:VEVENT
+            END:VCALENDAR
+        """.trimIndent()
+
+        val parsed = IcsCalendar.parse(content)
+
+        assertEquals(1, parsed.size)
+        assertEquals(0, parsed.single().startMinutes)
+        assertEquals(24 * 60, parsed.single().endMinutes)
+    }
+
+    @Test(timeout = 1000)
+    fun parseUnsupportedOrdinalMonthlyByDayDoesNotExpandAsPlainMonthly() {
+        val content = """
+            BEGIN:VCALENDAR
+            VERSION:2.0
+            PRODID:-//Test//CN
+            BEGIN:VEVENT
+            UID:monthly-ordinal
+            SUMMARY:Faculty Meeting
+            DTSTART;TZID=Asia/Shanghai:20260414T080000
+            DTEND;TZID=Asia/Shanghai:20260414T090000
+            RRULE:FREQ=MONTHLY;BYDAY=2TU
+            END:VEVENT
+            END:VCALENDAR
+        """.trimIndent()
+
+        val parsed = IcsCalendar.parse(content)
+
+        assertEquals(1, parsed.size)
+        assertEquals("2026-04-14", parsed.single().date)
+    }
+
+    @Test
+    fun writeWeeklyEntryBoundsRRule() {
+        val entry = TimetableEntry(
+            id = "bounded-weekly",
+            title = "Operating Systems",
+            date = "2026-03-02",
+            dayOfWeek = 1,
+            startMinutes = 8 * 60,
+            endMinutes = 9 * 60,
+            recurrenceType = RecurrenceType.WEEKLY.name,
+            semesterStartDate = "2026-03-02",
+            weekRule = WeekRule.ALL.name,
+        )
+
+        val text = IcsCalendar.write(listOf(entry))
+
+        assertTrue(text.contains("RRULE:FREQ=WEEKLY;BYDAY=MO;COUNT=512"))
+    }
+
+    @Test
     fun writeFoldsLongUtf8LinesAndRemainsParsable() {
         val entry = TimetableEntry(
             id = "long-note",
@@ -258,5 +320,60 @@ class IcsCalendarTest {
 
         assertEquals(2, parsed.size)
         assertEquals(setOf("event-a", "event-b"), parsed.map { it.id }.toSet())
+    }
+
+    @Test
+    fun parseKeepsRecurrenceOverridesWithSameUid() {
+        val content = """
+            BEGIN:VCALENDAR
+            VERSION:2.0
+            PRODID:-//Test//CN
+            BEGIN:VEVENT
+            UID:event-a
+            SUMMARY:Database
+            DTSTART;TZID=Asia/Shanghai:20260413T080000
+            DTEND;TZID=Asia/Shanghai:20260413T090000
+            END:VEVENT
+            BEGIN:VEVENT
+            UID:event-a
+            RECURRENCE-ID;TZID=Asia/Shanghai:20260420T080000
+            SUMMARY:Database
+            DTSTART;TZID=Asia/Shanghai:20260420T100000
+            DTEND;TZID=Asia/Shanghai:20260420T110000
+            END:VEVENT
+            END:VCALENDAR
+        """.trimIndent()
+
+        val parsed = IcsCalendar.parse(content)
+
+        assertEquals(2, parsed.size)
+        assertEquals(setOf("event-a", "event-a#20260420T080000"), parsed.map { it.id }.toSet())
+    }
+
+    @Test
+    fun parseKeepsDuplicateUidEventsWithUniqueImportedIds() {
+        val content = """
+            BEGIN:VCALENDAR
+            VERSION:2.0
+            PRODID:-//Test//CN
+            BEGIN:VEVENT
+            UID:event-a
+            SUMMARY:Database A
+            DTSTART;TZID=Asia/Shanghai:20260413T080000
+            DTEND;TZID=Asia/Shanghai:20260413T090000
+            END:VEVENT
+            BEGIN:VEVENT
+            UID:event-a
+            SUMMARY:Database B
+            DTSTART;TZID=Asia/Shanghai:20260414T080000
+            DTEND;TZID=Asia/Shanghai:20260414T090000
+            END:VEVENT
+            END:VCALENDAR
+        """.trimIndent()
+
+        val parsed = IcsCalendar.parse(content)
+
+        assertEquals(2, parsed.size)
+        assertEquals(setOf("event-a", "event-a#1"), parsed.map { it.id }.toSet())
     }
 }

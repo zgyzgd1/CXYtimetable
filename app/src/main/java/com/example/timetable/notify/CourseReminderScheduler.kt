@@ -619,14 +619,13 @@ object CourseReminderScheduler {
         startMinutes: Int,
         reminderMinutes: Int,
     ): Long? {
-        return runCatching {
-            val start = LocalTime.of(startMinutes / 60, startMinutes % 60)
-            occurrenceDate.atTime(start)
-                .atZone(systemZone)
-                .minusMinutes(reminderMinutes.toLong())
-                .toInstant()
-                .toEpochMilli()
-        }.getOrNull()
+        if (startMinutes !in 0 until 24 * 60 || reminderMinutes <= 0) return null
+        val start = LocalTime.of(startMinutes / 60, startMinutes % 60)
+        return occurrenceDate.atTime(start)
+            .atZone(systemZone)
+            .minusMinutes(reminderMinutes.toLong())
+            .toInstant()
+            .toEpochMilli()
     }
 
     /**

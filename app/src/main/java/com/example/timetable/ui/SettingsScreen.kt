@@ -48,6 +48,8 @@ import com.example.timetable.BuildConfig
 import com.example.timetable.R
 import com.example.timetable.data.AppBackgroundMode
 import com.example.timetable.data.BackgroundAppearance
+import com.example.timetable.data.MAX_WEEK_CARD_HUE
+import com.example.timetable.data.MIN_WEEK_CARD_HUE
 import com.example.timetable.notify.CourseReminderScheduler
 
 @Composable
@@ -190,7 +192,7 @@ fun SettingsScreen(
                 Slider(
                     value = weekCardHue,
                     onValueChange = onWeekCardHueChange,
-                    valueRange = -180f..180f,
+                    valueRange = MIN_WEEK_CARD_HUE..MAX_WEEK_CARD_HUE,
                     steps = 36,
                 )
             }

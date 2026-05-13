@@ -60,6 +60,9 @@ object EntryValidator {
      * @return 验证错误，或 null 表示验证通过
      */
     fun validate(entry: TimetableEntry): EntryValidationError? {
+        val title = entry.title.trim()
+        val location = entry.location.trim()
+        val note = entry.note.trim()
         val recurrence = resolveRecurrenceType(entry.recurrenceType)
             ?: return EntryValidationError.InvalidRecurrence
         val weekRule = resolveWeekRule(entry.weekRule)
@@ -75,10 +78,10 @@ object EntryValidator {
             ?.let { parseEntryDate(it) }
 
         return when {
-            entry.title.isBlank() -> EntryValidationError.EmptyTitle
-            entry.title.length > EntryConstants.MAX_TITLE_LENGTH -> EntryValidationError.TitleTooLong
-            entry.location.length > EntryConstants.MAX_LOCATION_LENGTH -> EntryValidationError.LocationTooLong
-            entry.note.length > EntryConstants.MAX_NOTE_LENGTH -> EntryValidationError.NoteTooLong
+            title.isBlank() -> EntryValidationError.EmptyTitle
+            title.length > EntryConstants.MAX_TITLE_LENGTH -> EntryValidationError.TitleTooLong
+            location.length > EntryConstants.MAX_LOCATION_LENGTH -> EntryValidationError.LocationTooLong
+            note.length > EntryConstants.MAX_NOTE_LENGTH -> EntryValidationError.NoteTooLong
             entry.startMinutes !in 0 until EntryConstants.MINUTES_PER_DAY -> EntryValidationError.InvalidStartTime
             entry.endMinutes !in 1..EntryConstants.MINUTES_PER_DAY -> EntryValidationError.InvalidEndTime
             entry.startMinutes >= entry.endMinutes -> EntryValidationError.EndBeforeStart

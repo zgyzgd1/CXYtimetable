@@ -17,6 +17,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -86,8 +87,10 @@ fun EntryEditorDialog(
 
     // Auto-fill semester start date from global config if empty
     val globalSemesterDate = remember { SemesterStore.getSemesterStartDate(context) }
-    if (semesterStartDateText.isBlank() && globalSemesterDate != null && recurrenceType == RecurrenceType.WEEKLY) {
-        semesterStartDateText = globalSemesterDate.toString()
+    LaunchedEffect(recurrenceType, globalSemesterDate) {
+        if (semesterStartDateText.isBlank() && globalSemesterDate != null && recurrenceType == RecurrenceType.WEEKLY) {
+            semesterStartDateText = globalSemesterDate.toString()
+        }
     }
 
     AlertDialog(

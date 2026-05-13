@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.example.timetable.util.OneTimeAction
 import com.example.timetable.widget.TimetableWidgetUpdater
 
 private const val EXACT_ALARM_PERMISSION_STATE_CHANGED =
