@@ -5,6 +5,8 @@ build/
 app/build/
 local.properties
 .idea/
+.lingma/
+.vscode/
 *.iml
 .DS_Store
 apk-archive-repo/
