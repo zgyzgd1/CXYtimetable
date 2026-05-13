@@ -16,7 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.timetable.R
@@ -62,7 +62,7 @@ fun ScheduleDialogOverlays(
     onWeekTimeSlotsChange: (List<WeekTimeSlot>) -> Unit,
 ) {
     val context = LocalContext.current
-    val resources = LocalResources.current
+    val resources = LocalContext.current.resources
     val scope = rememberCoroutineScope()
 
     deletingEntry?.let { toDelete ->

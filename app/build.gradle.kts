@@ -38,12 +38,13 @@ if (configuredReleaseSigningInputs.isNotEmpty() && !hasReleaseSigning && release
 
 android {
     namespace = "com.example.timetable"
-    compileSdk = 34
+    compileSdk = 36
+    buildToolsVersion = "37.0.0"
 
     defaultConfig {
         applicationId = "com.example.timetable"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName
     }
@@ -95,19 +96,19 @@ ksp {
 }
 
 dependencies {
-    implementation(platform("androidx.compose:compose-bom:2024.02.00"))
-    implementation("androidx.activity:activity-compose:1.8.2")
-    implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
-    implementation("com.kizitonwose.calendar:compose:2.5.0")
+    implementation(platform("androidx.compose:compose-bom:2024.10.00"))
+    implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    implementation("com.kizitonwose.calendar:compose:2.6.2")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("com.google.android.material:material:1.11.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("com.google.android.material:material:1.12.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
@@ -116,8 +117,8 @@ dependencies {
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion")
-    implementation("androidx.work:work-runtime-ktx:2.9.0")
-    testImplementation(platform("androidx.compose:compose-bom:2024.02.00"))
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+    testImplementation(platform("androidx.compose:compose-bom:2024.10.00"))
     testImplementation("androidx.compose.ui:ui-test-junit4")
     testImplementation("org.robolectric:robolectric:4.11.1")
     testImplementation("androidx.test.ext:junit:1.1.5")

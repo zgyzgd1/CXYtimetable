@@ -14,7 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.timetable.data.AppBackgroundMode
 import com.example.timetable.data.AppearanceStore
@@ -50,7 +50,7 @@ internal fun DayScheduleList(
     callbacks: DayListCallbacks,
 ) {
     val context = LocalContext.current
-    val resources = LocalResources.current
+    val resources = LocalContext.current.resources
     val scope = rememberCoroutineScope()
     LazyColumn(
         modifier = Modifier.fillMaxSize(),

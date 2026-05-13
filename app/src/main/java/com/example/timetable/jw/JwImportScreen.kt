@@ -40,7 +40,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -67,7 +67,7 @@ fun JwImportScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val resources = LocalResources.current
+    val resources = LocalContext.current.resources
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var webView by remember { mutableStateOf<WebView?>(null) }

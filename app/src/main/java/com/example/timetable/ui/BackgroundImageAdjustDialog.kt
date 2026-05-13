@@ -35,7 +35,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -56,14 +56,12 @@ fun BackgroundImageAdjustDialog(
     onSave: (BackgroundImageTransform) -> Unit,
 ) {
     val context = LocalContext.current
-    val windowInfo = LocalWindowInfo.current
+    val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val customBackground by produceState<ImageBitmap?>(initialValue = null, backgroundAppearance.revision) {
         value = withContext(Dispatchers.IO) {
-            BackgroundImageManager.customBackgroundFile(context)
-                .takeIf { it.isFile }
-                ?.let { file -> BitmapFactory.decodeFile(file.absolutePath) }
-                ?.asImageBitmap()
+            val file = BackgroundImageManager.customBackgroundFile(context)
+            if (file.isFile) BitmapFactory.decodeFile(file.absolutePath)?.asImageBitmap() else null
         }
     }
 
@@ -77,9 +75,8 @@ fun BackgroundImageAdjustDialog(
         mutableFloatStateOf(backgroundAppearance.imageTransform.verticalBias)
     }
 
-    val containerSizePx = windowInfo.containerSize
-    val screenWidthDp = with(density) { containerSizePx.width.toDp().value }
-    val screenHeightDp = with(density) { containerSizePx.height.toDp().value }
+    val screenWidthDp = configuration.screenWidthDp.toFloat()
+    val screenHeightDp = configuration.screenHeightDp.toFloat()
     val previewAspectRatio = (
         screenWidthDp /
             screenHeightDp.coerceAtLeast(1f)
