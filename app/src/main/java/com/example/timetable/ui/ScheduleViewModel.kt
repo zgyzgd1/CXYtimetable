@@ -37,14 +37,18 @@ import java.io.FileNotFoundException
 import java.io.IOException
 import java.io.InputStream
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -55,6 +59,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 private const val MAX_ICS_IMPORT_BYTES = 1024 * 1024
+private const val ENTRY_SIDE_EFFECT_DEBOUNCE_MS = 300L
 
 /**
  * 课程表视图模型。
@@ -101,7 +106,7 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             TimetableRepository.ensureMigrated(getApplication())
             _activeGroupId.value = TimetableRepository.resolveActiveGroupId(getApplication())
-            entries.collect { currentEntries ->
+            entries.debouncedEntrySideEffects().collect { currentEntries ->
                 syncReminders(currentEntries)
                 refreshWidgets(currentEntries)
             }
@@ -140,10 +145,13 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
      * @param entry 课程条目
      * @return 冲突的课程条目，或 null 如果没有冲突
      */
-    fun previewConflict(entry: TimetableEntry): TimetableEntry? {
+    suspend fun previewConflict(entry: TimetableEntry): TimetableEntry? {
         val normalized = normalizeEntry(entry)
         if (validateEntry(normalized) != null) return null
-        return findConflictForEntry(normalized, entries.value)
+        val entriesSnapshot = entries.value
+        return runConflictCalculation {
+            findConflictForEntry(normalized, entriesSnapshot)
+        }
     }
 
     /**
@@ -154,10 +162,13 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
      * @param entry 课程条目
      * @return 调整后的课程条目，或 null 如果无法解决冲突
      */
-    fun suggestResolvedEntry(entry: TimetableEntry): TimetableEntry? {
+    suspend fun suggestResolvedEntry(entry: TimetableEntry): TimetableEntry? {
         val normalized = normalizeEntry(entry)
         if (validateEntry(normalized) != null) return null
-        return suggestAdjustedEntryAfterConflicts(normalized, entries.value)
+        val entriesSnapshot = entries.value
+        return runConflictCalculation {
+            suggestAdjustedEntryAfterConflicts(normalized, entriesSnapshot)
+        }
     }
 
     /**
@@ -174,20 +185,24 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
             postMessage(getApplication<Application>().getString(R.string.vm_save_failed, it))
             return
         }
-        val conflict = findConflictForEntry(normalized, entries.value)
-        if (conflict != null && !allowConflict) {
-            postMessage(
-                getApplication<Application>().getString(
-                    R.string.vm_conflict_detected,
-                    conflict.title,
-                    formatMinutes(conflict.startMinutes),
-                    formatMinutes(conflict.endMinutes),
-                ),
-            )
-            return
-        }
+        val entriesSnapshot = entries.value
 
         viewModelScope.launch {
+            val conflict = runConflictCalculation {
+                findConflictForEntry(normalized, entriesSnapshot)
+            }
+            if (conflict != null && !allowConflict) {
+                postMessage(
+                    getApplication<Application>().getString(
+                        R.string.vm_conflict_detected,
+                        conflict.title,
+                        formatMinutes(conflict.startMinutes),
+                        formatMinutes(conflict.endMinutes),
+                    ),
+                )
+                return@launch
+            }
+
             TimetableRepository.upsertEntry(getApplication(), normalized)
 
             if (conflict == null) {
@@ -513,6 +528,22 @@ internal fun countImportConflicts(
     val internalConflicts = countConflictPairs(validEntries)
     val existingConflicts = countConflictPairsBetween(validEntries, existingEntries)
     return internalConflicts + existingConflicts
+}
+
+internal suspend fun <T> runConflictCalculation(
+    dispatcher: CoroutineDispatcher = Dispatchers.Default,
+    block: () -> T,
+): T {
+    return withContext(dispatcher) {
+        block()
+    }
+}
+
+@OptIn(FlowPreview::class)
+internal fun Flow<List<TimetableEntry>>.debouncedEntrySideEffects(
+    debounceMillis: Long = ENTRY_SIDE_EFFECT_DEBOUNCE_MS,
+): Flow<List<TimetableEntry>> {
+    return debounce(debounceMillis)
 }
 
 internal fun readLimitedUtf8Text(inputStream: InputStream, maxBytes: Int): String {

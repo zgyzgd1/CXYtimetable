@@ -16,7 +16,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.timetable.R
@@ -143,16 +142,18 @@ fun ScheduleDialogOverlays(
                 onEditingEntryChange(null)
             },
             onSave = { updatedEntry ->
-                val conflict = viewModel.previewConflict(updatedEntry)
-                if (conflict != null) {
-                    onPendingConflictChange(
-                        PendingEntryConflict(
-                            updatedEntry = updatedEntry,
-                            conflictEntry = conflict,
-                        ),
-                    )
-                } else {
-                    applyEntrySave(updatedEntry, false)
+                scope.launch {
+                    val conflict = viewModel.previewConflict(updatedEntry)
+                    if (conflict != null) {
+                        onPendingConflictChange(
+                            PendingEntryConflict(
+                                updatedEntry = updatedEntry,
+                                conflictEntry = conflict,
+                            ),
+                        )
+                    } else {
+                        applyEntrySave(updatedEntry, false)
+                    }
                 }
             },
         )
@@ -164,13 +165,13 @@ fun ScheduleDialogOverlays(
                 conflictEndMinutes = state.conflictEntry.endMinutes,
                 onSaveAnyway = { applyEntrySave(state.updatedEntry, true) },
                 onDeferAndSave = {
-                    val adjusted = viewModel.suggestResolvedEntry(state.updatedEntry)
-                    if (adjusted == null) {
-                        scope.launch {
+                    scope.launch {
+                        val adjusted = viewModel.suggestResolvedEntry(state.updatedEntry)
+                        if (adjusted == null) {
                             snackbarHostState.showSnackbar(resources.getString(R.string.msg_no_deferrable_slot))
+                        } else {
+                            applyEntrySave(adjusted, false)
                         }
-                    } else {
-                        applyEntrySave(adjusted, false)
                     }
                 },
                 onGoBack = { onPendingConflictChange(null) },

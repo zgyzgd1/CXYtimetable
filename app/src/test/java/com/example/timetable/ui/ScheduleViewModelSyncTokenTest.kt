@@ -1,6 +1,12 @@
 package com.example.timetable.ui
 
 import com.example.timetable.data.TimetableEntry
+import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -9,6 +15,55 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ScheduleViewModelSyncTokenTest {
+    @Test
+    fun runConflictCalculationUsesProvidedDispatcher() = runBlocking {
+        val executor = Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "conflict-calculation-worker")
+        }
+        val dispatcher = executor.asCoroutineDispatcher()
+        try {
+            val threadName = runConflictCalculation(dispatcher) {
+                Thread.currentThread().name
+            }
+
+            assertTrue(threadName.contains("conflict-calculation-worker"))
+        } finally {
+            dispatcher.close()
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
+    fun debouncedEntrySideEffectsSuppressesTransientInitialEmptyList() = runBlocking {
+        val upstream = MutableStateFlow(emptyList<TimetableEntry>())
+        val received = mutableListOf<List<TimetableEntry>>()
+        val loadedEntries = listOf(sampleEntry())
+        val job = launch(start = CoroutineStart.UNDISPATCHED) {
+            upstream.debouncedEntrySideEffects(debounceMillis = 40).collect(received::add)
+        }
+
+        delay(10)
+        upstream.value = loadedEntries
+        delay(80)
+        job.cancel()
+
+        assertEquals(listOf(loadedEntries), received)
+    }
+
+    @Test
+    fun debouncedEntrySideEffectsStillEmitsSettledEmptyList() = runBlocking {
+        val upstream = MutableStateFlow(emptyList<TimetableEntry>())
+        val received = mutableListOf<List<TimetableEntry>>()
+        val job = launch(start = CoroutineStart.UNDISPATCHED) {
+            upstream.debouncedEntrySideEffects(debounceMillis = 40).collect(received::add)
+        }
+
+        delay(80)
+        job.cancel()
+
+        assertEquals(listOf(emptyList<TimetableEntry>()), received)
+    }
+
     @Test
     fun reminderSyncTokenIsStableForSameEntriesAndReminderMinutes() {
         val entries = listOf(sampleEntry())

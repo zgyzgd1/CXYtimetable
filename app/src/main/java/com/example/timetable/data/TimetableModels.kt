@@ -78,6 +78,8 @@ data class TimetableEntry(
             require(startMinutes < endMinutes) { "结束时间需要晚于开始时间" }
             require(resolveRecurrenceType(recurrenceType) != null) { "重复规则无效: $recurrenceType" }
             require(resolveWeekRule(weekRule) != null) { "周次规则无效: $weekRule" }
+            // groupId is allowed to be blank — ifBlank defaults to DEFAULT_ID as a convenience;
+            // this is intentionally more lenient than other fields since empty means "use default group".
             if (semesterStartDate.isNotBlank()) {
                 require(parseEntryDate(semesterStartDate) != null) { "学期开学日期无效: $semesterStartDate" }
             }
